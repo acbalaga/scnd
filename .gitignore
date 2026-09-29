@@ -1,0 +1,5 @@
+node_modules/
+.wrangler/
+scripts/.cache/
+.DS_Store
+.dev.vars

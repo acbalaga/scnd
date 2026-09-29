@@ -4,6 +4,8 @@
 
 Static site served by a Cloudflare Worker (static assets only). No backend, no accounts, no stored user data.
 
+Start here: `CLAUDE.md` (project rules), `docs/SPEC.md` (Phase 1 spec), `docs/NEXT.md` (task queue).
+
 ## Current stage: spike
 
 `public/index.html` tests whether the browser can call Open-Meteo and NASA POWER directly (CORS), for Manila, Cebu and Davao, over the last complete month. The result decides the weather source for the "weather or system?" check (F4).
