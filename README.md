@@ -19,3 +19,15 @@ Result (29 Sep 2026): both sources pass CORS on desktop Chrome and iOS Brave, bu
 Cloudflare Workers, Git-connected. Every push to `main` deploys; other versions get preview URLs.
 
 Local: `npx wrangler dev`
+
+## Spike 2 result (29 Sep 2026)
+
+Against Global Solar Atlas long-term monthly GHI, 2020 to 2023:
+
+| Source | Worst wet-season bias | Month-to-month agreement with NASA (r) |
+| --- | --- | --- |
+| NASA POWER | ±4.8% (PASS) | n/a |
+| Open-Meteo satellite (Himawari) | +13.1% (FAIL, but consistent) | 0.90 to 0.96 |
+| Open-Meteo archive (reanalysis) | +11.8% (FAIL, Manila) | 0.81 to 0.89 |
+
+Decision: NASA POWER climatology for the typical year (F1). Himawari as a ratio to its own climatology for the weather index (F4), cross-checked monthly against NASA. Reanalysis dropped.
