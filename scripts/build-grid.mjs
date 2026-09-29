@@ -1,5 +1,6 @@
 // Build public/data/ph-grid.json from NASA POWER climatology (community RE).
 // Usage: node scripts/build-grid.mjs
+// Behind an HTTP proxy, run with NODE_USE_ENV_PROXY=1 so fetch honours HTTPS_PROXY.
 // Node 18+, no dependencies. Raw responses are cached in scripts/.cache/ (gitignored).
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
