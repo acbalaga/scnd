@@ -257,6 +257,21 @@ export function billDecode({ importKwh, exportKwh, genRate, varCharges, total })
   return { rImport, exportCredit, afterCredit, other, coverage: varCharges > 0 ? exportCredit / varCharges : null, exportGap: rImport - genRate, flags };
 }
 
+// Payback tracker (F6). The installer's promise is a straight line: cost spread evenly over the promised years.
+// promisedSavings: what would have been saved after `days` at that pace.
+export function promisedSavings({ cost, years, days }) {
+  if (![cost, years, days].every(Number.isFinite) || cost <= 0 || years <= 0 || days < 0) return err('bad_input', 'Need cost and years above zero and days >= 0.');
+  return (cost / (years * 365.25)) * days;
+}
+
+// Years to pay the system back if savings keep coming at the average daily rate so far.
+// A straight-line guess from bills that may cover only some seasons, so callers should say so.
+export function paybackYearsAtPace({ cost, saved, days }) {
+  if (![cost, saved, days].every(Number.isFinite) || cost <= 0 || days <= 0) return err('bad_input', 'Need cost and days above zero.');
+  if (saved <= 0) return err('no_savings', 'No savings yet, so there is no pace to project.');
+  return cost / ((saved / days) * 365.25);
+}
+
 // Each kWh moved from night to midday is worth r_import - r_export.
 export function loadShiftValue({ rImport, rExport }) {
   return Number.isFinite(rImport) && Number.isFinite(rExport) ? rImport - rExport : err('bad_input', 'Need numeric rates.');

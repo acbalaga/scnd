@@ -7,6 +7,7 @@
 <meta name="description" content="A free, private checker for Philippine rooftop solar. Your numbers stay in your browser.">
 <meta name="theme-color" content="#F3F6FA" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0A1424" media="(prefers-color-scheme: dark)">
+<script>try{var t=localStorage.getItem("scnd-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
 <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.webmanifest">
@@ -19,10 +20,17 @@
 
   <header class="top">
     <div class="brand">
-      <svg viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="#0E1B2C"/><path d="M8 27a12 12 0 0 1 24 0" fill="none" stroke="#FFC83D" stroke-width="4" stroke-linecap="round"/><path d="M20 27l6-9" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/><circle cx="20" cy="27" r="2.6" fill="#fff"/></svg>
-      <div><b>SCND</b><small>Your second meter</small></div>
+      <img src="/icons/logo.svg" width="84" height="38" alt="SCND: your second meter">
     </div>
     <div class="tools">
+      <button type="button" class="link theme" @click="cycleTheme()" :aria-label="'Colour mode: ' + theme + '. Tap to change.'" title="Colour mode">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <g x-show="theme === 'light'"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></g>
+          <path x-show="theme === 'dark'" d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+          <g x-show="theme === 'auto'"><circle cx="12" cy="12" r="9"/><path d="M12 3v18" /><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></g>
+        </svg>
+        <span x-text="theme === 'auto' ? 'Auto' : (theme === 'light' ? 'Light' : 'Dark')"></span>
+      </button>
       <button type="button" class="link" @click="saveData()" :disabled="!ready">Save</button>
       <button type="button" class="link" @click="$refs.file.click()">Load</button>
       <input type="file" accept="application/json,.json" x-ref="file" @change="loadFile($event)" hidden>
@@ -32,6 +40,7 @@
 
   <!-- Before setup: say what it is and offer the shortest path to an answer -->
   <section class="hero" x-show="!ready">
+    <div class="lcd-panel" aria-hidden="true"><div class="digits"><span>2nd</span></div><small>Your second meter<br>for rooftop solar</small></div>
     <h1>Is your solar doing its job?</h1>
     <p>Check your rooftop system against your own bill. Free, and everything you type stays in this browser.</p>
     <div class="row" style="margin-top:12px">
@@ -320,15 +329,38 @@
         <template x-for="e in weather.errors" :key="e"><p class="err" x-text="e"></p></template>
       </section>
 
-      <template x-if="cumulative.length > 0">
+      <template x-if="chartModel">
         <section class="card">
           <h3>Payback so far</h3>
-          <p class="help">Cumulative savings from the bills above. Add what you paid and the installer's promised payback to see if you are on track.</p>
+          <p class="help">Your savings from the bills above, compared with the installer's promise. Add what you paid and the promised payback to see if you are on track.</p>
           <div class="grid" style="margin-top:10px">
             <label>System cost (₱)<input type="number" inputmode="decimal" x-model.number="s.cost"></label>
             <label>Promised payback (years)<input type="number" inputmode="decimal" step="0.1" x-model.number="s.promisedYears"></label>
           </div>
-          <div x-html="chart"></div>
+          <div class="stats" x-show="paybackStats">
+            <div class="stat"><small>Saved so far</small><b x-text="'₱' + fmt(paybackStats.saved, 0)"></b><em x-text="'over ' + fmt(paybackStats.days, 0) + ' days'"></em></div>
+            <div class="stat" x-show="paybackStats.promised !== null"><small>Promised pace</small><b x-text="'₱' + fmt(paybackStats.promised, 0)"></b><em x-text="fmt(Math.abs(paybackStats.gapPct), 0) + '% ' + (paybackStats.gapPct >= 0 ? 'ahead' : 'behind')"></em></div>
+            <div class="stat" x-show="paybackStats.years !== null"><small>Payback at your pace</small><b x-text="fmt(paybackStats.years, 1) + ' yr'"></b><em x-text="paybackStats.promisedYears ? 'promised ' + fmt(paybackStats.promisedYears, 1) + ' yr' : 'rough guide'"></em></div>
+          </div>
+          <div class="legend" x-show="promisedPerDay">
+            <span><i class="key" style="border-color:var(--c-save)"></i>Your savings</span>
+            <span><i class="key" style="border-color:var(--c-promise)"></i>Promised pace</span>
+          </div>
+          <div class="chartbox" tabindex="0" @pointermove="chartMove($event)" @pointerdown="chartMove($event)" @pointerleave="chartHover = null" @focus="chartKey(0)" @blur="chartHover = null" @keydown.left.prevent="chartKey(-1)" @keydown.right.prevent="chartKey(1)">
+            <div x-html="chart"></div>
+            <div class="tip" x-show="tip" :style="tip ? tip.style : ''">
+              <div class="d" x-text="tip ? tip.date : ''"></div>
+              <div class="r"><span><i class="key" style="border-color:var(--c-save)"></i>Your savings</span><b x-text="tip ? tip.saved : ''"></b></div>
+              <div class="r" x-show="tip && tip.promised"><span><i class="key" style="border-color:var(--c-promise)"></i>Promised pace</span><b x-text="tip ? tip.promised : ''"></b></div>
+            </div>
+          </div>
+          <details class="chart-table">
+            <summary>Show as a table</summary>
+            <table>
+              <thead><tr><th>Bill ends</th><th>Your savings</th><th x-show="promisedPerDay">Promised pace</th></tr></thead>
+              <tbody><template x-for="p in chartModel.pts" :key="p.date"><tr><td x-text="fmtDate(p.date)"></td><td x-text="'₱' + fmt(p.saved, 0)"></td><td x-show="promisedPerDay" x-text="p.promised === null ? '' : '₱' + fmt(p.promised, 0)"></td></tr></template></tbody>
+            </table>
+          </details>
           <p class="help" x-text="paybackText"></p>
         </section>
       </template>
@@ -373,7 +405,7 @@
         </div>
         <p class="sub" style="margin-bottom:6px">Made from the owner's own bills and inverter figures. A screening check, not an inspection, and not a verdict on any installer or system.</p>
         <div class="tiles">
-          <div class="tile" x-show="sheet.latest"><small>Latest PR</small><b x-text="sheet.latest ? sheet.latest.pr : ''"></b><em x-text="sheet.latest ? sheet.latest.band : ''"></em></div>
+          <div class="tile" x-show="sheet.latest"><small>Latest PR</small><b class="lcd" x-text="sheet.latest ? sheet.latest.pr : ''"></b><em x-text="sheet.latest ? sheet.latest.band : ''"></em></div>
           <div class="tile"><small>Bills checked</small><b x-text="sheet.total"></b><em x-text="sheet.total > sheet.shown ? 'latest ' + sheet.shown + ' shown' : 'all shown'"></em></div>
           <div class="tile" x-show="sheet.savedTotal"><small>Saved so far</small><b x-text="sheet.savedTotal"></b><em>from these bills</em></div>
         </div>

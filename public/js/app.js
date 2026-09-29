@@ -257,11 +257,13 @@ document.addEventListener('alpine:init', () => {
       const arc = (v0, v1, cls) => { const [x0, y0] = pt(v0, 80), [x1, y1] = pt(v1, 80); return `<path class="arc" style="stroke:var(--${cls})" d="M${x0.toFixed(1)} ${y0.toFixed(1)} A80 80 0 0 1 ${x1.toFixed(1)} ${y1.toFixed(1)}"/>`; };
       const v = Math.max(0, Math.min(r.pr, 1)), deg = -90 + v * 180, gap = 0.006;
       const [gx, gy] = pt(green, 99), [ax, ay] = pt(amberFloor, 99);
-      return `<svg viewBox="-6 -4 212 142" role="img" aria-label="Performance ratio ${this.fmt(r.pr, 2)}, ${BAND_SHORT[r.band]}. Healthy is ${green} or more.">`
+      const pr = this.fmt(r.pr, 2);
+      return `<svg viewBox="-6 -4 212 150" role="img" aria-label="Performance ratio ${pr}, ${BAND_SHORT[r.band]}. Healthy is ${green} or more.">`
         + arc(0, amberFloor - gap, 'd-red') + arc(amberFloor + gap, green - gap, 'd-amber') + arc(green + gap, 1, 'd-green')
         + `<text class="scale" x="${ax.toFixed(1)}" y="${ay.toFixed(1)}" text-anchor="middle">${amberFloor}</text><text class="scale" x="${gx.toFixed(1)}" y="${gy.toFixed(1)}" text-anchor="middle">${green}</text>`
         + `<g class="needle" style="--a:${deg.toFixed(1)}deg"><line x1="100" y1="100" x2="100" y2="34"/><circle cx="100" cy="100" r="6"/></g>`
-        + `<text class="dial-num" x="100" y="132" text-anchor="middle">${this.fmt(r.pr, 2)}</text></svg>`;
+        + `<rect x="40" y="108" width="120" height="36" rx="7" fill="#0E1B2C"/><text class="lcd-lbl" x="48" y="130">PR</text>`
+        + `<text class="lcd-ghost" x="152" y="135" text-anchor="end">8.88</text><text class="lcd-num" x="152" y="135" text-anchor="end">${pr}</text></svg>`;
     },
     weatherTeaser(b) { const w = this.result(b)?.weather; return w && !w.missing ? `Index ${this.fmt(w.wi, 2)}` : (this.weather.status === 'done' ? 'No data' : 'Not checked'); },
     get canCheckWeather() { return this.bills.some((b) => this.result(b)?.pr != null); },
@@ -396,50 +398,117 @@ document.addEventListener('alpine:init', () => {
     flagText: (f) => FLAG_TEXT[f],
     fmt: (v, d) => (Number.isFinite(v) ? v.toLocaleString('en-PH', { minimumFractionDigits: d, maximumFractionDigits: d }) : ''),
 
-    // Cumulative savings, oldest bill first: [{ days since first reading, ₱ }].
+    // ---- Payback (F6) ----
+    // Points on the savings curve, oldest bill first. day = days since the first reading date.
     get cumulative() {
       const rows = this.bills.filter((b) => b.start).sort((a, c) => (a.start < c.start ? -1 : 1))
         .map((b) => ({ b, r: this.result(b) })).filter((x) => x.r && x.r.savings !== null);
       if (!rows.length) return [];
       const t0 = Date.parse(rows[0].b.start);
       let sum = 0;
-      return rows.map(({ b, r }) => { sum += r.savings; return { day: (Date.parse(b.end) - t0) / 86400000, saved: sum }; });
+      return rows.map(({ b, r }) => { sum += r.savings; return { day: (Date.parse(b.end) - t0) / 86400000, saved: sum, date: b.end }; });
     },
+    get startDate() { const b = this.bills.filter((x) => x.start).sort((a, c) => (a.start < c.start ? -1 : 1))[0]; return b ? b.start : ''; },
 
-    // Promised line: cost / (years x 365.25) per day, from the first reading date.
+    // Promised line: cost spread evenly over the promised years, from the first reading date.
     get promisedPerDay() {
       const cost = num(this.s.cost), yrs = num(this.s.promisedYears);
       return cost > 0 && yrs > 0 ? cost / (yrs * 365.25) : null;
     },
 
+    get paybackStats() {
+      const c = this.cumulative; if (!c.length) return null;
+      const last = c[c.length - 1], cost = num(this.s.cost), yrs = num(this.s.promisedYears);
+      const okNum = (v) => (calc.isError(v) ? null : v);
+      const promised = cost > 0 && yrs > 0 ? okNum(calc.promisedSavings({ cost, years: yrs, days: last.day })) : null;
+      const years = cost > 0 ? okNum(calc.paybackYearsAtPace({ cost, saved: last.saved, days: last.day })) : null;
+      return { saved: last.saved, days: last.day, promised, gapPct: promised ? (last.saved / promised - 1) * 100 : null, years, promisedYears: yrs > 0 ? yrs : null, cost: cost > 0 ? cost : null };
+    },
     get paybackText() {
-      const c = this.cumulative; if (!c.length) return '';
-      const last = c[c.length - 1], perDay = this.promisedPerDay;
-      let t = `Saved so far: ₱${this.fmt(last.saved, 0)} over ${this.fmt(last.day, 0)} days.`;
-      if (perDay) {
-        const promised = perDay * last.day;
-        const gap = (last.saved / promised - 1) * 100;
-        t += ` At the promised payback you would have saved ₱${this.fmt(promised, 0)} by now, so you are ${this.fmt(Math.abs(gap), 0)}% ${gap >= 0 ? 'ahead' : 'behind'}. Bills cover only some months, so compare a full year before drawing a conclusion.`;
-      }
-      return t;
+      const t = this.paybackStats; if (!t) return '';
+      let out = `Over ${this.fmt(t.days, 0)} days you saved ₱${this.fmt(t.saved, 0)}.`;
+      if (t.promised !== null) out += ` At the promised pace you would have saved ₱${this.fmt(t.promised, 0)}, so you are ${this.fmt(Math.abs(t.gapPct), 0)}% ${t.gapPct >= 0 ? 'ahead' : 'behind'}.`;
+      if (t.years !== null) out += ` At your pace so far the system pays itself back in about ${this.fmt(t.years, 1)} years${t.promisedYears ? `, against ${this.fmt(t.promisedYears, 1)} promised` : ''}.`;
+      return out + ' Your bills may cover only some months, so treat this as a rough guide until you have a full year.';
     },
 
+    // Chart model: pixel positions in a 340 x 200 box, clean axis ticks, one point per bill.
+    get chartModel() {
+      const c = this.cumulative; if (!c.length) return null;
+      const W = 340, H = 200, L = 48, R = 16, T = 14, B = 30, pw = W - L - R, ph = H - T - B;
+      const perDay = this.promisedPerDay, xMax = Math.max(c[c.length - 1].day, 30);
+      const top = Math.max(c[c.length - 1].saved, perDay ? perDay * xMax : 0, 1);
+      const raw = top / 4, pow = 10 ** Math.floor(Math.log10(raw)), n = raw / pow, step = (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * pow;
+      const yMax = Math.ceil(top / step) * step, X = (d) => L + (d / xMax) * pw, Y = (v) => T + (1 - v / yMax) * ph;
+      const pts = c.map((p) => ({ ...p, x: X(p.day), y: Y(p.saved), promised: perDay ? perDay * p.day : null, yp: perDay ? Y(perDay * p.day) : null }));
+      const yTicks = []; for (let v = 0; v <= yMax + 1e-9; v += step) yTicks.push({ v, y: Y(v), label: v === 0 ? '₱0' : (step >= 1000 ? `₱${+(v / 1000).toFixed(1)}k` : `₱${v}`) });
+      const t0 = Date.parse(this.startDate), xTicks = [{ day: 0, label: this.fmtShort(this.startDate) }];
+      for (let d = new Date(t0); ; ) {
+        d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1));
+        const day = (d.getTime() - t0) / 86400000;
+        if (day > xMax) break;
+        if (day >= xMax * 0.14 && day <= xMax * 0.92) xTicks.push({ day, label: d.toLocaleDateString('en-GB', { month: 'short', timeZone: 'UTC' }) });
+      }
+      // Always end the axis on the last reading date, and drop a month tick that would crowd it.
+      const endMs = t0 + xMax * 86400000, endLabel = this.fmtShort(new Date(endMs).toISOString().slice(0, 10));
+      for (let i = xTicks.length - 1; i > 0; i--) if (xTicks[i].day > xMax * 0.8) xTicks.splice(i, 1);
+      xTicks.push({ day: xMax, label: endLabel, end: true });
+      while (xTicks.length > 5) xTicks.splice(1, 1);
+      return { W, H, L, R, T, B, pw, ph, xMax, yMax, X, Y, pts, yTicks, xTicks: xTicks.map((k) => ({ ...k, x: X(k.day) })), perDay, baseY: Y(0) };
+    },
+    fmtShort(iso) { const t = Date.parse(iso); return Number.isFinite(t) ? new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }) : ''; },
+
+    chartHover: null,
+    chartMove(ev) {
+      const m = this.chartModel; if (!m) return;
+      const r = ev.currentTarget.getBoundingClientRect(), rel = ((ev.clientX - r.left) / r.width) * m.W;
+      let best = 0; m.pts.forEach((p, i) => { if (Math.abs(p.x - rel) < Math.abs(m.pts[best].x - rel)) best = i; });
+      this.chartHover = best;
+    },
+    chartKey(dir) { const m = this.chartModel; if (!m) return; const i = this.chartHover === null ? m.pts.length - 1 : this.chartHover + dir; this.chartHover = Math.max(0, Math.min(m.pts.length - 1, i)); },
+    get tip() {
+      const m = this.chartModel; if (!m || this.chartHover === null || !m.pts[this.chartHover]) return null;
+      const p = m.pts[this.chartHover], pct = (p.x / m.W) * 100;
+      return { date: this.fmtDate(p.date), saved: '₱' + this.fmt(p.saved, 0), promised: p.promised === null ? null : '₱' + this.fmt(p.promised, 0), style: `left:${pct.toFixed(1)}%; transform:translateX(${pct > 55 ? '-108%' : '8%'})` };
+    },
     get chart() {
-      const c = this.cumulative; if (!c.length) return '';
-      const W = 320, H = 150, L = 44, R = 8, T = 8, B = 22;
-      const perDay = this.promisedPerDay;
-      const xMax = Math.max(c[c.length - 1].day, 30);
-      const yMax = Math.max(c[c.length - 1].saved, perDay ? perDay * xMax : 0, 1) * 1.1;
-      const X = (d) => L + (d / xMax) * (W - L - R), Y = (v) => T + (1 - v / yMax) * (H - T - B);
-      const pts = [[0, 0], ...c.map((p) => [p.day, p.saved])].map(([d, v]) => `${X(d).toFixed(1)},${Y(v).toFixed(1)}`).join(' ');
-      let svg = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Cumulative savings in pesos over days since first reading">`;
-      svg += `<line x1="${L}" y1="${Y(0)}" x2="${W - R}" y2="${Y(0)}" style="stroke:var(--muted)" opacity=".5"/>`;
-      svg += `<text x="${L - 4}" y="${Y(0) + 3}" text-anchor="end">0</text><text x="${L - 4}" y="${T + 8}" text-anchor="end">₱${this.fmt(yMax, 0)}</text>`;
-      svg += `<text x="${L}" y="${H - 6}">day 0</text><text x="${W - R}" y="${H - 6}" text-anchor="end">day ${this.fmt(xMax, 0)}</text>`;
-      if (perDay) svg += `<line x1="${X(0)}" y1="${Y(0)}" x2="${X(xMax)}" y2="${Y(perDay * xMax)}" style="stroke:var(--amber)" stroke-dasharray="4 3" stroke-width="2"/>`;
-      svg += `<polyline points="${pts}" fill="none" style="stroke:var(--accent)" stroke-width="2.5"/>`;
-      svg += `</svg><p class="help"><span style="color:var(--accent)">━</span> your savings${perDay ? ` &nbsp; <span style="color:var(--amber)">╍</span> promised pace` : ''}</p>`;
-      return svg;
+      const m = this.chartModel; if (!m) return '';
+      const { W, H, L, R, T, ph, pts, yTicks, xTicks, baseY } = m, last = pts[pts.length - 1], hov = this.chartHover !== null ? pts[this.chartHover] : null;
+      const line = pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' '), first = pts[0];
+      const desc = `Cumulative savings in pesos. ${pts.map((p) => `${this.fmtDate(p.date)}: ${this.fmt(p.saved, 0)}`).join('. ')}.${m.perDay ? ' A promised-pace line is drawn for comparison.' : ''}`;
+      let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${desc.replace(/"/g, '')}">`;
+      for (const k of yTicks) svg += `<line class="${k.v === 0 ? 'axis-l' : 'grid-l'}" x1="${L}" x2="${W - R}" y1="${k.y.toFixed(1)}" y2="${k.y.toFixed(1)}"/><text x="${L - 6}" y="${(k.y + 4).toFixed(1)}" text-anchor="end">${k.label}</text>`;
+      for (const k of xTicks) svg += `<text x="${k.x.toFixed(1)}" y="${H - 8}" text-anchor="${k.day === 0 ? 'start' : (k.end ? 'end' : 'middle')}">${k.label}</text>`;
+      svg += `<path d="M${m.X(0).toFixed(1)} ${baseY.toFixed(1)} L${line.replace(/ /g, ' L')} L${last.x.toFixed(1)} ${baseY.toFixed(1)} Z" style="fill:var(--c-save)" opacity=".1"/>`;
+      if (m.perDay) svg += `<line x1="${m.X(0).toFixed(1)}" y1="${baseY.toFixed(1)}" x2="${m.X(m.xMax).toFixed(1)}" y2="${m.Y(m.perDay * m.xMax).toFixed(1)}" style="stroke:var(--c-promise)" stroke-width="2" stroke-linecap="round"/>`;
+      svg += `<polyline points="${m.X(0).toFixed(1)},${baseY.toFixed(1)} ${line}" fill="none" style="stroke:var(--c-save)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+      if (hov) svg += `<line class="cross" x1="${hov.x.toFixed(1)}" x2="${hov.x.toFixed(1)}" y1="${T}" y2="${(T + ph).toFixed(1)}"/>` + (hov.yp !== null ? `<circle cx="${hov.x.toFixed(1)}" cy="${hov.yp.toFixed(1)}" r="4" style="fill:var(--c-promise);stroke:var(--card)" stroke-width="2"/>` : '');
+      for (const p of pts) svg += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${p === hov ? 5.5 : 4}" style="fill:var(--c-save);stroke:var(--card)" stroke-width="2"/>`;
+      // One direct label: the latest saving. The legend and the tooltip carry the rest.
+      const anchor = last.x > W - 60 ? 'end' : 'start', lx = anchor === 'end' ? last.x - 2 : last.x + 2;
+      svg += `<text class="endlbl" x="${lx.toFixed(1)}" y="${Math.max(last.y - 10, T + 8).toFixed(1)}" text-anchor="${anchor}">₱${this.fmt(last.saved, 0)}</text>`;
+      return svg + '</svg>';
+    },
+
+    // ---- Theme: Auto follows the phone; Light and Dark override it. Stored on this device only. ----
+    theme: 'auto',
+    init() {
+      try { const t = localStorage.getItem('scnd-theme'); if (t === 'light' || t === 'dark') this.theme = t; } catch { /* storage blocked: stay on auto */ }
+      this.applyTheme();
+    },
+    cycleTheme() {
+      this.theme = { auto: 'light', light: 'dark', dark: 'auto' }[this.theme];
+      this.applyTheme();
+      try { localStorage.setItem('scnd-theme', this.theme); } catch { /* ignore */ }
+    },
+    applyTheme() {
+      const root = document.documentElement;
+      if (this.theme === 'auto') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', this.theme);
+      const colours = { light: '#F3F6FA', dark: '#0A1424' };
+      document.querySelectorAll('meta[name="theme-color"]').forEach((m) => {
+        const wants = m.getAttribute('media')?.includes('dark') ? 'dark' : 'light';
+        m.setAttribute('content', this.theme === 'auto' ? colours[wants] : colours[this.theme]);
+      });
     },
   }));
 });
