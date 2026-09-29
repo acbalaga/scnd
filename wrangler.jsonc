@@ -1,0 +1,9 @@
+{
+  // SCND: static-assets-only Worker. No script, no server logic.
+  "name": "scnd",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./public"
+  },
+  "preview_urls": true
+}
