@@ -4,8 +4,8 @@ Work top to bottom. Each task ends with its checks passing and a commit. Ask Fre
 
 ## Done
 
-- [x] **Spike 1: browser CORS.** Open-Meteo and NASA POWER both callable from the browser (desktop Chrome, iOS Brave). `public/index.html`.
-- [x] **Spike 2: source validation.** Against Global Solar Atlas, 2020 to 2023, five cities. NASA POWER for typical year, Himawari (Open-Meteo satellite) for weather index. `public/spike2.html`, results in README.
+- [x] **Spike 1: browser CORS.** Open-Meteo and NASA POWER both callable from the browser (desktop Chrome, iOS Brave). `public/spike1.html`, removed in task 8 (in git history).
+- [x] **Spike 2: source validation.** Against Global Solar Atlas, 2020 to 2023, five cities. NASA POWER for typical year, Himawari (Open-Meteo satellite) for weather index. `public/spike2.html` (removed in task 8, in git history), results in README.
 
 ## 1. Typical-year irradiance grid
 
@@ -81,5 +81,5 @@ Himawari monthly ratio to its own climatology, cross-checked against NASA POWER;
 
 ## 8. Clean-up before beta
 
-- Remove spike pages and the `/api/pvgis` and `/api/gsa` proxy routes (keep them in git history).
+- [x] Remove spike pages and the `/api/pvgis` and `/api/gsa` proxy routes (keep them in git history). Done: `spike1.html`, `spike2.html` and both routes are gone; `src/worker.js` is now a pass-through to the static files. Last commit that has them: `fba1128`.
 - Private beta: Fred is recruiting five owners across three DUs, at least two hybrids.

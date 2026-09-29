@@ -6,15 +6,17 @@ Static site served by a Cloudflare Worker (static assets only). No backend, no a
 
 Start here: `CLAUDE.md` (project rules), `docs/SPEC.md` (Phase 1 spec), `docs/NEXT.md` (task queue).
 
-## Current stage: spike
+## Current stage: pre-beta
 
-`public/index.html` tests whether the browser can call Open-Meteo and NASA POWER directly (CORS), for Manila, Cebu and Davao, over the last complete month. The result decides the weather source for the "weather or system?" check (F4).
+The app is in `public/`: `index.html`, `app.css`, `js/` (calc core, grid lookup, weather fetch, findings sheet, save/load) and `data/ph-grid.json` (typical-year sun). All maths is in `public/js/calc.js`, with golden-case tests.
 
-Open the deployed URL on a phone and a laptop and record PASS/FAIL per source.
+- Tests: `node --test`
+- Rebuild the sun grid: `NODE_USE_ENV_PROXY=1 node scripts/build-grid.mjs` (the env var is only needed behind an HTTP proxy)
+- Regenerate the pvlib reference cases: `python3 scripts/gen-poa-reference.py` (needs `pip install pvlib`)
 
-Result (29 Sep 2026): both sources pass CORS on desktop Chrome and iOS Brave, but disagree by up to 40% (Manila, Aug 2026).
+The spike pages and the `/api/pvgis` and `/api/gsa` proxy routes were removed in task 8. They are in git history (last present at commit `fba1128`); the spike results are below and in `docs/NEXT.md`.
 
-`public/spike2.html` compares Open-Meteo archive, Open-Meteo satellite (Himawari) and NASA POWER, as 2020 to 2023 calendar-month means, against Global Solar Atlas long-term monthly GHI for five cities. PVGIS SARAH-3 was the first choice of reference but does not cover the Philippines (PVGIS returns HTTP 400 and offers only ERA5 reanalysis there). `src/worker.js` proxies GSA at `/api/gsa` and PVGIS at `/api/pvgis` (PH coordinates only, cached a week). Pass rule: wet-season (Jun to Oct) bias within ±10% in every city.
+Spike 1 (29 Sep 2026): Open-Meteo and NASA POWER both pass browser CORS on desktop Chrome and iOS Brave.
 
 ## Deploy
 
