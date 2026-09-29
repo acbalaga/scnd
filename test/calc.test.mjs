@@ -196,6 +196,20 @@ test('hybridBalance edge: C above PV surplus raises grid_charging; zero C gives 
 test('batteryValue golden: 108 x (11 - 5) = 648', () => near(c.batteryValue({ d: 108, rImport: 11, rExport: 5 }), 648));
 test('batteryValue edge: negative discharge is an error', () => assert.ok(c.isError(c.batteryValue({ d: -1, rImport: 11, rExport: 5 }))));
 
+// ---- efficiencyDrop ----
+test('efficiencyDrop golden: two bills 5+ points under the first-3 average are flagged', () => {
+  const r = c.efficiencyDrop([0.9, 0.9, 0.9, 0.84, 0.83]);
+  near(r.baseline, 0.9); near(r.latest, 0.835); near(r.dropPoints, 0.065); assert.equal(r.flagged, true);
+});
+test('efficiencyDrop edge: one low bill, exactly 5 points, and under 5 valid bills', () => {
+  assert.equal(c.efficiencyDrop([0.9, 0.9, 0.9, 0.9, 0.8]).flagged, false);      // only the latest is low
+  assert.equal(c.efficiencyDrop([0.9, 0.9, 0.9, 0.85, 0.85]).flagged, true);     // exactly 5 points counts
+  assert.equal(c.efficiencyDrop([0.9, 0.9, 0.9, 0.86, 0.86]).flagged, false);    // 4 points does not
+  assert.equal(c.efficiencyDrop([0.9, 0.9, 0.9, 0.8]), null);
+  assert.equal(c.efficiencyDrop([0.9, null, 0.9, 0.9, null, 0.8, 0.8]).flagged, true);   // gaps are skipped
+  assert.ok(c.isError(c.efficiencyDrop('x')));
+});
+
 // ---- loadCheck ----
 test('loadCheck golden: implied 438 against app 440 is -2 kWh, -0.45%', () => {
   const r = c.loadCheck({ implied: 438, app: 440 }); near(r.gapKwh, -2); near(r.gapPct, -0.4545, 1e-3);

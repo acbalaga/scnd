@@ -316,6 +316,12 @@
           <h2 style="margin-top:0">Battery so far</h2>
           <p x-text="'Over ' + batteryTotal.bills + ' bill' + (batteryTotal.bills === 1 ? '' : 's') + ', the battery earned about ₱' + fmt(batteryTotal.earned, 0) + '.' + (batteryTotal.cost ? ' That is ' + fmt(batteryTotal.earned / batteryTotal.cost * 100, 1) + '% of its cost.' : '')"></p>
           <p class="help">Each kWh from the battery is worth what you did not buy, minus what the same kWh would have earned as an export credit.</p>
+          <template x-if="efficiencyTrend">
+            <div>
+              <p class="help" x-text="'Round-trip efficiency: ' + fmt(efficiencyTrend.baseline * 100, 0) + '% in your first 3 bills, ' + fmt(efficiencyTrend.latest * 100, 0) + '% in your latest 2.'"></p>
+              <div class="flag" x-show="efficiencyTrend.flagged"><strong>Efficiency has dropped for two bills in a row.</strong> It is about <span x-text="fmt(efficiencyTrend.dropPoints * 100, 0)"></span> points below your first bills. Worth asking: has the battery or BMS firmware changed, and are there battery fault codes or temperature warnings?</div>
+            </div>
+          </template>
         </section>
       </template>
 
@@ -324,6 +330,7 @@
           <h2 style="margin-top:0">Year over year</h2>
           <p x-text="'Comparing the same months a year apart, weather-adjusted PR changed by about ' + fmt(Math.abs(degradationResult.annualLossPct), 1) + '% a year (' + (degradationResult.annualLossPct >= 0 ? 'down' : 'up') + '), across ' + degradationResult.pairs + ' pair' + (degradationResult.pairs === 1 ? '' : 's') + '.' + (degradationResult.exceedsWarranty === null ? '' : (degradationResult.exceedsWarranty ? ' That is more than the ' + fmt(degradationResult.warrantyPct, 2) + '% a year in your module warranty.' : ' That is within the ' + fmt(degradationResult.warrantyPct, 2) + '% a year in your module warranty.'))"></p>
           <p class="help">One year of degradation is small next to month-to-month noise in the sun data, so one or two pairs mean little. It becomes more useful as the pairs build up over two or more years.</p>
+          <div class="flag" x-show="degradationResult.pairs < minPairs"><strong>Early reading.</strong> <span x-text="'Fewer than ' + minPairs + ' pairs, so'"></span> this is too few months to act on. It is shown so you know it is being tracked. Keep adding bills.</div>
         </section>
       </template>
     </section>

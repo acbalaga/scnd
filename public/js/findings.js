@@ -15,9 +15,10 @@ const span = (b) => `${b.start} to ${b.end}`;
 //   weather: null, or { wi, uncertain, inferred, source, split: { weather, system, total } }
 //   hybridFlags: optional array, e.g. ['grid_charging']
 // payback: null, or { saved, promised } (pesos to date)
+// efficiency: null, or { baseline, latest, dropPoints, flagged } from calc.efficiencyDrop (fractions of 1)
 // degradation: null, or { annualLossPct, pairs, exceedsWarranty, warrantyPct } from calc.degradation
 // Returns { items: [{ id, text }], requests: [text], uncertainty: [text], allClear: boolean }.
-export function findings({ bills, payback, degradation = null }) {
+export function findings({ bills, payback, degradation = null, efficiency = null }) {
   const items = [];
   const last = bills[bills.length - 1];
   const raised = [...bills].reverse().find((b) => b.redRaised);
@@ -45,6 +46,9 @@ export function findings({ bills, payback, degradation = null }) {
   if (bills.some((b) => b.hybridFlags?.includes('grid_charging'))) {
     items.push({ id: 'grid_charging', text: 'In at least one bill the battery took in more energy than the solar left over after export, so some of it came from the grid. Question: Is the battery set to charge from the grid (for example overnight or in backup mode), and what schedule was intended?' });
   }
+  if (efficiency?.flagged) {
+    items.push({ id: 'rte_drop', text: `Battery round-trip efficiency has been about ${Math.round(efficiency.dropPoints * 100)} points below the owner's first bills for two bills in a row (${Math.round(efficiency.baseline * 100)}% at the start, ${Math.round(efficiency.latest * 100)}% now). Questions: Has the battery or BMS firmware changed? Are there battery fault codes or temperature warnings? Is a round-trip efficiency stated in the battery warranty?` });
+  }
   if (degradation && degradation.exceedsWarranty && degradation.pairs >= MIN_DEGRADATION_PAIRS) {
     items.push({ id: 'degradation', text: `Weather-adjusted PR is down about ${degradation.annualLossPct.toFixed(1)}% a year over ${degradation.pairs} same-month pair${degradation.pairs === 1 ? '' : 's'}, against a module warranty of ${degradation.warrantyPct}% a year. Monthly weather noise is large next to a yearly loss, so treat this as a reason to keep tracking. Questions: How does the installer measure degradation (IV curve, flash test)? What does the warranty require as evidence?` });
   }
@@ -62,6 +66,11 @@ export function findings({ bills, payback, degradation = null }) {
   const uncertainty = [
     'Sun data are estimates. Satellite sun data can be off by 5 to 10% at a single location for one month, and dry-season figures can read low. One low month proves nothing, so a flag is raised only after two in a row.',
   ];
+  // Early degradation readings are shown for awareness, not action: too few pairs to be a finding.
+  if (degradation && degradation.pairs < MIN_DEGRADATION_PAIRS) {
+    const dir = degradation.annualLossPct >= 0 ? 'down' : 'up';
+    uncertainty.push(`Year-over-year check so far: weather-adjusted PR is about ${Math.abs(degradation.annualLossPct).toFixed(1)}% ${dir} a year over ${degradation.pairs} same-month pair${degradation.pairs === 1 ? '' : 's'}. That is too few months to act on, because monthly sun data is noisy. It is shown so you know it is being tracked.`);
+  }
   if (bills.some((b) => b.weather?.uncertain)) uncertainty.push('For at least one period the two weather sources disagreed by more than 5 points, so the weather call is uncertain.');
   if (bills.some((b) => b.weather?.inferred)) uncertainty.push('For at least one period the weather index came from a single source with no cross-check.');
 

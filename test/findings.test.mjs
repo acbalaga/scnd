@@ -25,6 +25,15 @@ test('findings golden: grid charging and degradation beyond warranty each produc
   assert.deepEqual(r.items.map((i) => i.id), ['grid_charging', 'degradation']);
   assert.match(r.items[1].text, /2\.3%/); assert.match(r.items[1].text, /0\.5%/); assert.match(r.items[1].text, /noise/);
 });
+test('findings golden: efficiency drop raises a battery question; unflagged does not', () => {
+  const r = findings({ bills: [bill()], payback: null, efficiency: { baseline: 0.9, latest: 0.83, dropPoints: 0.07, flagged: true } });
+  assert.equal(r.items[0].id, 'rte_drop'); assert.match(r.items[0].text, /7 points/); assert.match(r.items[0].text, /90%/);
+  assert.equal(findings({ bills: [bill()], payback: null, efficiency: { baseline: 0.9, latest: 0.89, dropPoints: 0.01, flagged: false } }).allClear, true);
+});
+test('findings edge: few degradation pairs appear as an awareness note, not a question', () => {
+  const r = findings({ bills: [bill()], payback: null, degradation: { annualLossPct: 3.7, pairs: 2, exceedsWarranty: true, warrantyPct: 0.5 } });
+  assert.equal(r.allClear, true); assert.equal(r.uncertainty.length, 2); assert.match(r.uncertainty[1], /too few months to act on/); assert.match(r.uncertainty[1], /3\.7% down/);
+});
 test('findings edge: too few pairs, within warranty or null raises no degradation question', () => {
   assert.equal(findings({ bills: [bill()], payback: null, degradation: { annualLossPct: 3, pairs: MIN_DEGRADATION_PAIRS - 1, exceedsWarranty: true, warrantyPct: 0.5 } }).allClear, true);
   assert.equal(findings({ bills: [bill()], payback: null, degradation: { annualLossPct: 0.3, pairs: 4, exceedsWarranty: false, warrantyPct: 0.5 } }).allClear, true);

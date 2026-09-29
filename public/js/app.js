@@ -4,7 +4,7 @@ import * as calc from './calc.js';
 import { loadGrid, lookup, isLowDiffuse } from './grid.js';
 import { fetchSatellite, fetchNasa } from './weather.js';
 import { serialize, parse } from './data.js';
-import { findings } from './findings.js';
+import { findings, MIN_DEGRADATION_PAIRS } from './findings.js';
 
 const num = (v) => (v === '' || v === null || v === undefined ? NaN : Number(v));
 const round1 = (v) => Math.round(v * 10) / 10;
@@ -47,6 +47,7 @@ const newBill = () => ({ id: nextId++, start: '', end: '', inverterKwh: '', impo
 
 document.addEventListener('alpine:init', () => {
   Alpine.data('scnd', () => ({
+    minPairs: MIN_DEGRADATION_PAIRS,
     cities: CITIES,
     facings: FACINGS,
     place: '',
@@ -164,7 +165,7 @@ document.addEventListener('alpine:init', () => {
       const cum = this.cumulative, perDay = this.promisedPerDay;
       const payback = perDay && cum.length ? { saved: cum[cum.length - 1].saved, promised: perDay * cum[cum.length - 1].day } : null;
       const f = findings({
-        payback, degradation: this.degradationResult,
+        payback, degradation: this.degradationResult, efficiency: this.efficiencyTrend,
         bills: rows.map(({ b, r }) => ({
           start: b.start, end: b.end, pr: r.pr, band: r.band, redRaised: this.redRaised(b), actualKwh: num(b.inverterKwh),
           expectedKwh: r.expectedKwh, weather: r.weather, flags: r.flags, savings: r.savings, hybridFlags: r.hybrid?.flags ?? [],
@@ -247,6 +248,14 @@ document.addEventListener('alpine:init', () => {
       }
       const warrantyPct = num(this.s.warrantyPct), d = calc.degradation(records, warrantyPct);
       return d && !calc.isError(d) ? { ...d, warrantyPct } : null;
+    },
+
+    // F9: sustained drop in round-trip efficiency against the owner's own first bills. null until 5 bills have one.
+    get efficiencyTrend() {
+      if (!this.s.hybrid) return null;
+      const ordered = this.bills.filter((b) => b.start).sort((a, c) => (a.start < c.start ? -1 : 1));
+      const r = calc.efficiencyDrop(ordered.map((b) => this.result(b)?.hybrid?.roundTripEfficiency ?? null));
+      return r && !calc.isError(r) ? r : null;
     },
 
     // F9: what the battery has earned over the bills entered, against its cost if given.

@@ -292,6 +292,27 @@ export function hybridBalance({ i, gPv, x, c, d }) {
   return { load, roundTripEfficiency: c > 0 ? d / c : null, flags: c > gPv - x ? ['grid_charging'] : [] };
 }
 
+// Sustained drop in round-trip efficiency against the owner's own first bills (docs/SPEC.md F9).
+// Threshold decided by Fred, 29 Sep 2026: flag when the latest 2 bills are both 5 or more percentage points
+// below the average of the first 3 bills. Tunable: change here only.
+export const RTE_DROP_POINTS = 0.05;
+export const RTE_BASELINE_BILLS = 3;
+export const RTE_RUN = 2;
+
+// efficiencies: round-trip efficiency per bill as fractions, oldest first, null where a bill has none.
+// Returns null until there are baseline + run valid values (5), else { baseline, latest, dropPoints, flagged }.
+// dropPoints is in fractions of 1 (0.07 = 7 points) and is baseline minus the mean of the latest 2 bills.
+export function efficiencyDrop(efficiencies) {
+  if (!Array.isArray(efficiencies)) return err('bad_input', 'Need a list of efficiencies.');
+  const vals = efficiencies.filter((v) => Number.isFinite(v));
+  if (vals.length < RTE_BASELINE_BILLS + RTE_RUN) return null;
+  const baseline = vals.slice(0, RTE_BASELINE_BILLS).reduce((a, v) => a + v, 0) / RTE_BASELINE_BILLS;
+  const recent = vals.slice(-RTE_RUN);
+  const latest = recent.reduce((a, v) => a + v, 0) / RTE_RUN;
+  const flagged = recent.every((v) => baseline - v >= RTE_DROP_POINTS - 1e-9);
+  return { baseline, latest, dropPoints: baseline - latest, flagged };
+}
+
 // Battery value = D x (r_import - r_export): what each stored kWh earns over exporting it.
 export function batteryValue({ d, rImport, rExport }) {
   return Number.isFinite(d) && d >= 0 && Number.isFinite(rImport) && Number.isFinite(rExport) ? d * (rImport - rExport) : err('bad_input', 'Need D >= 0 and numeric rates.');
