@@ -23,6 +23,7 @@ Owner: Fred (Alfred Balaga), renewable energy O&M practitioner. Personal project
 ## Stack
 
 - Plain HTML + Alpine.js + ES modules. No build step, no framework, no bundler.
+- Fonts: Pixelify Sans (words) and DSEG7 Classic (LCD digits), both SIL OFL 1.1, self-hosted in `public/fonts/` with their licences. Body text stays in the system font. Do not use the pixel face for numbers (its 5 reads as S).
 - Inline SVG charts, hand-rolled. Print stylesheet + `window.print()` for the findings sheet.
 - Cloudflare Workers (static assets). `wrangler.jsonc`, deploys on push to `main` via Git integration. Per-version preview URLs are on for beta testers.
 - Local dev: `npx wrangler dev`.

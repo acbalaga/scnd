@@ -16,7 +16,7 @@ Start here: `CLAUDE.md` (project rules), `docs/SPEC.md` (spec), `docs/NEXT.md` (
 | F2 | Bill decoder: import, export credit at the generation charge, and why fixed charges keep the bill above zero (Taglish walk-through) |
 | F3 | Findings sheet: one printable page of questions for the installer, no installer names |
 | F4 | Weather or system: satellite and NASA POWER cross-checked, labelled "uncertain" or "inferred" when they disagree or one is missing |
-| F5 to F7 | Energy split, true savings against the promised payback, load-shift value |
+| F5 to F7 | Energy split, true savings against the promised payback (chart with hover, table view and payback time at your own pace), load-shift value |
 | F8 | Year-over-year degradation against the module warranty, after 13 months of bills |
 | F9 | Hybrid systems: battery round-trip efficiency, implied house load, battery value, grid-charging flag |
 
@@ -26,13 +26,14 @@ Save and load use a JSON file on the owner's own device. "Try an example" fills 
 
 - User inputs never leave the browser. The only outbound calls are weather lookups to Open-Meteo and NASA POWER, made when the owner clicks "Check the weather", with the location rounded to 0.1° (about 11 km).
 - The typical-year sun data is a static file (`public/data/ph-grid.json`), so F1 needs no lookup.
+- The only thing stored on your device is your Auto, Light or Dark choice (in the browser's local storage), and only if you pick one. There are no cookies.
 - The Worker rate-limits requests per visitor with a daily-rotating hash of the IP, never the raw IP. It logs and stores nothing.
 
 ## Layout
 
-- `public/`: `index.html`, `app.css`, `manifest.webmanifest`, `icons/`, `js/` (`calc.js` all the maths, `grid.js`, `weather.js`, `findings.js`, `data.js`, `app.js`), `data/ph-grid.json`, `vendor/alpine.min.js` (Alpine 3.17.4, MIT, vendored so the page makes no third-party request)
+- `public/`: `index.html`, `app.css`, `manifest.webmanifest`, `icons/`, `js/` (`calc.js` all the maths, `grid.js`, `weather.js`, `findings.js`, `data.js`, `app.js`), `data/ph-grid.json`, `vendor/alpine.min.js` (Alpine 3.17.4, MIT), `fonts/` (Pixelify Sans and DSEG7 Classic, SIL Open Font Licence 1.1, licences alongside), `icons/` (logo and app icons). Everything is self-hosted so the page makes no third-party request
 - `src/worker.js`: serves `public/` and rate-limits
-- `scripts/`: `build-grid.mjs` (builds the sun grid), `gen-poa-reference.py` (pvlib reference cases)
+- `scripts/`: `build-grid.mjs` (builds the sun grid), `gen-poa-reference.py` (pvlib reference cases), `gen-logo.mjs` and `gen-icons.mjs` (the seven-segment SCND logo and app icons)
 - `test/`: golden-case tests
 - `docs/`: spec, task queue, rate limiting
 

@@ -168,6 +168,19 @@ test('billDecode edge: total below the charges, generation rate above buying rat
   assert.ok(c.isError(c.billDecode({ importKwh: 300, exportKwh: NaN, genRate: 9.7, varCharges: 3600, total: 2100 })));
 });
 
+// ---- promisedSavings, paybackYearsAtPace ----
+test('promisedSavings golden: 365.25 days of a 3-year, 300000 promise is 100000', () => near(c.promisedSavings({ cost: 300000, years: 3, days: 365.25 }), 100000, 1e-6));
+test('promisedSavings edge: zero years or negative days is an error', () => {
+  assert.ok(c.isError(c.promisedSavings({ cost: 300000, years: 0, days: 10 }))); assert.ok(c.isError(c.promisedSavings({ cost: 300000, years: 3, days: -1 })));
+});
+test('paybackYearsAtPace golden: 12000 saved in 60 days against 350000 is about 5.9 years', () => {
+  near(c.paybackYearsAtPace({ cost: 350000, saved: 12000, days: 60 }), 350000 / (200 * 365.25), 1e-9);
+});
+test('paybackYearsAtPace edge: no savings and no days are errors', () => {
+  assert.equal(c.paybackYearsAtPace({ cost: 350000, saved: 0, days: 60 }).error, 'no_savings');
+  assert.ok(c.isError(c.paybackYearsAtPace({ cost: 350000, saved: 100, days: 0 })));
+});
+
 // ---- degradation ----
 const months = (year, pr) => Array.from({ length: 12 }, (_, m) => ({ year, month: m + 1, pr }));
 test('degradation golden: Jan 0.80 to 0.796 is 0.5%/yr, within a 0.55% warranty', () => {
