@@ -2,7 +2,7 @@
 
 Sep 29, 2026 · Alfred Balaga
 
-> Snapshot of the living spec at 29 Sep 2026. Where it conflicts with `CLAUDE.md` or `docs/NEXT.md`, those win: they record decisions made after the spikes. Known stale items: build-plan steps 1 and 2 and the first acceptance criterion reference PVGIS (it does not cover the Philippines); "Filipino/Taglish copy" is no longer deferred; the architecture table's F4 row is superseded by the spike 2 result below it.
+> Living spec, brought in line with the build on 29 Sep 2026 (tasks 1 to 9 in `docs/NEXT.md`). Where it conflicts with `CLAUDE.md` or `docs/NEXT.md`, those win. Deferred to v2 and unchanged: quote auditor, brand CSV import, screenshot OCR.
 
 ## Problem and evidence
 
@@ -50,9 +50,9 @@ v1 ships eight features. Three are the core you picked; five exist because the i
 | --- | --- | --- | --- | --- |
 | F9 | Battery value and health | Is the battery earning its cost? Is its round-trip efficiency drifting? Is PV being curtailed or the battery charging from the grid at night? | Raw kWh only | No |
 
-**Inputs, all typed by the user:** location (pin or barangay, rounded), kWp, tilt and facing, inverter AC rating, commissioning month; monthly inverter kWh; per bill: import kWh, export kWh, generation charge, total amount; optional: installer's promised monthly savings and payback years, module warranty degradation %/yr, outage hours.
+**Inputs, all typed by the user:** location (nearest city, or coordinates, rounded to 0.1°), kWp, tilt and facing, inverter AC rating, commissioning month; monthly inverter kWh; per bill: import kWh, export kWh, generation charge, total amount; optional: installer's promised monthly savings and payback years, module warranty degradation %/yr, outage hours.
 
-**Deferred to v2:** quote auditor tab, brand CSV import, screenshot OCR, link-out to the obsolescence tracker, Filipino/Taglish copy.
+**Deferred to v2:** quote auditor tab, brand CSV import, screenshot OCR, link-out to the obsolescence tracker. (Taglish help text is in v1: bill-decoder explanations and tooltips.)
 
 Design note: rates are always read off the user's own bill, never hard-coded. That sidesteps the retail-vs-generation-rate confusion and survives monthly rate changes and non-Meralco DUs.
 
@@ -60,15 +60,15 @@ Design note: rates are always read off the user's own bill, never hard-coded. Th
 
 Every number is computed in the browser from the user's inputs plus a monthly irradiance value. Nothing needs more than arithmetic.
 
-**F1 Performance ratio.** Plane-of-array irradiation H\_POA (kWh/m² for the period) comes from horizontal irradiation via Erbs decomposition and an isotropic transposition for the user's tilt and facing.
+**F1 Performance ratio.** Plane-of-array irradiation H\_POA (kWh/m² for the period) comes from the typical-year grid (NASA POWER monthly mean GHI and diffuse, so no decomposition model is needed). Each month's mean day is integrated with Collares-Pereira and Rabl (global) and Liu-Jordan (diffuse) hourly apportioning, isotropic sky, ground albedo 0.2, for the user's tilt and facing. Bills run reading date to reading date, so the period is split across calendar months and weighted by days. The transposition is checked against pvlib on eight golden cases (within 0.07%; the limit is 3%).
 
 ```latex
-PR = \frac{E_{inverter}}{P_{kWp} \times H_{POA}}
+PR = \frac{E_{PV}}{P_{kWp} \times H_{POA}}
 ```
 
-Bands (tunable): green ≥ 0.75, amber 0.65 to 0.75, red < 0.65. Red is only raised after two consecutive months, because satellite monthly irradiance carries roughly ±5 to 10% error at a single point. A commercial rooftop benchmark of 78 to 82% PR is published by PH installers ([Solaren](https://solaren-power.com/comparing-solar-quotes-in-the-philippines/)); residential sits lower with shading and heat.
+Bands (tunable, `PR_BANDS` in `calc.js`): green ≥ 0.75; amber 0.65 to 0.75 in Jun to Oct and 0.62 to 0.75 in Nov to May; red below the amber floor. The dry-season floor is lower because NASA POWER reads up to about 8% low in the dry months (spike 2). Red is only raised after two consecutive bills, because satellite monthly irradiance carries roughly ±5 to 10% error at a single point. Locations with a diffuse fraction under 0.3 in any month (26 grid cells, February to April, around Mindoro, Panay, northern Palawan and the seas west of Luzon) carry an extra caveat in the UI. A commercial rooftop benchmark of 78 to 82% PR is published by PH installers ([Solaren](https://solaren-power.com/comparing-solar-quotes-in-the-philippines/)); residential sits lower with shading and heat.
 
-**F4 Weather or system.** Weather index WI = actual-month H\_POA ÷ typical-month H\_POA. The shortfall against a typical month splits into two parts:
+**F4 Weather or system.** Weather index WI = actual-period sun ÷ typical-period sun, worked out from daily GHI for the bill's own dates against a 2020 to 2025 baseline. It is computed twice, from Himawari (Open-Meteo satellite) and from NASA POWER, each against its own baseline, and the two are averaged. If they are more than 5 points apart the call is labelled "uncertain". If one source has under 80% of the period's days, the index comes from the other alone and is shown as "inferred", not cross-checked. If neither has data, F4 says so and the PR stays against a typical year. The index is on GHI and applied to POA (actual diffuse is not available per period). Data is fetched only when the user clicks, with the location rounded to 0.1°. The shortfall against a typical period splits into two parts:
 
 ```latex
 \Delta E = \underbrace{E_{typ}(1 - WI)}_{weather} + \underbrace{(E_{typ} \cdot WI - E_{inverter})}_{system}
@@ -76,11 +76,11 @@ Bands (tunable): green ≥ 0.75, amber 0.65 to 0.75, red < 0.65. Red is only rai
 
 **F5 Energy split.** With G = inverter kWh, X = exported kWh and I = imported kWh for the same billing period: self-consumed S = G − X, household load L = I + S, self-consumption ratio = S ÷ G. Bill periods are not calendar months, so the form asks for the bill's reading dates and the inverter kWh between them (every major app shows daily totals).
 
-**F6 True savings.** Savings = S × r\_import + X × r\_export, where r\_import = the bill's variable charges ÷ I, and r\_export = the generation charge printed on the bill. Cumulative savings are plotted against system cost and the installer's promised payback line.
+**F6 True savings.** Savings = S × r\_import + X × r\_export, where r\_import = the bill's variable charges ÷ I, and r\_export = the generation charge printed on the bill. Cumulative savings are plotted against the installer's promised payback pace (system cost divided by promised years), and the sheet asks how the promise was worked out.
 
 **F7 Load-shift value.** Each kWh moved from night to midday is worth r\_import − r\_export. At the September 2026 Meralco figures cited above that is roughly ₱6/kWh.
 
-**F8 Degradation.** Year-over-year ratio of weather-normalised PR for the same calendar month, compared against the module warranty's annual degradation. Needs 13+ months of data; hidden until then.
+**F8 Degradation.** Year-over-year ratio of weather-adjusted PR for the same calendar month (bills are paired by the month and year of their midpoint), compared against the module warranty's annual degradation. Needs 13+ months of bills with a weather check; hidden until then. Monthly noise is far larger than a year's degradation, so the on-screen card shows an "Early reading" notice under 6 pairs, and the findings sheet raises a question only from 6 pairs (below that it is an awareness note).
 
 **F9 Hybrid energy balance.** PR uses the app's PV yield, not inverter AC output, so battery losses don't read as a PV fault. With C = battery charge and D = battery discharge:
 
@@ -88,7 +88,7 @@ Bands (tunable): green ≥ 0.75, amber 0.65 to 0.75, red < 0.65. Red is only rai
 L = I + G_{PV} - X - C + D
 ```
 
-Monthly D ÷ C is an apparent round-trip efficiency; a sustained drop against the owner's own first months flags battery or BMS issues. Battery value = D × (r\_import − r\_export), i.e. what each stored kWh earns over exporting it, tracked against the battery's share of system cost. Three extra flags: PV curtailment (zero-export, battery at 100%, PR dips on sunny days), grid charging at night (C greater than PV surplus), and backup hours during brownouts, noted but not priced.
+Monthly D ÷ C is an apparent round-trip efficiency; a sustained drop against the owner's own first months flags battery or BMS issues. Battery value = D × (r\_import − r\_export), i.e. what each stored kWh earns over exporting it, tracked against the battery's share of system cost. Extra flags: grid charging (C greater than the PV left after export, a lower bound), and a sustained efficiency drop (the latest 2 bills both 5 or more points below the average of the first 3, `efficiencyDrop` in `calc.js`). PV curtailment (zero-export, battery at 100%, PR dips on sunny days) is not modelled, because it needs daily battery state of charge that monthly totals do not carry. Backup hours during brownouts are noted, not priced.
 
 **Sanity flags:** DC/AC ratio above 1.3 (clipping lowers PR in sunny months), S < 0 (inverter and bill periods misaligned), zero-export months after net-metering activation (meter not reversed), outage hours entered (on-grid inverters stop during brownouts by design).
 
@@ -99,14 +99,15 @@ The tool is a set of static files with no server of ours, no accounts and no dat
 | Decision | Choice | Why |
 | --- | --- | --- |
 | App shell | Static HTML + Alpine.js, ES modules, no build step | Same mental model as SCNTL's Alpine layer; any static host serves it |
-| Typical-year irradiance (F1, F7) | Pre-computed JSON grid for PH land cells (0.25°): monthly GHI, diffuse fraction, ambient temp; est. under 200 KB | Source under validation (spike 2, 29 Sep): PVGIS SARAH-3 does not cover the Philippines and only offers ERA5 reanalysis there, so the grid will be built from whichever source best matches Global Solar Atlas long-term monthly GHI, or from GSA itself if its CC BY 4.0 terms allow bulk use ([PVGIS API](https://joint-research-centre.ec.europa.eu/photovoltaic-geographical-information-system-pvgis/getting-started-pvgis/api-non-interactive-service_en)) |
-| Actual-month irradiance (F4) | Browser fetch to Open-Meteo, coordinates rounded to 0.1° | Free for non-commercial use, no key ([Open-Meteo](https://open-meteo.com/en/features)). CORS not yet verified: spike task 1. Fallback NASA POWER; last resort, F4 compares against typical only |
+| Typical-year irradiance (F1, F7) | Pre-computed JSON grid, 0.5° over the Philippines (748 cells): monthly GHI, diffuse and air temperature from NASA POWER climatology 2001 to 2020, 141.8 KB, built by `scripts/build-grid.mjs` and committed | Within ±5% of Global Solar Atlas in the wet season, reads up to about 8% low in the dry season (spike 2). PVGIS SARAH-3 does not cover the Philippines. Global Solar Atlas is the validation reference only |
+| Actual-month irradiance (F4) | Browser fetch, only on click, coordinates rounded to 0.1°: Open-Meteo satellite (Himawari) and NASA POWER daily GHI | CORS verified (spike 1). Himawari is used as a ratio to its own 2020 to 2025 baseline so its absolute bias cancels; NASA is the cross-check and the fallback ([Open-Meteo](https://open-meteo.com/en/features), non-commercial use) |
 | Persistence | None by default. "Save my data" downloads a JSON file; "Load" reads it back | Monthly return visits work without us storing anything |
 | Findings sheet (F3) | Print stylesheet + `window.print()` → Save as PDF | No PDF library, works on phones |
 | Charts | Inline SVG, hand-rolled | No dependency, prints cleanly |
 | Analytics | None, or a cookieless page counter | Privacy claim stays literally true |
+| Rate limiting | Worker with Cloudflare's Workers Rate Limiting binding: 100 requests per 10 seconds per visitor, keyed by a daily-rotating hash of the IP, fails open | Bot floods are stopped in our own code (a WAF rule was not available on the plan). Costs a Worker request per page request, see `docs/RATE-LIMITING.md` |
 
-**Spike 2 result (29 Sep 2026), supersedes the irradiance rows above.** PVGIS SARAH-3 does not cover the Philippines, so sources were scored against Global Solar Atlas long-term monthly GHI, 2020 to 2023, five cities (Laoag, Manila, Iloilo, Cebu, Davao).
+**Spike 2 result (29 Sep 2026), the evidence behind the irradiance rows above.** PVGIS SARAH-3 does not cover the Philippines, so sources were scored against Global Solar Atlas long-term monthly GHI, 2020 to 2023, five cities (Laoag, Manila, Iloilo, Cebu, Davao).
 
 | Source | Wet-season bias vs GSA | Dry-season bias vs GSA | Month-to-month agreement with NASA (r) | Role |
 | --- | --- | --- | --- | --- |
@@ -114,7 +115,7 @@ The tool is a set of static files with no server of ours, no accounts and no dat
 | Open-Meteo satellite (Himawari, 5 km) | +7.3% to +13.1% | +4.0% to +9.2% | 0.90 to 0.96 | F4 weather index, as a ratio to its own climatology so the bias cancels |
 | Open-Meteo archive (reanalysis) | −1.9% to +11.8% | −3.5% to +12.7% | 0.81 to 0.89 | Dropped |
 
-F4 cross-checks each month's Himawari weather index against NASA; a gap above 5% labels the weather call "uncertain". Open question: use GSA directly for F1 if its terms permit automated use.
+F4 cross-checks each bill's Himawari weather index against NASA; a gap above 5 points labels the weather call "uncertain". Himawari history check (29 Sep 2026): data starts 3 Jul 2015, full years 2016 to 2025 are clean, 2026 has holes in the seamless model, and the series steps down 2 to 6% between 2016 to 2019 and 2022 to 2025, which is why the baseline is 2020 to 2025. Open question: use GSA directly for F1 if its terms permit automated use.
 
 Compute load is a few hundred arithmetic operations per month of data. A 2018 budget Android phone handles it.
 
@@ -130,7 +131,7 @@ Serve the app from a subdomain (e.g. `solar.alfredbalaga.com`) and surface it fr
 
 Recommendation: B for the app, C as the doorway on alfredbalaga.com. Verify in hPanel that subdomain DNS records are editable while the domain sits on the Builder.
 
-**Decision: Cloudflare Workers Free with static assets.** Requests to static assets are free and unlimited ([Cloudflare docs](https://developers.cloudflare.com/workers/static-assets/billing-and-limitations/)), so a static app costs nothing at any realistic traffic. The catch: a Workers custom domain needs the domain's nameservers on Cloudflare, unlike Pages, which accepts a CNAME for a subdomain ([cogley.jp](https://cogley.jp/articles/cloudflare-pages-to-workers-migration)). Two paths: move alfredbalaga.com's DNS to Cloudflare and re-point the Builder site from there (confirm Hostinger supports that for the Builder first), or launch on the free `*.workers.dev` address and add the custom domain later. The same Worker can later host a small proxy if Open-Meteo refuses browser calls, inside the free script quota.
+**Decision: Cloudflare Workers Free with static assets.** Requests to static assets are free and unlimited ([Cloudflare docs](https://developers.cloudflare.com/workers/static-assets/billing-and-limitations/)), so a static app costs nothing at any realistic traffic. That changed when the rate-limiting Worker was added: with `run_worker_first` every request is a Worker request (Free plan: 100,000 a day), so a flood could exhaust the free cap and take the site down. Watch it during beta, and move to the paid plan if traffic warrants. The catch: a Workers custom domain needs the domain's nameservers on Cloudflare, unlike Pages, which accepts a CNAME for a subdomain ([cogley.jp](https://cogley.jp/articles/cloudflare-pages-to-workers-migration)). Two paths: move alfredbalaga.com's DNS to Cloudflare and re-point the Builder site from there (confirm Hostinger supports that for the Builder first), or launch on the free `*.workers.dev` address and add the custom domain later. The same Worker can later host a small proxy if Open-Meteo refuses browser calls, inside the free script quota.
 
 ## Risks and mitigations
 
@@ -142,32 +143,35 @@ The biggest risk is a false red flag that sends an owner to fight an installer o
 | Unmodelled shading (neighbor's roof, water tank) | PR reads low year-round | Ask "any shading after 9am or before 3pm?"; if yes, compare month to month rather than against absolute band |
 | Bill period vs inverter period misalignment | Negative self-consumption, nonsense savings | Force reading dates; S < 0 blocks the result and explains why |
 | Users treat output as a verdict on their installer | Reputational heat for you | Findings sheet framed as "questions to ask", no installer names stored or shown, disclaimer that it is a screening check, not an inspection |
-| Open-Meteo CORS or terms change | F4 breaks | Fallback chain (NASA POWER, then typical-only); non-commercial use only |
+| Open-Meteo CORS or terms change | F4 breaks | NASA POWER alone (shown as inferred), then typical-only; non-commercial use only. Himawari has holes in 2026 today, which the fallback already covers |
+| Bot traffic | Free-plan Worker request cap reached, site unavailable | Per-visitor rate limit in the Worker; fails open; watch the daily request count in beta |
 | Employer IP overlap | Ownership dispute | Low: residential net-metering is outside NAC's business. Build on personal hardware and time anyway, and keep it off company devices this time |
 
 **Out of scope:** diagnosing specific faults, string-level data, cell-level or SoC-curve battery analysis (v1 works from monthly charge and discharge totals), anything above 100 kW.
 
 ## Build plan and acceptance criteria
 
-Nine steps, the calc core before any UI, so the numbers are trusted before anything looks finished.
+Built in the order of `docs/NEXT.md`, calc core before any UI, so the numbers are trusted before anything looks finished.
 
-1. **Spike (half a day).** From a local static page, confirm browser fetches to Open-Meteo and NASA POWER return data with CORS headers; pull PVGIS MRcalc for three PH points.
-2. **Irradiance grid.** Python script builds the PH land-cell JSON from PVGIS MRcalc (horizontal irradiation, diffuse ratio, average temperature).
-3. **Calc core.** One pure JS module (transposition, PR, split, savings, degradation) with golden-case tests, the same discipline as SCNTL's regression suite.
-4. **Input flow + F1, F5, F6, F7.** System setup once, then one card per bill.
-5. **F2 bill decoder.** Annotated walk-through of the user's own numbers: import, export, credit, fixed charges.
-6. **F4 weather check** wired to the verified source.
-7. **F3 findings sheet + save/load JSON.**
-8. **Private beta** with 5 owners across Luzon, Visayas and Mindanao DUs; compare the tool's PR against each owner's installer claims.
-9. **Deploy** to the subdomain; doorway page on alfredbalaga.com.
+1. **Spikes.** Done. Browser CORS for Open-Meteo and NASA POWER (spike 1); source validation against Global Solar Atlas (spike 2).
+2. **Typical-year grid.** Done (task 1). `scripts/build-grid.mjs` builds `public/data/ph-grid.json` from NASA POWER.
+3. **Calc core.** Done (task 2). One pure JS module with golden-case tests, POA checked against pvlib.
+4. **Input flow and F1, F5, F6, F7.** Done (task 3). System setup once, then one card per bill.
+5. **F2 bill decoder.** Done (task 4). Taglish walk-through of the owner's own numbers.
+6. **F4 weather check.** Done (task 5).
+7. **F3 findings sheet and save/load JSON.** Done (task 6).
+8. **F8 degradation and F9 hybrid.** Done (task 7).
+9. **Clean-up and rate limiting.** Done (tasks 8 and 9). Spike pages and proxy routes removed; per-visitor limiter in the Worker.
+10. **Private beta** with 5 owners across Luzon, Visayas and Mindanao DUs; compare the tool's PR against each owner's installer claims. Open.
+11. **Deploy** to the subdomain; doorway page on alfredbalaga.com. Open.
 
 **Done when:**
 
-- [ ] Grid-derived annual yield is within ±3% of PVGIS PVcalc for Manila, Cebu, Davao, Iloilo and Laoag at the same tilt and loss
-- [ ] Golden-case tests pass for every formula in Calculation method, including S < 0 and zero-export cases
-- [ ] A first-time owner finishes setup plus one bill in under 5 minutes on a phone
-- [ ] Network tab shows no request carrying user inputs, only the rounded-coordinate weather call
-- [ ] Findings sheet prints to one A4/Letter page from Chrome and Safari mobile
+- [x] Grid annual GHI agrees with an independent reference. Superseded the PVGIS PVcalc criterion (PVGIS does not cover the Philippines): Manila is +3.9% against Global Solar Atlas (limit ±5%), and Laoag, Iloilo, Cebu and Davao are within 4% of the spike 2 NASA means (limit ±8%)
+- [x] Golden-case tests pass for every formula in Calculation method, including S < 0 and zero-export cases (`node --test`, 94 tests)
+- [ ] A first-time owner finishes setup plus one bill in under 5 minutes on a phone. Needs a real first-time owner
+- [x] Network tab shows no request carrying user inputs: only static files from our own host, plus the rounded-coordinate weather calls made on click (checked in headless Chromium)
+- [ ] Findings sheet prints to one A4/Letter page from Chrome and Safari mobile. One page on A4 and Letter in Chromium in the worst case built; Safari mobile not yet checked
 - [ ] Every beta owner can explain their own export credit after using F2
 
 ## Open decisions
@@ -177,6 +181,7 @@ Nine steps, the calc core before any UI, so the numbers are trusted before anyth
 - [x] **Hybrid systems.** In v1 scope as F9
 - [x] **Language.** English UI; Taglish for bill-decoder explanations, tooltips and nudges; findings sheet stays English because it goes to the installer
 - [x] **Obsolescence tracker.** Separate product and brand
+- [x] **Rate limiting.** In code: Worker with the Workers Rate Limiting binding (a WAF rule was not available on Fred's plan). See `docs/RATE-LIMITING.md`
 - [ ] **Beta recruits.** Fred sourcing five owners across three DUs, with at least two hybrids
 
 ## Sources
@@ -189,4 +194,6 @@ Nine steps, the calc core before any UI, so the numbers are trusted before anyth
 - [Solaren Power, comparing solar quotes in PH](https://solaren-power.com/comparing-solar-quotes-in-the-philippines/)
 - [PVGIS non-interactive API](https://joint-research-centre.ec.europa.eu/photovoltaic-geographical-information-system-pvgis/getting-started-pvgis/api-non-interactive-service_en)
 - [Open-Meteo features](https://open-meteo.com/en/features)
+- [Cloudflare, Workers Rate Limiting binding](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/)
+- [NASA POWER data access](https://power.larc.nasa.gov/docs/)
 - [Hostinger, embedding custom code](https://www.hostinger.com/support/6463152-hostinger-website-builder-how-to-embed-custom-code/)

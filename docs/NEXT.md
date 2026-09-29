@@ -86,7 +86,8 @@ Himawari monthly ratio to its own climatology, cross-checked against NASA POWER;
 
 ## 9. Rate limiting
 
-Added 29 Sep 2026 at Fred's request. Decided: a Cloudflare WAF rate limiting rule on the custom domain. Write-up and suggested values in `docs/RATE-LIMITING.md`.
+Added 29 Sep 2026 at Fred's request. A Cloudflare WAF rate limiting rule was not available on Fred's plan (Enterprise add-on), so it is in code. See `docs/RATE-LIMITING.md`.
 
-- [x] Approach decided and documented.
-- [ ] **Fred:** create the rule in the Cloudflare dashboard (needs the zone, so I cannot do it from here) and run the curl check in the doc. Tick this when done.
+- [x] Worker runs first (`run_worker_first`) and checks the Workers Rate Limiting binding: 100 requests per 10 seconds per visitor, keyed by a daily-rotating hash of the IP, fails open. `src/worker.js`, `wrangler.jsonc`, 4 tests.
+- [x] Checked in the Workers runtime under `wrangler dev`: 150 rapid requests gave 100 served and 50 `429`; another visitor unaffected; recovered after 10 seconds; static files served; `/api/pvgis` returns 404.
+- [ ] **Fred, after deploy:** run the curl check in the doc against the live hostname, and watch the daily Worker request count during beta (Free plan cap is 100,000 a day, and every request now counts).

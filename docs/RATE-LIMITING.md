@@ -1,50 +1,34 @@
 # Rate limiting
 
-Decided 29 Sep 2026 (Fred): use a Cloudflare WAF rate limiting rule on the custom domain. No code, nothing stored by us, no Worker requests used. `src/worker.js` stays a pass-through.
+Decided 29 Sep 2026 (Fred): a Cloudflare WAF rate limiting rule was not available on the plan (it showed as an Enterprise add-on), so the limiter is in the Worker, in code.
 
-## Why this way
+## What it does
 
-- Requests for static files never run the Worker, and Cloudflare does not bill or cap static asset requests. A bot hitting the page costs nothing and there is no backend or paid upstream behind it.
-- The only real cost of bot traffic is noise in any counter we might add later. A rule at the edge stops it before it reaches the site.
-- A Worker-based limiter would need `run_worker_first`, so every request becomes a Worker call. That is billable, and a flood could hit the free daily cap and take the site down. It would also key on IP inside our own code, which stretches CLAUDE.md rule 2.
+`src/worker.js` runs first on every request (`assets.run_worker_first` in `wrangler.jsonc`) and asks Cloudflare's Workers Rate Limiting binding (`LIMITER`) whether this visitor is over the limit.
 
-## What a normal visit looks like
+- **Limit:** 100 requests per 10 seconds per visitor. One page load is 7 requests to our own host (`/`, `/app.css`, `/js/app.js`, `/vendor/alpine.min.js`, `/js/calc.js`, `/js/grid.js`, `/data/ph-grid.json`). Save, load, print and the two weather calls do not touch our host. A person clicking around never gets near the limit.
+- **Why loose:** many Philippine mobile users share one public IP behind carrier-grade NAT. A tight limit would block real owners along with bots. Lower it only if the daily request count shows a real flood.
+- **Over the limit:** `429` with `Retry-After: 10` and `Cache-Control: no-store`, and a one-line plain message.
+- **Key:** the first 16 bytes of SHA-256 over `IP|UTC date`, in hex. The raw IP is never our key, and counters reset by themselves at midnight UTC. Cloudflare holds the counters. We do not log or store anything, and we never read user inputs.
+- **Fails open:** if the binding is missing, errors, or there is no client IP, the visitor is served. The limiter must never take the site down.
 
-One page load is 7 requests to our own host (`/`, `/app.css`, `/js/app.js`, `/vendor/alpine.min.js`, `/js/calc.js`, `/js/grid.js`, `/data/ph-grid.json`), measured in headless Chromium. Everything else the app does is in the browser: save, load, print, and the two weather calls go to Open-Meteo and NASA POWER, not to us. A person clicking around never gets near 20 requests in 10 seconds.
+To change the numbers, edit `ratelimits` in `wrangler.jsonc` (`limit`, and `period`, which Cloudflare allows as 10 or 60 seconds).
 
-## The rule (set in the Cloudflare dashboard by Fred)
+## Trade-offs
 
-Security, then WAF, then Rate limiting rules, then Create rule, on the zone that holds the SCND custom domain.
+- **Every request is a Worker request.** Static asset requests are normally free and unlimited, but with `run_worker_first` they run the Worker. Free plan: 100,000 Worker requests a day. About 14,000 page loads a day would reach it. A flood that the limiter blocks still counts against the cap, so a big enough flood can take the site down for the rest of the day. Watch the daily request count in the Cloudflare dashboard during beta. If traffic or bots grow, move to the Workers Paid plan.
+- **Counts are approximate.** The binding is per Cloudflare location and eventually consistent, so the limit is permissive, not exact. That is fine for stopping floods.
+- **No cover for `workers.dev`?** It does cover it: the limiter is in the Worker, so preview URLs are limited too.
+- **Not a defence against a large distributed attack.** Cloudflare's built-in DDoS protection is the layer for that, and it is on by default.
 
-| Setting | Suggested value |
-| --- | --- |
-| Rule name | `scnd bot flood` |
-| If incoming requests match | Custom filter expression: `(http.host eq "<your SCND hostname>")` |
-| Characteristics | IP |
-| Requests | 100 |
-| Period | 10 seconds |
-| Action | Block |
-| Duration | 10 seconds (or the longest your plan allows) |
+## Checked
 
-Why 100 per 10 seconds and not tighter: many Philippine mobile users share one public IP behind carrier-grade NAT, so a strict limit would block real owners along with bots. Treat 100 as a starting point and lower it only if the Security events log shows a real flood.
+Under `wrangler dev` (Workers runtime, local), 150 rapid requests from one visitor gave 100 served and 50 blocked with `429`; a second visitor was unaffected; the first visitor was served again after 10 seconds; static files were served; the removed `/api/pvgis` route returned 404. Unit tests are in `test/worker.test.mjs`. Local counters are exact, production counters are approximate (above).
 
-Plan limits change: the number of rules, the allowed periods and the allowed durations depend on the Cloudflare plan. Check what the dashboard offers for your plan and pick the closest values. If only one rule is allowed, use the one above.
+## Check it after deploy
 
-## Not covered
-
-- Per-version preview URLs (`*.workers.dev`) are not on the zone, so the rule does not apply to them. They are unlisted and for beta testers.
-- This does not stop a determined, distributed attack. Cloudflare's built-in DDoS protection is the layer for that and is on by default.
-
-## Check it works
-
-From a terminal, after saving the rule (expect HTTP 429 or a block page once you pass the limit, then normal again after the duration):
+From your own connection (not a shared one), expect some `429` once you pass the limit, then `200` again after about 10 seconds:
 
 ```
 for i in $(seq 1 150); do curl -s -o /dev/null -w "%{http_code}\n" https://<your SCND hostname>/; done | sort | uniq -c
 ```
-
-Then look at Security, then Events, to confirm the rule name shows up. Do this from your own connection, not a shared one.
-
-## Privacy note
-
-Cloudflare sees visitor IPs on any host it serves, and the rate limiter counts by IP at its edge. We do not receive, log or store those counts. This does not change the claim that the user's inputs never leave the browser.

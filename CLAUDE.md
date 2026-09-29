@@ -7,7 +7,7 @@ Owner: Fred (Alfred Balaga), renewable energy O&M practitioner. Personal project
 ## Hard rules
 
 1. **Static and private.** No backend of ours holding user data, no accounts, no database, no cookies, no analytics beyond an optional cookieless counter. User inputs (system details, bills, generation) never leave the browser. The only allowed outbound calls from the app are irradiance lookups with coordinates rounded to 0.1°.
-2. **The Worker (`src/worker.js`) stays thin.** It serves `public/` and may proxy public data sources that block browser calls. It never receives user inputs beyond rounded coordinates, and never logs or stores anything.
+2. **The Worker (`src/worker.js`) stays thin.** It serves `public/`, rate-limits requests with Cloudflare's rate limiting binding (key is a daily-rotating hash of the IP, never the raw IP; see `docs/RATE-LIMITING.md`), and may proxy public data sources that block browser calls. It never receives user inputs beyond rounded coordinates, and never logs or stores anything itself.
 3. **Calc core before UI.** All maths lives in one pure JS module (`public/js/calc.js`, no DOM, no fetch) with golden-case tests. No formula ships without a test. Tests run with `node --test`.
 4. **No company data.** Nothing from Fred's employer (NAC Energy / NAC EnerTech / EPI): no plant data, pyranometer data, SCADA exports, documents or templates. If a task seems to need it, stop and ask.
 5. **No hard-coded tariffs.** Rates are always read from the user's own bill. Meralco figures appear only in examples and tests, labelled with their date.
