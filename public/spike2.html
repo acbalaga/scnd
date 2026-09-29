@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SCND spike 2: irradiance sources vs PVGIS</title>
+<style>
+  :root { --bg:#fbfbfa; --ink:#15191e; --muted:#5b6470; --line:#d9dde2; --ok:#1f7a4d; --warn:#9a6700; --bad:#b3261e; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#111418; --ink:#e8eaed; --muted:#9aa3ad; --line:#2a3038; --ok:#5cc28d; --warn:#e3b341; --bad:#f28b82; } }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 system-ui, sans-serif; }
+  main { max-width:880px; margin:0 auto; padding:24px 16px 48px; }
+  h1 { font-size:20px; margin:0 0 4px; } h2 { font-size:16px; margin:28px 0 8px; }
+  p.sub { color:var(--muted); margin:0 0 16px; }
+  .scroll { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-size:13.5px; font-variant-numeric:tabular-nums; }
+  th, td { text-align:right; padding:7px 8px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  th:first-child, td:first-child { text-align:left; }
+  th { color:var(--muted); font-weight:600; }
+  .ok { color:var(--ok); font-weight:600; } .warn { color:var(--warn); font-weight:600; } .bad { color:var(--bad); font-weight:600; }
+  button { font:inherit; padding:8px 14px; border-radius:8px; border:1px solid var(--line); background:transparent; color:var(--ink); cursor:pointer; margin-right:8px; }
+  #log { font:12px/1.5 ui-monospace, monospace; color:var(--muted); white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Which irradiance source can SCND trust?</h1>
+  <p class="sub">Monthly mean daily GHI, Jan 2020 to Dec 2023, five PH cities, each source compared against PVGIS SARAH-3 (reference). Wet season = Jun to Oct. Pass rule: wet-season bias within ±10% in every city.</p>
+  <p><button id="run">Run comparison</button><button id="csv" disabled>Copy monthly data as CSV</button></p>
+
+  <h2>Verdict</h2>
+  <div class="scroll"><table id="verdict"></table></div>
+
+  <h2>Bias vs PVGIS by city (wet / dry season)</h2>
+  <p class="sub">Bias = source mean ÷ PVGIS mean − 1 over the months both have. MAPE in brackets = mean absolute monthly error.</p>
+  <div class="scroll"><table id="bias"></table></div>
+
+  <h2>Fetch log</h2>
+  <div id="log"></div>
+</main>
+<script type="module">
+const cities = [
+  { name: 'Laoag',  lat: 18.2, lon: 120.6 },
+  { name: 'Manila', lat: 14.6, lon: 121.0 },
+  { name: 'Iloilo', lat: 10.7, lon: 122.6 },
+  { name: 'Cebu',   lat: 10.3, lon: 123.9 },
+  { name: 'Davao',  lat: 7.1,  lon: 125.6 },
+];
+const Y0 = 2020, Y1 = 2023;
+const WET = new Set([6, 7, 8, 9, 10]);
+const MIN_DAYS = 25; // a month needs this many valid daily values to count
+
+const logEl = document.getElementById('log');
+const log = s => { logEl.textContent += s + '\n'; };
+
+const daysIn = (y, m) => new Date(Date.UTC(y, m, 0)).getUTCDate();
+const key = (y, m) => `${y}-${String(m).padStart(2, '0')}`;
+
+async function getJSON(url) {
+  const t0 = performance.now();
+  const r = await fetch(url);
+  const ms = Math.round(performance.now() - t0);
+  if (!r.ok) throw new Error(`HTTP ${r.status} (${ms} ms) ${(await r.text()).slice(0, 200)}`);
+  const j = await r.json();
+  return { j, ms };
+}
+
+// Daily series {time[], value[]} in MJ/m²/day -> Map(month -> kWh/m²/day)
+function monthlyFromDaily(times, vals) {
+  const acc = new Map();
+  times.forEach((t, i) => {
+    const v = vals[i];
+    if (typeof v !== 'number' || !Number.isFinite(v)) return;
+    const k = t.slice(0, 7);
+    const a = acc.get(k) ?? { s: 0, n: 0 };
+    a.s += v; a.n += 1; acc.set(k, a);
+  });
+  const out = new Map();
+  for (const [k, a] of acc) if (a.n >= MIN_DAYS) out.set(k, a.s / a.n / 3.6);
+  return out;
+}
+
+const sources = {
+  pvgis: {
+    label: 'PVGIS SARAH-3 (reference)',
+    async load(c) {
+      const { j, ms } = await getJSON(`/api/pvgis?lat=${c.lat}&lon=${c.lon}&startyear=${Y0}&endyear=${Y1}`);
+      const out = new Map();
+      for (const row of j.outputs.monthly) {
+        const hk = Object.keys(row).find(k => k.startsWith('H(h)'));
+        if (hk && Number.isFinite(row[hk])) out.set(key(row.year, row.month), row[hk] / daysIn(row.year, row.month));
+      }
+      return { out, ms };
+    },
+  },
+  omArchive: {
+    label: 'Open-Meteo archive (reanalysis)',
+    async load(c) {
+      const { j, ms } = await getJSON(`https://archive-api.open-meteo.com/v1/archive?latitude=${c.lat}&longitude=${c.lon}&start_date=${Y0}-01-01&end_date=${Y1}-12-31&daily=shortwave_radiation_sum&timezone=Asia%2FManila`);
+      return { out: monthlyFromDaily(j.daily.time, j.daily.shortwave_radiation_sum), ms };
+    },
+  },
+  omSatellite: {
+    label: 'Open-Meteo satellite (Himawari)',
+    async load(c) {
+      const { j, ms } = await getJSON(`https://satellite-api.open-meteo.com/v1/archive?latitude=${c.lat}&longitude=${c.lon}&start_date=${Y0}-01-01&end_date=${Y1}-12-31&daily=shortwave_radiation_sum&models=satellite_radiation_seamless&timezone=Asia%2FManila`);
+      return { out: monthlyFromDaily(j.daily.time, j.daily.shortwave_radiation_sum), ms };
+    },
+  },
+  nasa: {
+    label: 'NASA POWER (monthly)',
+    async load(c) {
+      const { j, ms } = await getJSON(`https://power.larc.nasa.gov/api/temporal/monthly/point?parameters=ALLSKY_SFC_SW_DWN&community=RE&latitude=${c.lat}&longitude=${c.lon}&start=${Y0}&end=${Y1}&format=JSON`);
+      const out = new Map();
+      for (const [k, v] of Object.entries(j.properties.parameter.ALLSKY_SFC_SW_DWN)) {
+        const m = Number(k.slice(4, 6));
+        if (m >= 1 && m <= 12 && v > -900) out.set(`${k.slice(0, 4)}-${k.slice(4, 6)}`, v);
+      }
+      return { out, ms };
+    },
+  },
+};
+const candidates = ['omArchive', 'omSatellite', 'nasa'];
+
+// data[city][source] = Map(month -> kWh/m²/day)
+const data = {};
+
+function stats(src, ref, wet) {
+  let ss = 0, sr = 0, ape = 0, n = 0;
+  for (const [k, r] of ref) {
+    const m = Number(k.slice(5, 7));
+    if (WET.has(m) !== wet) continue;
+    const s = src.get(k);
+    if (!Number.isFinite(s) || !(r > 0)) continue;
+    ss += s; sr += r; ape += Math.abs(s / r - 1); n += 1;
+  }
+  return n ? { bias: ss / sr - 1, mape: ape / n, n } : null;
+}
+
+const pct = x => `${x >= 0 ? '+' : ''}${(x * 100).toFixed(1)}%`;
+const cls = x => Math.abs(x) <= 0.05 ? 'ok' : Math.abs(x) <= 0.10 ? 'warn' : 'bad';
+const cell = st => st ? `<span class="${cls(st.bias)}">${pct(st.bias)}</span> <span style="color:var(--muted)">(${(st.mape * 100).toFixed(0)}%, n=${st.n})</span>` : '<span style="color:var(--muted)">no overlap</span>';
+
+function render() {
+  const bias = document.getElementById('bias');
+  let h = '<tr><th>Source</th><th>Season</th>' + cities.map(c => `<th>${c.name}</th>`).join('') + '</tr>';
+  const verdictRows = [];
+  for (const s of candidates) {
+    let worstWet = 0, allWet = true;
+    for (const wet of [true, false]) {
+      h += `<tr><td>${sources[s].label}</td><td>${wet ? 'Wet' : 'Dry'}</td>`;
+      for (const c of cities) {
+        const d = data[c.name];
+        const st = d?.[s] && d?.pvgis ? stats(d[s], d.pvgis, wet) : null;
+        if (wet) {
+          if (!st) allWet = false; else worstWet = Math.max(worstWet, Math.abs(st.bias));
+        }
+        h += `<td>${cell(st)}</td>`;
+      }
+      h += '</tr>';
+    }
+    verdictRows.push({ s, worstWet, allWet });
+  }
+  bias.innerHTML = h;
+
+  document.getElementById('verdict').innerHTML =
+    '<tr><th>Source</th><th>Worst wet-season bias</th><th>Result</th></tr>' +
+    verdictRows.map(v => {
+      const pass = v.allWet && v.worstWet <= 0.10;
+      const res = !v.allWet ? '<span class="warn">INCOMPLETE</span> (missing months)' : pass ? '<span class="ok">PASS</span>' : '<span class="bad">FAIL</span>';
+      return `<tr><td>${sources[v.s].label}</td><td>${v.allWet ? pct(v.worstWet).replace('+', '±') : 'n/a'}</td><td>${res}</td></tr>`;
+    }).join('');
+}
+
+function csv() {
+  const cols = ['pvgis', ...candidates];
+  const rows = ['city,month,' + cols.join(',')];
+  for (const c of cities) {
+    for (let y = Y0; y <= Y1; y++) for (let m = 1; m <= 12; m++) {
+      const k = key(y, m);
+      rows.push([c.name, k, ...cols.map(s => {
+        const v = data[c.name]?.[s]?.get(k);
+        return Number.isFinite(v) ? v.toFixed(3) : '';
+      })].join(','));
+    }
+  }
+  return rows.join('\n');
+}
+
+async function run() {
+  document.getElementById('run').disabled = true;
+  logEl.textContent = '';
+  for (const c of cities) {
+    data[c.name] = {};
+    for (const s of ['pvgis', ...candidates]) {
+      try {
+        const { out, ms } = await sources[s].load(c);
+        data[c.name][s] = out;
+        log(`OK   ${c.name.padEnd(7)} ${s.padEnd(12)} ${String(out.size).padStart(2)} months  ${ms} ms`);
+      } catch (e) {
+        log(`FAIL ${c.name.padEnd(7)} ${s.padEnd(12)} ${e.message}`);
+      }
+      render();
+    }
+  }
+  document.getElementById('run').disabled = false;
+  document.getElementById('csv').disabled = false;
+}
+
+document.getElementById('run').addEventListener('click', run);
+document.getElementById('csv').addEventListener('click', async () => {
+  const text = csv();
+  try { await navigator.clipboard.writeText(text); alert('Copied ' + text.split('\n').length + ' lines.'); }
+  catch { const w = window.open('', '_blank'); w.document.write('<pre>' + text + '</pre>'); }
+});
+render();
+</script>
+</body>
+</html>
