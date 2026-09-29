@@ -83,3 +83,10 @@ Himawari monthly ratio to its own climatology, cross-checked against NASA POWER;
 
 - [x] Remove spike pages and the `/api/pvgis` and `/api/gsa` proxy routes (keep them in git history). Done: `spike1.html`, `spike2.html` and both routes are gone; `src/worker.js` is now a pass-through to the static files. Last commit that has them: `fba1128`.
 - Private beta: Fred is recruiting five owners across three DUs, at least two hybrids.
+
+## 9. Rate limiting
+
+Added 29 Sep 2026 at Fred's request. Decided: a Cloudflare WAF rate limiting rule on the custom domain. Write-up and suggested values in `docs/RATE-LIMITING.md`.
+
+- [x] Approach decided and documented.
+- [ ] **Fred:** create the rule in the Cloudflare dashboard (needs the zone, so I cannot do it from here) and run the curl check in the doc. Tick this when done.
