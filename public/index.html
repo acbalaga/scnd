@@ -353,7 +353,7 @@
         <table class="sheet-table">
           <thead><tr><th>Period</th><th>Solar kWh</th><th>Expected kWh</th><th>PR</th><th>Weather</th><th>Exported</th><th>Saved</th></tr></thead>
           <tbody><template x-for="r in sheet.rows" :key="r.period"><tr>
-            <td x-text="r.period"></td><td x-text="r.actual"></td><td x-text="r.expected"></td><td x-text="r.pr + ' (' + r.band + ')'"></td><td x-text="r.wi"></td><td x-text="r.exported"></td><td x-text="r.saved"></td>
+            <td data-label="Period" x-text="r.period"></td><td data-label="Solar kWh" x-text="r.actual"></td><td data-label="Expected kWh" x-text="r.expected"></td><td data-label="PR" x-text="r.pr + ' (' + r.band + ')'"></td><td data-label="Weather" x-text="r.wi"></td><td data-label="Exported" x-text="r.exported"></td><td data-label="Saved" x-text="r.saved"></td>
           </tr></template></tbody>
         </table>
         <p class="help">Expected kWh is what the panels should make in that sun at PR 0.75. PR is the share of the sun's energy on the panels that became electricity. Weather is the weather index: the sun in the period divided by a typical year's sun for the same dates (1.00 is typical).</p>

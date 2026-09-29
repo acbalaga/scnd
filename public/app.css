@@ -3,6 +3,7 @@
 @media (prefers-color-scheme: dark) { :root { --bg:#111418; --card:#181c22; --ink:#e8eaed; --muted:#9aa3ad; --line:#2a3038; --accent:#6db1f5;
   --green:#5cc28d; --amber:#f0b84a; --red:#f28b82; --green-bg:#173325; --amber-bg:#3a2d10; --red-bg:#3d1c1a; } }
 * { box-sizing:border-box; }
+html { -webkit-text-size-adjust:100%; }
 [x-cloak] { display:none !important; }
 body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.5 system-ui, sans-serif; }
 main { max-width:640px; margin:0 auto; padding:20px 16px 64px; }
@@ -12,9 +13,14 @@ p { margin:0 0 10px; } .sub, .help { color:var(--muted); font-size:14px; }
 .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin:12px 0; }
 .grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px; } .grid > * { min-width:0; } .grid .wide { grid-column:1 / -1; }
 label { display:flex; flex-direction:column; font-size:14px; font-weight:600; } label span.hint { display:block; margin-bottom:4px; font-weight:400; color:var(--muted); font-size:13px; }
-input, select { width:100%; max-width:100%; font:inherit; padding:10px; margin-top:auto; padding-top:10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--ink); min-height:44px; }
-input[type=checkbox] { width:auto; min-height:0; margin:0 8px 0 0; }
-label.check { display:flex; align-items:flex-start; font-weight:400; } 
+input, select { display:block; width:100%; min-width:0; max-width:100%; font:inherit; padding:10px; margin-top:auto; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--ink); min-height:44px; text-align:left; -webkit-appearance:none; appearance:none; }
+/* Safari gives date and month inputs their own intrinsic width and centres the text: reset both. */
+input[type=date], input[type=month] { line-height:1.2; }
+input::-webkit-date-and-time-value { text-align:left; min-height:1.2em; }
+input::-webkit-datetime-edit { padding:0; }
+select { padding-right:36px; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%237a838d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 12px center; }
+input[type=checkbox] { -webkit-appearance:auto; appearance:auto; flex:none; width:22px; height:22px; min-height:0; margin:0; accent-color:var(--accent); }
+label.check { flex-direction:row; align-items:flex-start; gap:12px; font-weight:400; font-size:15px; line-height:1.4; }
 button { font:inherit; min-height:44px; padding:10px 16px; border-radius:8px; border:1px solid var(--line); background:transparent; color:var(--ink); cursor:pointer; }
 button.primary { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
 @media (prefers-color-scheme: dark) { button.primary { color:#111418; } }
@@ -32,6 +38,13 @@ svg.chart { width:100%; height:auto; } svg.chart text { fill:var(--muted); font-
 details.decoder { background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-top:12px; } details.decoder ol { padding-left:20px; margin:8px 0; } details.decoder li { margin-bottom:10px; }
 table.sheet-table { width:100%; border-collapse:collapse; font-size:13px; } .sheet-table th, .sheet-table td { border-bottom:1px solid var(--line); padding:4px 6px; text-align:left; vertical-align:top; } .sheet-table th { color:var(--muted); font-weight:600; }
 #findings ol, #findings ul { margin:4px 0 8px; padding-left:20px; } #findings li { margin-bottom:4px; }
+@media screen and (max-width:600px) {
+  .sheet-table thead { display:none; }
+  .sheet-table, .sheet-table tbody, .sheet-table tr { display:block; }
+  .sheet-table tr { border-bottom:1px solid var(--line); padding:8px 0; }
+  .sheet-table td { display:flex; justify-content:space-between; gap:12px; border:0; padding:2px 0; text-align:right; }
+  .sheet-table td::before { content:attr(data-label); color:var(--muted); text-align:left; }
+}
 @media print {
   @page { margin:12mm; }
   body { background:#fff; color:#000; }
