@@ -44,6 +44,8 @@ System setup once (location, kWp, tilt, facing, inverter AC kW, commissioning mo
 
 ## 4. F2 bill decoder
 
+- [x] Done. `billDecode` in `public/js/calc.js` (3 tests), and a Taglish "Decode this bill" walk-through in each bill card. Copy claims cite the SPEC sources (29 Sep 2026) in a comment next to the copy. A credit larger than the variable charges is flagged, not modelled, because how it carries over is not verified.
+
 Annotated walk-through of the user's own bill numbers. Explain export credit at the generation charge, and why fixed charges keep the bill above zero.
 
 ## 5. F4 weather check

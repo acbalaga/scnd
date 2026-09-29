@@ -29,6 +29,12 @@ const FLAG_TEXT = {
   clipping: 'Panels are more than 1.3 times the inverter size, so the inverter caps output on sunny days.',
 };
 
+const DECODE_FLAG_TEXT = {
+  gen_above_buy: "Mas mataas ang generation charge na inilagay mo kaysa sa average na binibili mo. Tingnan kung ang 'Variable charges' ay ang subtotal bago ang export credit.",
+  credit_exceeds_variable: 'Mas malaki ang export credit kaysa sa variable charges. Itanong sa utility kung paano hinahawakan ang sobrang credit sa bill mo (carry-over o hindi). Hindi ito kinukwenta ng SCND.',
+  total_below_charges: 'Mas mababa ang total mo kaysa sa lumalabas sa kwenta. Baka may discount o carry-over na credit, o may maling numero. Balikan ang bill.',
+};
+
 let nextId = 1;
 const newBill = () => ({ id: nextId++, start: '', end: '', inverterKwh: '', importKwh: '', exportKwh: '', genRate: '', varCharges: '', total: '', outageHours: '' });
 
@@ -127,6 +133,12 @@ document.addEventListener('alpine:init', () => {
       return calc.redFlag(ordered.slice(0, k + 1).map((x) => this.result(x)?.band ?? null));
     },
 
+    num,
+    decode(b) {
+      const v = { importKwh: num(b.importKwh), exportKwh: num(b.exportKwh), genRate: num(b.genRate), varCharges: num(b.varCharges), total: num(b.total) };
+      return Object.values(v).every(Number.isFinite) ? calc.billDecode(v) : null;
+    },
+    decodeFlagText: (f) => DECODE_FLAG_TEXT[f],
     bandLabel: (band) => BAND_LABEL[band],
     flagText: (f) => FLAG_TEXT[f],
     fmt: (v, d) => (Number.isFinite(v) ? v.toLocaleString('en-PH', { minimumFractionDigits: d, maximumFractionDigits: d }) : ''),

@@ -29,4 +29,5 @@ details { margin:6px 0; font-size:14px; } summary { cursor:pointer; color:var(--
 .err { color:var(--red); font-size:14px; margin:6px 0; }
 .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:12px; }
 svg.chart { width:100%; height:auto; } svg.chart text { fill:var(--muted); font-size:10px; }
+details.decoder { background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-top:12px; } details.decoder ol { padding-left:20px; margin:8px 0; } details.decoder li { margin-bottom:10px; }
 @media print { button, details summary { display:none; } }

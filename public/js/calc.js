@@ -178,6 +178,36 @@ export function savings({ s, x, rImport, rExport }) {
   return s * rImport + x * rExport;
 }
 
+// ---------- F2: bill decoder ----------
+
+// Walks one net-metered bill from the user's own numbers. Returns the amounts the UI narrates:
+//   rImport       average buying rate, variable charges / imported kWh
+//   exportCredit  X x generation charge
+//   afterCredit   variable charges minus credit, floored at 0
+//   other         total minus afterCredit: fixed charges, taxes and anything not in "variable charges"
+//   coverage      share of variable charges the credit offsets (null if variable charges are 0)
+//   exportGap     rImport - genRate: what a kWh used at home earns over a kWh exported
+// Claims behind it (docs/SPEC.md, sources dated 29 Sep 2026: Lakasolar "rebate vs net metering",
+// SolarPro Install "reading the net-metered Meralco bill"): exports are credited at the generation
+// charge, not the retail rate; fixed charges do not shrink with solar, so the bill stays above zero.
+// Not verified: how a credit larger than the variable charges is carried over. We flag it, not model it.
+export function billDecode({ importKwh, exportKwh, genRate, varCharges, total }) {
+  if (![importKwh, exportKwh, genRate, varCharges, total].every(Number.isFinite) || [importKwh, exportKwh, genRate, varCharges, total].some((v) => v < 0)) {
+    return err('bad_input', 'Need import kWh, export kWh, generation charge, variable charges and total as numbers >= 0.');
+  }
+  if (importKwh <= 0) return err('bad_input', 'Imported kWh must be above zero to work out your buying rate.');
+  const rImport = varCharges / importKwh;
+  const exportCredit = exportKwh * genRate;
+  const raw = varCharges - exportCredit;
+  const afterCredit = Math.max(raw, 0);
+  const other = total - afterCredit;
+  const flags = [];
+  if (genRate > rImport) flags.push('gen_above_buy');
+  if (raw < 0) flags.push('credit_exceeds_variable');
+  if (other < 0) flags.push('total_below_charges');
+  return { rImport, exportCredit, afterCredit, other, coverage: varCharges > 0 ? exportCredit / varCharges : null, exportGap: rImport - genRate, flags };
+}
+
 // Each kWh moved from night to midday is worth r_import - r_export.
 export function loadShiftValue({ rImport, rExport }) {
   return Number.isFinite(rImport) && Number.isFinite(rExport) ? rImport - rExport : err('bad_input', 'Need numeric rates.');

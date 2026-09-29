@@ -118,6 +118,24 @@ test('savings edge: negative self-consumption is an error', () => assert.ok(c.is
 test('loadShiftValue golden: 11 - 5 = 6', () => near(c.loadShiftValue({ rImport: 11, rExport: 5 }), 6));
 test('loadShiftValue edge: missing rate is an error', () => assert.ok(c.isError(c.loadShiftValue({ rImport: 11 }))));
 
+// ---- billDecode ----
+// Example only: generation charge 9.70 PHP/kWh is Meralco's September 2026 schedule (docs/SPEC.md); the rest is made up.
+test('billDecode golden: 300 kWh in, 220 out at 9.70, 3600 variable, 2100 total', () => {
+  const r = c.billDecode({ importKwh: 300, exportKwh: 220, genRate: 9.7, varCharges: 3600, total: 2100 });
+  near(r.rImport, 12); near(r.exportCredit, 2134); near(r.afterCredit, 1466); near(r.other, 634);
+  near(r.coverage, 2134 / 3600); near(r.exportGap, 2.3); assert.deepEqual(r.flags, []);
+});
+test('billDecode edge: credit above variable charges keeps other charges above zero and is flagged', () => {
+  const r = c.billDecode({ importKwh: 100, exportKwh: 500, genRate: 9.7, varCharges: 1200, total: 400 });
+  near(r.afterCredit, 0); near(r.other, 400); assert.ok(r.flags.includes('credit_exceeds_variable'));
+});
+test('billDecode edge: total below the charges, generation rate above buying rate, bad input', () => {
+  assert.ok(c.billDecode({ importKwh: 300, exportKwh: 0, genRate: 9.7, varCharges: 3600, total: 3000 }).flags.includes('total_below_charges'));
+  assert.ok(c.billDecode({ importKwh: 300, exportKwh: 0, genRate: 15, varCharges: 3600, total: 3900 }).flags.includes('gen_above_buy'));
+  assert.ok(c.isError(c.billDecode({ importKwh: 0, exportKwh: 0, genRate: 9.7, varCharges: 0, total: 0 })));
+  assert.ok(c.isError(c.billDecode({ importKwh: 300, exportKwh: NaN, genRate: 9.7, varCharges: 3600, total: 2100 })));
+});
+
 // ---- degradation ----
 const months = (year, pr) => Array.from({ length: 12 }, (_, m) => ({ year, month: m + 1, pr }));
 test('degradation golden: Jan 0.80 to 0.796 is 0.5%/yr, within a 0.55% warranty', () => {

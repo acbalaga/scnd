@@ -168,6 +168,25 @@
                 </div>
               </template>
 
+              <!-- F2 bill decoder. Copy claims (export credit at the generation charge, not retail; fixed charges keep
+                   the bill above zero) come from docs/SPEC.md sources, dated 29 Sep 2026: Lakasolar "rebate vs net
+                   metering" and SolarPro Install "reading the net-metered Meralco bill". No rates are hard-coded:
+                   every peso figure below is read from the user's own bill. -->
+              <template x-if="decode(b) && !decode(b).error">
+                <details class="decoder" open>
+                  <summary><strong>Decode this bill</strong></summary>
+                  <ol>
+                    <li><strong>Binili mo sa grid.</strong> Bumili ka ng <b x-text="fmt(num(b.importKwh), 0) + ' kWh'"></b>. Ang mga singil na tumataas kasabay ng kWh ay <b x-text="'₱' + fmt(num(b.varCharges), 2)"></b>. Average iyon na <b x-text="'₱' + fmt(decode(b).rImport, 2) + ' bawat kWh'"></b>.</li>
+                    <li><strong>Na-export mo.</strong> Nag-export ka ng <b x-text="fmt(num(b.exportKwh), 0) + ' kWh'"></b>. Ang credit ay nasa presyo ng generation charge lang (<b x-text="'₱' + fmt(num(b.genRate), 2)"></b> bawat kWh), hindi sa buong presyo ng binibili mo. Kaya ang export credit mo ay <b x-text="'₱' + fmt(decode(b).exportCredit, 2)"></b>.
+                      <span x-show="decode(b).exportGap > 0"> Mas malaki ang ipon kapag ginamit mo mismo sa bahay ang solar (<b x-text="'₱' + fmt(decode(b).rImport, 2)"></b>) kaysa i-export (<b x-text="'₱' + fmt(num(b.genRate), 2)"></b>).</span></li>
+                    <li><strong>Pagkatapos ng credit.</strong> <span x-text="'₱' + fmt(num(b.varCharges), 2) + ' minus ₱' + fmt(decode(b).exportCredit, 2) + ' ay ₱' + fmt(decode(b).afterCredit, 2) + '.'"></span>
+                      <span x-show="decode(b).coverage !== null"> Na-offset ng credit ang <b x-text="fmt(Math.min(decode(b).coverage, 1) * 100, 0) + '%'"></b> ng variable charges.</span></li>
+                    <li><strong>Bakit hindi zero ang bill.</strong> Ang natitirang <b x-text="'₱' + fmt(Math.max(decode(b).other, 0), 2)"></b> ay fixed charges (tulad ng metering at supply) at iba pang singil na hindi sakop ng variable charges. Hindi ito bumababa kahit gaano karami ang i-export mo. Pambawas lang sa variable charges ang credit, kaya hindi kailanman zero ang bill.</li>
+                    <li><strong>Total.</strong> <b x-text="'₱' + fmt(num(b.total), 2)"></b> ang binayaran mo.</li>
+                  </ol>
+                  <template x-for="f in decode(b).flags" :key="f"><div class="flag" x-text="decodeFlagText(f)"></div></template>
+                </details>
+              </template>
               <template x-for="f in result(b).flags" :key="f"><div class="flag" x-text="flagText(f)"></div></template>
             </div>
           </template>
