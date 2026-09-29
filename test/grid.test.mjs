@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, statSync } from 'node:fs';
-import { interpolate, lookup } from '../public/js/grid.js';
+import { interpolate, isLowDiffuse, lookup, LOW_DIFFUSE_FRACTION } from '../public/js/grid.js';
 import { GSA_MANILA_GHI_KWH_M2_MONTH } from './fixtures-gsa.mjs';
 
 const GRID_PATH = new URL('../public/data/ph-grid.json', import.meta.url);
@@ -43,14 +43,26 @@ test('Manila annual GHI within 5% of Global Solar Atlas', opts, () => {
   const gsa = GSA_MANILA_GHI_KWH_M2_MONTH.reduce((s, v) => s + v, 0);
   assert.ok(Math.abs(nasa / gsa - 1) <= 0.05, `NASA ${nasa.toFixed(0)} vs GSA ${gsa.toFixed(0)} kWh/m2/yr`);
 });
-test('diffuse fraction is 0.3 to 0.7 for every land cell and month', opts, () => {
+// Bound is 0.3 to 0.7 everywhere, except cells flagged by isLowDiffuse (very clear dry season),
+// which may go down to 0.27. Flagged cells must be the Feb to Apr clear-sky set only.
+test('diffuse fraction is 0.3 to 0.7, or 0.27 to 0.7 for flagged low-diffuse cells', opts, () => {
   real.ghi.forEach((g, k) => {
-    if (!g) return;
+    const flagged = isLowDiffuse({ ghi: g, dif: real.dif[k] });
     g.forEach((v, m) => {
       const f = real.dif[k][m] / v;
-      assert.ok(f >= 0.3 && f <= 0.7, `cell ${k} month ${m + 1}: ${f.toFixed(2)}`);
+      assert.ok(f >= (flagged ? 0.27 : LOW_DIFFUSE_FRACTION) && f <= 0.7, `cell ${k} month ${m + 1}: ${f.toFixed(3)}`);
+      if (flagged && f < LOW_DIFFUSE_FRACTION) assert.ok(m >= 1 && m <= 3, `cell ${k}: low diffuse outside Feb-Apr (month ${m + 1})`);
     });
   });
+});
+test('isLowDiffuse flags synthetic clear-sky points and passes normal ones', () => {
+  const ghi = Array(12).fill(5);
+  assert.equal(isLowDiffuse({ ghi, dif: Array(12).fill(2) }), false);
+  assert.equal(isLowDiffuse({ ghi, dif: Array(12).fill(1.4) }), true);
+});
+test('isLowDiffuse is true in the Mindoro dry-season area and false at Manila', opts, () => {
+  assert.equal(isLowDiffuse(lookup(real, 11.5, 121.0)), true);
+  assert.equal(isLowDiffuse(lookup(real, 14.6, 121.0)), false);
 });
 
 // TODO(Fred): the spike 2 NASA monthly means for Laoag, Iloilo, Cebu, Davao are in README/public/spike2.html

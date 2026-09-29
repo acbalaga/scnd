@@ -34,3 +34,14 @@ export function lookup(grid, lat, lon) {
   const t2m = interpolate(grid, 't2m', lat, lon);
   return ghi && dif && t2m ? { ghi, dif, t2m } : null;
 }
+
+// Diffuse fraction below this in any month marks a very clear dry-season location.
+// Found in the 2001-2020 NASA POWER climatology (built 29 Sep 2026): 42 cell-months (26 cells) in Feb to Apr
+// around Mindoro, Panay, northern Palawan and the seas west of Luzon, minimum 0.279. NASA also reads up to ~8% low in the dry season
+// (README "Spike 2 result"), so results there should carry a caveat in the UI.
+export const LOW_DIFFUSE_FRACTION = 0.3;
+
+// True if any month at this point has a diffuse fraction below LOW_DIFFUSE_FRACTION.
+export function isLowDiffuse(point) {
+  return point.ghi.some((g, m) => point.dif[m] / g < LOW_DIFFUSE_FRACTION);
+}
