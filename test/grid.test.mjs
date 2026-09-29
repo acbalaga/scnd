@@ -6,7 +6,6 @@ import { GSA_MANILA_GHI_KWH_M2_MONTH } from './fixtures-gsa.mjs';
 
 const GRID_PATH = new URL('../public/data/ph-grid.json', import.meta.url);
 const DAYS = [31, 28.25, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-const annualMean = (m) => m.reduce((s, v) => s + v, 0) / 12;
 
 // Synthetic 2x2 grid: value = 10*i + j + month index, so bilinear results are easy to check.
 const tiny = (() => {
@@ -65,13 +64,15 @@ test('isLowDiffuse is true in the Mindoro dry-season area and false at Manila', 
   assert.equal(isLowDiffuse(lookup(real, 14.6, 121.0)), false);
 });
 
-// TODO(Fred): the spike 2 NASA monthly means for Laoag, Iloilo, Cebu, Davao are in README/public/spike2.html
-// results, not in the repo as data. Fill SPIKE2_ANNUAL_MEAN (kWh/m2/day) to enable this check.
-const SPIKE2_ANNUAL_MEAN = { laoag: null, iloilo: null, cebu: null, davao: null };
-const SITES = { laoag: [18.2, 120.6], iloilo: [10.7, 122.56], cebu: [10.3, 123.9], davao: [7.07, 125.6] };
+// Spike 2 NASA POWER monthly means, 2020 to 2023, day-weighted annual mean in kWh/m2/day.
+// Recomputed 29 Sep 2026 from the same API call and coordinates as public/spike2.html.
+// The grid is the 2001-2020 climatology, so a few percent of difference is expected.
+const SPIKE2_ANNUAL_MEAN = { laoag: 5.320, iloilo: 5.156, cebu: 4.972, davao: 4.961 };
+const SITES = { laoag: [18.2, 120.6], iloilo: [10.7, 122.6], cebu: [10.3, 123.9], davao: [7.1, 125.6] };
 for (const [name, [lat, lon]] of Object.entries(SITES)) {
-  test(`${name} annual GHI within 8% of spike 2`, { skip: hasGrid && SPIKE2_ANNUAL_MEAN[name] ? false : 'needs grid and spike 2 value' }, () => {
-    const mean = annualMean(lookup(real, lat, lon).ghi);
-    assert.ok(Math.abs(mean / SPIKE2_ANNUAL_MEAN[name] - 1) <= 0.08);
+  test(`${name} annual GHI within 8% of spike 2`, opts, () => {
+    const ghi = lookup(real, lat, lon).ghi;
+    const mean = ghi.reduce((s, v, m) => s + v * DAYS[m], 0) / 365.25;
+    assert.ok(Math.abs(mean / SPIKE2_ANNUAL_MEAN[name] - 1) <= 0.08, `${name} ${mean.toFixed(3)} vs ${SPIKE2_ANNUAL_MEAN[name]}`);
   });
 }

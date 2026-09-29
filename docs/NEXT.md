@@ -18,7 +18,7 @@ Build `scripts/build-grid.mjs` (Node, no dependencies) that writes `public/data/
 - **Checks**
     - [x] File under 250 KB. Result: 141.8 KB, 748 cells, none empty. Period 2001 to 2020.
     - [x] Interpolated GHI at Manila (14.6, 121.0) is within ±5% of Global Solar Atlas on the annual mean. Reference (GSA, kWh/m²/month, Jan to Dec, fetched 29 Sep 2026): 115.26, 128.82, 163.99, 180.03, 180.64, 158.64, 143.59, 142.91, 133.83, 126.08, 116.37, 107.05. Store as a test fixture. Result: +3.9% (1763 vs 1697 kWh/m²/yr).
-    - [ ] (blocked: needs the spike 2 annual means in `SPIKE2_ANNUAL_MEAN`, test/grid.test.mjs) Laoag, Iloilo, Cebu and Davao annual GHI within ±8% of the spike 2 NASA monthly means (sanity check that the grid and interpolation are wired correctly).
+    - [x] Laoag, Iloilo, Cebu and Davao annual GHI within ±8% of the spike 2 NASA monthly means (sanity check that the grid and interpolation are wired correctly). Result: Laoag -3.8%, Iloilo -0.7%, Cebu +1.6%, Davao +1.9% (Manila +5.1%, for reference).
     - [x] Diffuse fraction is between 0.3 and 0.7 for every cell and month (sanity bound for PH climate). Decided 29 Sep 2026: bound stays 0.3 to 0.7, except cells flagged by `isLowDiffuse` (any month under 0.3), which get a floor of 0.27 and a UI caveat (copy comes with task 3). Result: 42 cell-months (26 cells) in Feb to Apr (Mindoro, Panay, northern Palawan, seas west of Luzon) sit at 0.279 to 0.300; max is 0.634.
 
 ## 2. Calc core
