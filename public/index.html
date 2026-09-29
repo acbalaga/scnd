@@ -390,47 +390,60 @@
     </section>
   </template>
 
-  <!-- F3 findings sheet. Prints alone (see app.css). Framed as questions, never a verdict; no installer names.
-       Sources for the uncertainty wording: docs/SPEC.md risk table and README "Sources decision", 29 Sep 2026. -->
-  <section id="findings" class="card" x-show="showSheet && sheet">
+  <!-- F3 findings sheet: a report page. Prints alone (see app.css). Framed as questions, never a verdict; no installer names.
+       Sources for the basis and uncertainty wording: docs/SPEC.md risk table and README "Sources decision", 29 Sep 2026. -->
+  <section id="findings" class="card paper" x-show="showSheet && sheet">
     <template x-if="sheet">
       <div>
-        <div class="row" style="margin:0 0 12px;justify-content:space-between" data-noprint>
-          <strong>Findings sheet</strong>
+        <div class="toolbar" data-noprint>
+          <span><strong>Findings sheet.</strong> Preview of the printed page.</span>
           <button type="button" class="primary" @click="window.print()">Print or save as PDF</button>
         </div>
-        <div class="sheet-head">
-          <div><div class="sheet-brand">SCND · YOUR SECOND METER</div><h2>Solar system check: questions for my installer</h2></div>
-          <div class="sheet-date" x-text="sheet.date"></div>
+
+        <header class="rpt-head">
+          <div class="rpt-brand"><img src="/icons/logo.svg" width="48" height="22" alt=""><span>Independent screening check</span></div>
+          <div class="rpt-meta"><div>Date <b x-text="sheet.date"></b></div><div>Reference <b x-text="sheet.ref"></b></div></div>
+        </header>
+        <h2 class="rpt-title">Solar system performance check</h2>
+        <p class="rpt-sub">Questions for the installer, prepared from the owner's own bills and inverter figures.</p>
+
+        <h3>Summary</h3>
+        <p class="lead" x-text="sheet.summary"></p>
+        <div class="figures">
+          <div x-show="sheet.latest"><small>Latest PR</small><b x-text="sheet.latest ? sheet.latest.pr : ''"></b><em x-text="sheet.latest ? sheet.latestWording : ''"></em></div>
+          <div><small>Bills reviewed</small><b x-text="sheet.total"></b><em x-text="sheet.total > sheet.shown ? 'latest ' + sheet.shown + ' shown below' : 'all shown below'"></em></div>
+          <div x-show="sheet.savedTotal"><small>Savings to date</small><b x-text="sheet.savedTotal"></b><em>from these bills</em></div>
         </div>
-        <p class="sub" style="margin-bottom:6px">Made from the owner's own bills and inverter figures. A screening check, not an inspection, and not a verdict on any installer or system.</p>
-        <div class="tiles">
-          <div class="tile" x-show="sheet.latest"><small>Latest PR</small><b class="lcd" x-text="sheet.latest ? sheet.latest.pr : ''"></b><em x-text="sheet.latest ? sheet.latest.band : ''"></em></div>
-          <div class="tile"><small>Bills checked</small><b x-text="sheet.total"></b><em x-text="sheet.total > sheet.shown ? 'latest ' + sheet.shown + ' shown' : 'all shown'"></em></div>
-          <div class="tile" x-show="sheet.savedTotal"><small>Saved so far</small><b x-text="sheet.savedTotal"></b><em>from these bills</em></div>
-        </div>
-        <h3>System</h3>
-        <div class="chips"><template x-for="c in sheet.system" :key="c"><span x-text="c"></span></template></div>
-        <h3>Bills checked</h3>
-        <table class="sheet-table">
-          <thead><tr><th>Period</th><th>Solar kWh</th><th>Expected kWh</th><th>PR</th><th>Weather</th><th>Exported</th><th>Saved</th></tr></thead>
+
+        <h3>1. System</h3>
+        <dl class="kv"><template x-for="kv in sheet.system" :key="kv[0]"><div class="kvp"><dt x-text="kv[0]"></dt><dd x-text="kv[1]"></dd></div></template></dl>
+
+        <h3>2. Performance by billing period</h3>
+        <table class="rt">
+          <thead><tr><th>Period</th><th>Solar (kWh)</th><th>Expected (kWh)</th><th>PR</th><th>Assessment</th><th>Weather index</th><th>Exported (kWh)</th><th>Saved (PHP)</th></tr></thead>
           <tbody><template x-for="r in sheet.rows" :key="r.period"><tr>
-            <td data-label="Period" x-text="r.period"></td><td data-label="Solar kWh" x-text="r.actual"></td><td data-label="Expected kWh" x-text="r.expected"></td><td data-label="PR" x-text="r.pr + ' (' + r.band + ')'"></td><td data-label="Weather" x-text="r.wi"></td><td data-label="Exported" x-text="r.exported"></td><td data-label="Saved" x-text="r.saved"></td>
+            <td data-label="Period" x-text="r.period"></td><td data-label="Solar (kWh)" x-text="r.actual"></td><td data-label="Expected (kWh)" x-text="r.expected"></td><td data-label="PR" x-text="r.pr"></td>
+            <td data-label="Assessment" :class="{ low: r.low }" x-text="r.band"></td><td data-label="Weather index" x-text="r.wi"></td><td data-label="Exported (kWh)" x-text="r.exported"></td><td data-label="Saved (PHP)" x-text="r.saved"></td>
           </tr></template></tbody>
         </table>
-        <p class="help">Expected: what a healthy system (PR 0.75) makes in that sun. PR: share of the sun's energy on the panels that became electricity. Weather: sun in the period against a typical year (1.00 is typical).</p>
-        <h3>Questions to ask</h3>
-        <p x-show="sheet.allClear">No questions raised: PR was within the usual range in every bill checked.</p>
+
+        <h3>3. Questions for the installer</h3>
+        <p x-show="sheet.allClear">No questions are raised: PR was within the usual range in every bill reviewed.</p>
         <ol class="q" x-show="!sheet.allClear"><template x-for="i in sheet.items" :key="i.id"><li x-text="i.text"></li></template></ol>
-        <h3>Please share</h3>
+
+        <h3>4. Information requested</h3>
         <ul><template x-for="q in sheet.requests" :key="q"><li x-text="q"></li></template></ul>
-        <h3>How sure are these numbers?</h3>
-        <ul><template x-for="u in sheet.uncertainty" :key="u"><li x-text="u"></li></template></ul>
+
+        <h3>5. Basis and limitations</h3>
+        <ul><template x-for="u in sheet.sources" :key="u"><li x-text="u"></li></template></ul>
+
+        <div class="notes">Notes and installer response</div>
+        <p class="rpt-foot">Prepared with SCND, a free self-check tool for rooftop solar owners. A screening check from the owner's own figures: not an inspection or certification, and not a verdict on any installer or system.</p>
       </div>
     </template>
   </section>
 
-  <p class="foot">Nothing here is a verdict. It is a set of questions to ask your installer. <a :href="feedbackHref" x-show="feedbackHref">Send feedback</a></p>
+  <p class="foot">Nothing here is a verdict. It is a set of questions to ask your installer. <a :href="feedbackHref" x-show="feedbackHref" target="_blank" rel="noopener noreferrer">Give feedback</a> <span x-show="feedbackHref">(opens a Google Form: please leave out bill numbers and personal details)</span></p>
 </main>
 </body>
 </html>

@@ -25,6 +25,8 @@ const FACINGS = [
   { label: 'Northeast', az: -135 }, { label: 'Northwest', az: 135 }, { label: 'North', az: 180 },
 ];
 
+const REPORT_BAND = { green: 'Within range', amber: 'Below range', red: 'Low' };
+const REPORT_WORDING = { green: 'within the usual range', amber: 'a little below the usual range', red: 'low' };
 const BAND_SHORT = { green: 'healthy', amber: 'a bit low', red: 'low' };
 const BAND_LABEL = { green: 'Within range', amber: 'A bit low, worth watching', red: 'Low' };
 const FLAG_TEXT = {
@@ -43,9 +45,10 @@ const HYBRID_FLAG_TEXT = {
   grid_charging: 'The battery took in more energy than the solar left over after export, so some of it came from the grid. That can be a charge schedule or backup mode setting. Worth checking it is what you intended.',
 };
 
-// Feedback link. Left empty on purpose: a mailto in the page source is public, so Fred picks the address.
-// When set, the footer shows "Send feedback". The link carries a subject only, never any user data.
-const FEEDBACK_EMAIL = '';
+// Feedback: a link to Fred's Google Form. Left empty until he has the form's URL; the footer link only shows when it is set.
+// It is a plain link the user chooses to click (no request from this page). The form is Google's, so the footer
+// asks people not to type bill numbers or personal details into it.
+const FEEDBACK_URL = '';
 
 let nextId = 1;
 const newBill = () => ({ id: nextId++, start: '', end: '', inverterKwh: '', importKwh: '', exportKwh: '', genRate: '', varCharges: '', total: '', outageHours: '', chargeKwh: '', dischargeKwh: '', homeLoadKwh: '', open: true });
@@ -68,7 +71,7 @@ document.addEventListener('alpine:init', () => {
     example: false,
     savedOnce: false,
     saveNudgeHidden: false,
-    feedbackHref: FEEDBACK_EMAIL ? `mailto:${FEEDBACK_EMAIL}?subject=SCND%20feedback` : '',
+    feedbackHref: FEEDBACK_URL,
     showSheet: false,
     weather: { status: 'idle', sat: null, nasa: null, satBase: null, nasaBase: null, errors: [] },
 
@@ -184,19 +187,34 @@ document.addEventListener('alpine:init', () => {
           expectedKwh: r.expectedKwh, weather: r.weather, flags: r.flags, savings: r.savings, hybridFlags: r.hybrid?.flags ?? [],
         })),
       });
-      const s = this.s, face = FACINGS.find((x) => x.az === num(s.azimuth))?.label ?? `${s.azimuth}°`;
+      const s = this.s, face = (FACINGS.find((x) => x.az === num(s.azimuth))?.label ?? `${s.azimuth}°`).toLowerCase();
+      const date = new Date().toISOString().slice(0, 10), lastRow = rows.length ? rows[rows.length - 1] : null;
+      const latest = lastRow ? { period: this.fmtRange(lastRow.b.start, lastRow.b.end), pr: this.fmt(lastRow.r.pr, 2), band: lastRow.r.band } : null;
+      const nq = f.items.length;
+      // Basis lines: what the numbers rest on. Data sources are ours (README "Sources decision", 29 Sep 2026).
+      const weatherUsed = rows.some((x) => x.r.weather && !x.r.weather.missing);
+      const sources = [
+        `PR is the electricity produced divided by what the panels are rated to produce in the sun received. Within the usual range is ${calc.PR_BANDS.green} or more, with a lower limit of ${calc.PR_BANDS.amberWet} (June to October) or ${calc.PR_BANDS.amberDry} (November to May). Expected output assumes a PR of ${calc.PR_BANDS.green}.`,
+        `Sun data: NASA POWER typical-year climatology (2001 to 2020), transposed to the panel tilt and facing.${weatherUsed ? ' Weather index compares each period with a 2020 to 2025 baseline from satellite data (Himawari, through Open-Meteo) and NASA POWER, where 1.00 is a typical year.' : ''}`,
+      ];
       return {
         ...f,
-        date: new Date().toISOString().slice(0, 10),
-        system: [`${s.kWp} kWp panels`, `${s.acKw} kW inverter (DC/AC ${this.fmt(num(s.kWp) / num(s.acKw), 2)})`, `${s.tilt}° tilt, facing ${face.toLowerCase()}`, s.hybrid ? 'Hybrid with battery' : 'On-grid', `Location ${s.lat}, ${s.lon} (rounded)`, s.commissioned ? `Switched on ${s.commissioned}` : 'Switch-on month not given'],
-        rows: rows.slice(-6).map(({ b, r }) => ({
-          period: `${b.start} to ${b.end}`, actual: this.fmt(num(b.inverterKwh), 0), expected: this.fmt(r.expectedKwh, 0),
-          pr: this.fmt(r.pr, 2), band: BAND_SHORT[r.band], wi: r.weather && !r.weather.missing ? this.fmt(r.weather.wi, 2) : 'n/a',
-          exported: Number.isFinite(num(b.exportKwh)) ? this.fmt(num(b.exportKwh), 0) : 'n/a', saved: r.savings !== null ? '₱' + this.fmt(r.savings, 0) : 'n/a',
+        date, ref: `SCND-${date.replaceAll('-', '')}`,
+        summary: latest ? `For ${latest.period}, the performance ratio was ${latest.pr}, ${REPORT_WORDING[latest.band]}. ${nq ? `${nq} question${nq === 1 ? '' : 's'} ${nq === 1 ? 'is' : 'are'} raised for the installer.` : 'No questions are raised.'}` : '',
+        system: [
+          ['Array capacity', `${s.kWp} kWp`], ['Inverter', `${s.acKw} kW (DC/AC ${this.fmt(num(s.kWp) / num(s.acKw), 2)})`],
+          ['Orientation', `${s.tilt}° tilt, facing ${face}`], ['System type', s.hybrid ? 'Hybrid with battery' : 'On-grid'],
+          ['Location (rounded)', `${s.lat}, ${s.lon}`], ['Switched on', s.commissioned || 'Not given'],
+        ],
+        rows: rows.slice(-5).map(({ b, r }) => ({
+          period: this.fmtRange(b.start, b.end), actual: this.fmt(num(b.inverterKwh), 0), expected: this.fmt(r.expectedKwh, 0),
+          pr: this.fmt(r.pr, 2), band: REPORT_BAND[r.band], low: r.band === 'red', wi: r.weather && !r.weather.missing ? this.fmt(r.weather.wi, 2) : 'n/a',
+          exported: Number.isFinite(num(b.exportKwh)) ? this.fmt(num(b.exportKwh), 0) : 'n/a', saved: r.savings !== null ? this.fmt(r.savings, 0) : 'n/a',
         })),
-        shown: Math.min(rows.length, 6), total: rows.length,
-        latest: rows.length ? { period: this.fmtRange(rows[rows.length - 1].b.start, rows[rows.length - 1].b.end), pr: this.fmt(rows[rows.length - 1].r.pr, 2), band: BAND_SHORT[rows[rows.length - 1].r.band] } : null,
-        savedTotal: cum.length ? '₱' + this.fmt(cum[cum.length - 1].saved, 0) : null,
+        shown: Math.min(rows.length, 5), total: rows.length, latest,
+        latestWording: latest ? REPORT_WORDING[latest.band] : '',
+        savedTotal: cum.length ? 'PHP ' + this.fmt(cum[cum.length - 1].saved, 0) : null,
+        sources: [...sources, ...f.uncertainty],
       };
     },
 
