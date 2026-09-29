@@ -14,7 +14,7 @@ Start here: `CLAUDE.md` (project rules), `docs/SPEC.md` (spec), `docs/NEXT.md` (
 | --- | --- |
 | F1 | Performance ratio (PR) per bill against a typical year's sun, with a wider dry-season amber band |
 | F2 | Bill decoder: import, export credit at the generation charge, and why fixed charges keep the bill above zero (Taglish walk-through) |
-| F3 | Findings sheet: one printable page of questions for the installer, no installer names |
+| F3 | Findings sheet: a one-page report (summary, system, performance table, numbered questions, information requested, basis and limitations, notes space) for the installer, no installer names |
 | F4 | Weather or system: satellite and NASA POWER cross-checked, labelled "uncertain" or "inferred" when they disagree or one is missing |
 | F5 to F7 | Energy split, true savings against the promised payback (chart with hover, table view and payback time at your own pace), load-shift value |
 | F8 | Year-over-year degradation against the module warranty, after 13 months of bills |
@@ -31,11 +31,11 @@ Save and load use a JSON file on the owner's own device. "Try an example" fills 
 
 ## Layout
 
-- `public/`: `index.html`, `app.css`, `manifest.webmanifest`, `icons/`, `js/` (`calc.js` all the maths, `grid.js`, `weather.js`, `findings.js`, `data.js`, `app.js`), `data/ph-grid.json`, `vendor/alpine.min.js` (Alpine 3.17.4, MIT), `fonts/` (Pixelify Sans and DSEG7 Classic, SIL Open Font Licence 1.1, licences alongside), `icons/` (logo and app icons). Everything is self-hosted so the page makes no third-party request
+- `public/`: `index.html`, `app.css`, `manifest.webmanifest`, `icons/`, `js/` (`calc.js` all the maths, `grid.js`, `weather.js`, `findings.js`, `data.js`, `app.js`), `data/ph-grid.json`, `vendor/alpine.min.js` (Alpine 3.17.4, MIT), `fonts/` (Pixelify Sans and DSEG7 Classic for the app, Source Serif 4 and Source Sans 3 for the printed report, all SIL Open Font Licence 1.1, licences alongside), `icons/` (logo and app icons). Everything is self-hosted so the page makes no third-party request
 - `src/worker.js`: serves `public/` and rate-limits
 - `scripts/`: `build-grid.mjs` (builds the sun grid), `gen-poa-reference.py` (pvlib reference cases), `gen-logo.mjs` and `gen-icons.mjs` (the seven-segment SCND logo and app icons)
 - `test/`: golden-case tests
-- `docs/`: spec, task queue, rate limiting
+- `docs/`: spec, task queue, rate limiting, custom domain guide, feedback form setup
 
 ## Develop
 
@@ -49,6 +49,10 @@ Save and load use a JSON file on the owner's own device. "Try an example" fills 
 Cloudflare Workers, Git-connected. Every push to `main` deploys; other versions get preview URLs.
 
 The Worker runs first on every request (`run_worker_first`) so it can rate-limit: 100 requests per 10 seconds per visitor, failing open if the limiter is unavailable. Every request is therefore a Worker request (Free plan: 100,000 a day). Watch the daily count during beta. Details and the trade-offs are in `docs/RATE-LIMITING.md`.
+
+## Feedback
+
+Set `FEEDBACK_URL` in `public/js/app.js` to a Google Form link to show a "Give feedback" link in the footer. See `docs/FEEDBACK-FORM.md`. The link is a plain link the visitor chooses to click, and it passes none of their numbers to the form.
 
 ## Status
 

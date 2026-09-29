@@ -114,3 +114,11 @@ Requested by Fred 29 Sep 2026 after testing on Safari (iPhone). Decided: answer 
 - Verified in headless Chromium (phone width): 98 unit tests, e2e including theme persistence, chart lines and colours, tooltip, table, single-series case, fonts from our own host, no overflow at 320/375/390 px, worst-case sheet 812 px and still one Letter page with 110 px of extra content added. Also fixed: the sheet's real print headroom was being eaten by the page's bottom padding.
 - **Not verified:** Safari (iPhone), and how the pixel fonts look on your phone.
 
+### 10c. Report-style findings sheet, feedback and domain (Fred, 29 Sep 2026)
+
+- [x] **Findings sheet redesigned as a report.** Masthead with reference number and date, serif title, one-sentence summary and three key figures, system table, ruled performance table with a plain-word assessment column, numbered questions (Q1, Q2...), information requested, basis and limitations (sources and uncertainty), a notes box for the installer's response, and a footer disclaimer. Source Serif 4 and Source Sans 3 (SIL OFL 1.1, self-hosted, about 96 KB, loaded only when the sheet is opened). Paper-white in dark mode so the preview matches the print. Amounts are written PHP because those fonts have no peso sign. Question wording tightened (no repeated "Question:" labels).
+- [x] Worst case I could build (5 questions firing, every note, 5 bills) prints on one A4 page and one Letter page (905 px of about 950 usable on Letter). Beyond that it breaks cleanly onto a second page (headings and rows do not split).
+- [x] **Feedback:** the mailto is replaced by `FEEDBACK_URL` for a Google Form link (hidden until set, opens in a new tab, footer asks people to leave out bill numbers and personal details). Setup and suggested questions in `docs/FEEDBACK-FORM.md`. **Fred:** create the form and send the link.
+- [x] **Custom domain guide** in `docs/CUSTOM-DOMAIN.md` (three paths, steps, undo). Written without access to Cloudflare's docs, so check menu names against the dashboard.
+- **Not verified:** Safari (iPhone) printing of the sheet.
+
