@@ -52,6 +52,11 @@ Annotated walk-through of the user's own bill numbers. Explain export credit at 
 
 Himawari monthly ratio to its own climatology, cross-checked against NASA POWER; "uncertain" label when they disagree by more than 5 points.
 
+**Himawari history check (29 Sep 2026, `satellite_radiation_seamless`, daily `shortwave_radiation_sum`, Manila, Laoag, Cebu, Davao):**
+- Data starts 3 Jul 2015 at all four points. Full calendar years 2016 to 2025 have at least 25 valid days in every month at every point.
+- 2026 has holes: Manila has 3 or fewer valid days per month for Jan to Apr and none for May to Aug; Laoag misses Jul and Aug; Cebu misses Feb to May; Davao is nearly complete. Sep 2026 is present to about the 14th. `jma_jaxa_himawari` behaves the same. Calling without `models` returns a full 2026, but it is a different product (values differ on almost every day; mean difference up to -0.45 kWh/m²/day at Davao), so it is not a drop-in fill.
+- The series steps down 2 to 6% between 2016 to 2019 and 2022 to 2025 at all four points (Manila 5.28 to 4.96, Davao 5.91 to 5.57 kWh/m²/day). Cause not established.
+
 **Decision (ask Fred):** Himawari climatology baseline period (the API's history depth decides this; check how far back `satellite_radiation_seamless` goes for PH points).
 
 ## 6. F3 findings sheet, save/load JSON
