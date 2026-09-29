@@ -53,7 +53,12 @@ async function pvgis(url, ctx) {
 
   let res;
   for (let attempt = 0; attempt < 2; attempt++) {
-    res = await fetch(upstream.toString(), { headers: { accept: 'application/json' } });
+    res = await fetch(upstream.toString(), {
+      headers: {
+        accept: 'application/json',
+        'user-agent': 'SCND/0.1 (+https://github.com/acbalaga/scnd; irradiance validation spike)',
+      },
+    });
     if (res.status !== 429 && res.status !== 529) break;
     await new Promise(r => setTimeout(r, 1500));
   }
