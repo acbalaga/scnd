@@ -1,0 +1,136 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import * as c from '../public/js/calc.js';
+
+const near = (a, b, tol = 1e-9) => assert.ok(Math.abs(a - b) <= tol, `${a} vs ${b}`);
+const poaCases = JSON.parse(readFileSync(new URL('./fixtures-poa.json', import.meta.url), 'utf8')).cases;
+
+// ---- poaMonth: pvlib golden cases, pass rule +/-3% ----
+for (const k of poaCases) {
+  test(`poaMonth golden: ${k.name}, month ${k.month}`, () => {
+    const v = c.poaMonth({ ghi: k.ghi, dif: k.dif, tilt: k.tilt, azimuth: k.azimuth, lat: k.lat, month: k.month, days: k.days });
+    const err = v / k.kwhPerM2 - 1;
+    assert.ok(Math.abs(err) <= 0.03, `${k.name} m${k.month}: ${v.toFixed(2)} vs pvlib ${k.kwhPerM2} (${(err * 100).toFixed(2)}%)`);
+  });
+}
+test('poaMonth: flat plane returns GHI x days', () => {
+  near(c.poaMonth({ ghi: 5, dif: 2, tilt: 0, azimuth: 0, lat: 14.6, month: 3 }), 5 * 31, 0.5);
+});
+test('poaMonth edge: bad input returns an error object', () => {
+  assert.ok(c.isError(c.poaMonth({ ghi: 5, dif: 6, tilt: 10, azimuth: 0, lat: 14.6, month: 1 })));
+  assert.ok(c.isError(c.poaMonth({ ghi: 5, dif: 2, tilt: 10, azimuth: 0, lat: 14.6, month: 13 })));
+  assert.ok(c.isError(c.poaMonth({ ghi: NaN, dif: 2, tilt: 10, azimuth: 0, lat: 14.6, month: 1 })));
+});
+
+// ---- performanceRatio ----
+test('performanceRatio golden: 480 kWh, 4 kWp, 160 kWh/m2 = 0.75', () => near(c.performanceRatio({ eKwh: 480, kWp: 4, hPoa: 160 }), 0.75));
+test('performanceRatio edge: zero irradiation and negative energy are errors', () => {
+  assert.ok(c.isError(c.performanceRatio({ eKwh: 480, kWp: 4, hPoa: 0 })));
+  assert.ok(c.isError(c.performanceRatio({ eKwh: -1, kWp: 4, hPoa: 100 })));
+});
+
+// ---- expectedEnergy ----
+test('expectedEnergy golden: 4 kWp x 150 x 0.75 = 450', () => near(c.expectedEnergy({ kWp: 4, hPoa: 150, pr: 0.75 }), 450));
+test('expectedEnergy edge: zero kWp is an error', () => assert.ok(c.isError(c.expectedEnergy({ kWp: 0, hPoa: 150, pr: 0.75 }))));
+
+// ---- prBand, isDrySeason ----
+test('prBand golden: boundaries, dry and wet season', () => {
+  assert.equal(c.prBand(0.75, 7), 'green');
+  assert.equal(c.prBand(0.70, 7), 'amber');
+  assert.equal(c.prBand(0.64, 7), 'red');      // wet season floor 0.65
+  assert.equal(c.prBand(0.64, 1), 'amber');    // dry season floor 0.62
+  assert.equal(c.prBand(0.62, 12), 'amber');
+  assert.equal(c.prBand(0.619, 12), 'red');
+});
+test('prBand edge: bad month is an error', () => assert.ok(c.isError(c.prBand(0.7, 0))));
+test('isDrySeason golden and edge: Nov to May dry, Jun to Oct wet', () => {
+  assert.deepEqual([5, 6, 10, 11].map(c.isDrySeason), [true, false, false, true]);
+});
+
+// ---- redFlag ----
+test('redFlag golden: two consecutive reds', () => assert.equal(c.redFlag(['green', 'red', 'red']), true));
+test('redFlag edge: single red, red-amber-red, empty', () => {
+  assert.equal(c.redFlag(['green', 'red']), false);
+  assert.equal(c.redFlag(['red', 'amber', 'red']), false);
+  assert.equal(c.redFlag([]), false);
+});
+
+// ---- weatherIndex, weatherSplit, weatherCall ----
+test('weatherIndex golden: 140 / 160 = 0.875', () => near(c.weatherIndex({ hActual: 140, hTypical: 160 }), 0.875));
+test('weatherIndex edge: zero typical is an error', () => assert.ok(c.isError(c.weatherIndex({ hActual: 1, hTypical: 0 }))));
+test('weatherSplit golden: 500 typical, WI 0.9, 400 actual = 50 weather + 50 system', () => {
+  const r = c.weatherSplit({ eTypical: 500, wi: 0.9, eActual: 400 });
+  near(r.weather, 50); near(r.system, 50); near(r.total, 100);
+});
+test('weatherSplit edge: system part goes negative when output beats the weather-adjusted expectation', () => {
+  assert.ok(c.weatherSplit({ eTypical: 500, wi: 0.9, eActual: 460 }).system < 0);
+  assert.ok(c.isError(c.weatherSplit({ eTypical: 0, wi: 0.9, eActual: 1 })));
+});
+test('weatherCall golden: 0.92 and 0.90 agree', () => {
+  const r = c.weatherCall(0.92, 0.90); near(r.wi, 0.91); assert.equal(r.uncertain, false);
+});
+test('weatherCall edge: more than 5 points apart is uncertain', () => {
+  assert.equal(c.weatherCall(0.95, 0.88).uncertain, true);
+  assert.ok(c.isError(c.weatherCall(NaN, 0.9)));
+});
+
+// ---- energySplit ----
+test('energySplit golden: G 400, X 150, I 200 -> S 250, L 450, ratio 0.625', () => {
+  const r = c.energySplit({ g: 400, x: 150, i: 200 });
+  near(r.selfConsumed, 250); near(r.load, 450); near(r.selfConsumptionRatio, 0.625);
+});
+test('energySplit edge: S < 0 returns an error object, not a number', () => {
+  const r = c.energySplit({ g: 100, x: 150, i: 200 });
+  assert.ok(c.isError(r)); assert.equal(r.error, 'period_misalignment');
+});
+
+// ---- money ----
+test('importRate golden: 3000 / 300 kWh = 10 per kWh', () => near(c.importRate({ variableCharges: 3000, i: 300 }), 10));
+test('importRate edge: zero import is an error', () => assert.ok(c.isError(c.importRate({ variableCharges: 3000, i: 0 }))));
+test('savings golden: 250 x 10 + 150 x 5 = 3250', () => near(c.savings({ s: 250, x: 150, rImport: 10, rExport: 5 }), 3250));
+test('savings edge: negative self-consumption is an error', () => assert.ok(c.isError(c.savings({ s: -1, x: 0, rImport: 10, rExport: 5 }))));
+test('loadShiftValue golden: 11 - 5 = 6', () => near(c.loadShiftValue({ rImport: 11, rExport: 5 }), 6));
+test('loadShiftValue edge: missing rate is an error', () => assert.ok(c.isError(c.loadShiftValue({ rImport: 11 }))));
+
+// ---- degradation ----
+const months = (year, pr) => Array.from({ length: 12 }, (_, m) => ({ year, month: m + 1, pr }));
+test('degradation golden: Jan 0.80 to 0.796 is 0.5%/yr, within a 0.55% warranty', () => {
+  const r = c.degradation([...months(2025, 0.8), { year: 2026, month: 1, pr: 0.796 }], 0.55);
+  near(r.annualLossPct, 0.5, 1e-9); assert.equal(r.pairs, 1); assert.equal(r.exceedsWarranty, false);
+});
+test('degradation edge: null under 13 months, error on bad pr', () => {
+  assert.equal(c.degradation(months(2025, 0.8)), null);
+  assert.ok(c.isError(c.degradation([{ year: 2025, month: 1, pr: 0 }])));
+});
+test('degradation edge: loss above warranty is flagged', () => {
+  const r = c.degradation([...months(2025, 0.8), { year: 2026, month: 1, pr: 0.78 }], 1.0);
+  near(r.annualLossPct, 2.5); assert.equal(r.exceedsWarranty, true);
+});
+
+// ---- hybridBalance, batteryValue ----
+test('hybridBalance golden: I 100, PV 400, X 50, C 120, D 108 -> L 438, RTE 0.9', () => {
+  const r = c.hybridBalance({ i: 100, gPv: 400, x: 50, c: 120, d: 108 });
+  near(r.load, 438); near(r.roundTripEfficiency, 0.9); assert.deepEqual(r.flags, []);
+});
+test('hybridBalance edge: C above PV surplus raises grid_charging; zero C gives null RTE; negative load is an error', () => {
+  assert.deepEqual(c.hybridBalance({ i: 100, gPv: 400, x: 50, c: 360, d: 300 }).flags, ['grid_charging']);
+  assert.equal(c.hybridBalance({ i: 100, gPv: 400, x: 50, c: 0, d: 0 }).roundTripEfficiency, null);
+  assert.ok(c.isError(c.hybridBalance({ i: 0, gPv: 100, x: 0, c: 150, d: 0 })));
+});
+test('batteryValue golden: 108 x (11 - 5) = 648', () => near(c.batteryValue({ d: 108, rImport: 11, rExport: 5 }), 648));
+test('batteryValue edge: negative discharge is an error', () => assert.ok(c.isError(c.batteryValue({ d: -1, rImport: 11, rExport: 5 }))));
+
+// ---- sanityFlags ----
+test('sanityFlags golden: DC/AC 1.4, no export after activation, outage', () => {
+  assert.deepEqual(c.sanityFlags({ kWp: 7, acKw: 5, exportKwh: 0, netMeteringActive: true, outageHours: 3 }), ['clipping', 'no_export_after_activation', 'outage']);
+});
+test('sanityFlags edge: DC/AC exactly 1.3, zero export before activation, no outage raise nothing', () => {
+  assert.deepEqual(c.sanityFlags({ kWp: 6.5, acKw: 5, exportKwh: 0, netMeteringActive: false, outageHours: 0 }), []);
+});
+
+// ---- isError ----
+test('isError golden and edge', () => {
+  assert.equal(c.isError({ error: 'x', message: 'y' }), true);
+  assert.equal(c.isError(0), false); assert.equal(c.isError(null), false); assert.equal(c.isError([]), false);
+});

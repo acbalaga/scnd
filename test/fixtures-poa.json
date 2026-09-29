@@ -1,0 +1,98 @@
+{
+ "meta": {
+  "generator": "scripts/gen-poa-reference.py",
+  "pvlib": "0.16.1",
+  "albedo": 0.2,
+  "note": "ghi, dif in kWh/m2/day from public/data/ph-grid.json (2001-2020 NASA POWER); kwhPerM2 per month"
+ },
+ "cases": [
+  {
+   "name": "Manila tilt 10 south",
+   "month": 1,
+   "lat": 14.6,
+   "tilt": 10,
+   "azimuth": 0,
+   "days": 31,
+   "ghi": 4.08,
+   "dif": 1.786,
+   "kwhPerM2": 135.989
+  },
+  {
+   "name": "Manila tilt 10 south",
+   "month": 7,
+   "lat": 14.6,
+   "tilt": 10,
+   "azimuth": 0,
+   "days": 31,
+   "ghi": 4.708,
+   "dif": 2.448,
+   "kwhPerM2": 141.432
+  },
+  {
+   "name": "Manila tilt 15 east",
+   "month": 1,
+   "lat": 14.6,
+   "tilt": 15,
+   "azimuth": -90,
+   "days": 31,
+   "ghi": 4.08,
+   "dif": 1.786,
+   "kwhPerM2": 124.029
+  },
+  {
+   "name": "Manila tilt 15 east",
+   "month": 7,
+   "lat": 14.6,
+   "tilt": 15,
+   "azimuth": -90,
+   "days": 31,
+   "ghi": 4.708,
+   "dif": 2.448,
+   "kwhPerM2": 143.06
+  },
+  {
+   "name": "Davao tilt 5 north",
+   "month": 1,
+   "lat": 7.1,
+   "tilt": 5,
+   "azimuth": 180,
+   "days": 31,
+   "ghi": 4.336,
+   "dif": 2.193,
+   "kwhPerM2": 130.145
+  },
+  {
+   "name": "Davao tilt 5 north",
+   "month": 7,
+   "lat": 7.1,
+   "tilt": 5,
+   "azimuth": 180,
+   "days": 31,
+   "ghi": 4.972,
+   "dif": 2.51,
+   "kwhPerM2": 156.317
+  },
+  {
+   "name": "Laoag tilt 20 south",
+   "month": 1,
+   "lat": 18.2,
+   "tilt": 20,
+   "azimuth": 0,
+   "days": 31,
+   "ghi": 4.301,
+   "dif": 1.688,
+   "kwhPerM2": 155.18
+  },
+  {
+   "name": "Laoag tilt 20 south",
+   "month": 7,
+   "lat": 18.2,
+   "tilt": 20,
+   "azimuth": 0,
+   "days": 31,
+   "ghi": 5.395,
+   "dif": 2.461,
+   "kwhPerM2": 154.344
+  }
+ ]
+}

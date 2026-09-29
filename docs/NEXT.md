@@ -30,9 +30,9 @@ Build `scripts/build-grid.mjs` (Node, no dependencies) that writes `public/data/
 - **PR, weather split, energy split, savings, load-shift value, degradation, hybrid balance** exactly as in `docs/SPEC.md` "Calculation method" (F1, F4 to F9).
 - **Edge cases with tests:** S < 0 (period misalignment) returns an error object, not a number; zero export after net-metering activation raises a flag; DC/AC above 1.3 raises a clipping flag; hybrid with C > PV surplus raises grid-charging flag; F8 returns null under 13 months.
 - **Checks**
-    - [ ] `node --test` passes, every exported function has at least one golden case and one edge case.
+    - [x] `node --test` passes, every exported function has at least one golden case and one edge case. Result: 57 tests pass. POA vs pvlib 0.16.1 reference: worst case 0.07% across the 8 cases (limit 3%). The reference shares the hourly apportioning method with calc.js, so it validates geometry and transposition, not the apportioning model itself.
 
-**Decision (ask Fred):** PR band thresholds for dry season given NASA's up to −8% dry bias. Proposal: green ≥ 0.75, amber 0.62 to 0.75, red < 0.62 in Nov to May; unchanged in Jun to Oct.
+**Decision (Fred, 29 Sep 2026): proposal accepted, implemented in `PR_BANDS` (`public/js/calc.js`).** PR band thresholds for dry season given NASA's up to −8% dry bias: green ≥ 0.75, amber 0.62 to 0.75, red < 0.62 in Nov to May; unchanged in Jun to Oct.
 
 ## 3. Input flow and F1, F5, F6, F7
 
