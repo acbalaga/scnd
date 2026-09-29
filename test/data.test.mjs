@@ -30,3 +30,15 @@ test('parse rejects text in number fields, bad dates and too many bills', () => 
   assert.match(parse(JSON.stringify({ ...base, bills: Array(61).fill(base.bills[0]) })).error, /at most/);
   assert.match(parse('x'.repeat(1_000_001)).error, /too large/);
 });
+
+test('parse accepts a version 1 file saved before the battery and warranty fields existed', () => {
+  const old = JSON.parse(serialize(setup, bills));
+  for (const k of ['warrantyPct', 'batteryCost']) delete old.setup[k];
+  for (const k of ['chargeKwh', 'dischargeKwh', 'homeLoadKwh']) delete old.bills[0][k];
+  const r = parse(JSON.stringify(old));
+  assert.equal(r.error, undefined); assert.equal(r.setup.warrantyPct, ''); assert.equal(r.bills[0].chargeKwh, '');
+});
+test('serialize keeps battery and warranty fields', () => {
+  const r = parse(serialize({ ...setup, warrantyPct: 0.5, batteryCost: 150000 }, [{ ...bills[0], chargeKwh: 120, dischargeKwh: 108, homeLoadKwh: 440 }]));
+  assert.equal(r.setup.warrantyPct, 0.5); assert.equal(r.setup.batteryCost, 150000); assert.equal(r.bills[0].dischargeKwh, 108);
+});

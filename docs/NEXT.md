@@ -72,6 +72,13 @@ Himawari monthly ratio to its own climatology, cross-checked against NASA POWER;
 
 ## 7. F8 degradation, F9 hybrid
 
+- [x] Built (1 threshold and 1 flag still to confirm, see below).
+- **F9:** hybrid bills take battery charged, battery discharged and an optional app home load. Per bill: round-trip efficiency (out / in), worked-out house load with the gap to the app's load, battery value, and the grid-charging flag. Summary card: battery earned so far, and the share of battery cost if given. Warranty and battery cost are optional setup fields. PV curtailment is not modelled: it needs daily battery state of charge, which monthly numbers do not have. Outage hours are already noted, not priced.
+- **F8:** same-month weather-adjusted PR (from the F4 check), bills paired by the month and year of their midpoint. Hidden until the bills span 13 months and have a weather check. Card states that month-to-month noise is far larger than a year's degradation.
+- Verified in headless Chromium with live weather data (14 hybrid bills, Cebu): all cards render, grid-charging flag fires on the one bill built to trigger it, save and load restore the battery and warranty fields, no console errors. Old save files without the new fields still load.
+- **Proposed, awaiting Fred:** `MIN_DEGRADATION_PAIRS = 6` in `public/js/findings.js`. The sheet raises a degradation question only from 6 same-month pairs, because 1 or 2 noisy pairs would give false alarms.
+- **Open, awaiting Fred:** the SPEC's "sustained drop in round-trip efficiency" flag needs a threshold. Round-trip efficiency is shown per bill with no flag until one is agreed.
+
 ## 8. Clean-up before beta
 
 - Remove spike pages and the `/api/pvgis` and `/api/gsa` proxy routes (keep them in git history).

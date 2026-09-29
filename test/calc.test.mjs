@@ -37,7 +37,7 @@ test('poaPeriod golden: a whole calendar month matches poaMonth', () => {
   const ghi = Array(12).fill(5), dif = Array(12).fill(2);
   const a = c.poaPeriod({ ghi, dif, tilt: 10, azimuth: 0, lat: 14.6, start: '2026-03-01', end: '2026-04-01' });
   near(a.hPoa, c.poaMonth({ ghi: 5, dif: 2, tilt: 10, azimuth: 0, lat: 14.6, month: 3 }), 1e-9);
-  assert.equal(a.days, 31); assert.equal(a.midMonth, 3);
+  assert.equal(a.days, 31); assert.equal(a.midMonth, 3); assert.equal(a.midYear, 2026);
 });
 test('poaPeriod golden: a straddling period weights each month by its days', () => {
   const ghi = [4, 6, ...Array(10).fill(5)], dif = Array(12).fill(2);
@@ -195,6 +195,14 @@ test('hybridBalance edge: C above PV surplus raises grid_charging; zero C gives 
 });
 test('batteryValue golden: 108 x (11 - 5) = 648', () => near(c.batteryValue({ d: 108, rImport: 11, rExport: 5 }), 648));
 test('batteryValue edge: negative discharge is an error', () => assert.ok(c.isError(c.batteryValue({ d: -1, rImport: 11, rExport: 5 }))));
+
+// ---- loadCheck ----
+test('loadCheck golden: implied 438 against app 440 is -2 kWh, -0.45%', () => {
+  const r = c.loadCheck({ implied: 438, app: 440 }); near(r.gapKwh, -2); near(r.gapPct, -0.4545, 1e-3);
+});
+test('loadCheck edge: zero or missing app load is an error', () => {
+  assert.ok(c.isError(c.loadCheck({ implied: 438, app: 0 }))); assert.ok(c.isError(c.loadCheck({ implied: 438, app: NaN })));
+});
 
 // ---- sanityFlags ----
 test('sanityFlags golden: DC/AC 1.4, no export after activation, outage', () => {

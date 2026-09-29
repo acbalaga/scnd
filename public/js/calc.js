@@ -86,7 +86,7 @@ export function splitPeriod(start, end) {
 
 // POA irradiation over a bill period: each calendar month's mean day, weighted by the days it covers.
 // ghi and dif are the 12 monthly means (kWh/m2/day). midMonth is the month holding the period's midpoint,
-// used to pick the wet or dry PR band.
+// used to pick the wet or dry PR band. midYear is the year of that midpoint (F8 pairs bills by month and year).
 export function poaPeriod({ ghi, dif, tilt, azimuth, lat, start, end }) {
   const parts = splitPeriod(start, end);
   if (isError(parts)) return parts;
@@ -97,7 +97,7 @@ export function poaPeriod({ ghi, dif, tilt, azimuth, lat, start, end }) {
     hPoa += h; days += d;
   }
   const mid = new Date(Date.parse(start) + (days / 2) * 86400000);
-  return { hPoa, days, midMonth: mid.getUTCMonth() + 1 };
+  return { hPoa, days, midMonth: mid.getUTCMonth() + 1, midYear: mid.getUTCFullYear() };
 }
 
 // ---------- F1: performance ratio and bands ----------
@@ -295,6 +295,13 @@ export function hybridBalance({ i, gPv, x, c, d }) {
 // Battery value = D x (r_import - r_export): what each stored kWh earns over exporting it.
 export function batteryValue({ d, rImport, rExport }) {
   return Number.isFinite(d) && d >= 0 && Number.isFinite(rImport) && Number.isFinite(rExport) ? d * (rImport - rExport) : err('bad_input', 'Need D >= 0 and numeric rates.');
+}
+
+// Compares the load implied by the balance above with the home load the owner's app reports (needs a CT meter).
+// Shows the gap; it does not judge it, because no tolerance has been agreed.
+export function loadCheck({ implied, app }) {
+  if (!Number.isFinite(implied) || !Number.isFinite(app) || app <= 0) return err('bad_input', 'Need the implied load and an app load above zero.');
+  return { gapKwh: implied - app, gapPct: (implied / app - 1) * 100 };
 }
 
 // ---------- Sanity flags ----------

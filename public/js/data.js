@@ -7,9 +7,9 @@ export const VERSION = 1;
 const MAX_BYTES = 1_000_000;
 const MAX_BILLS = 60;
 
-const SETUP_NUM = ['lat', 'lon', 'kWp', 'acKw', 'tilt', 'azimuth', 'cost', 'promisedYears'];
+const SETUP_NUM = ['lat', 'lon', 'kWp', 'acKw', 'tilt', 'azimuth', 'cost', 'promisedYears', 'warrantyPct', 'batteryCost'];
 const SETUP_BOOL = ['hybrid', 'netMetering'];
-const BILL_NUM = ['inverterKwh', 'importKwh', 'exportKwh', 'genRate', 'varCharges', 'total', 'outageHours'];
+const BILL_NUM = ['inverterKwh', 'importKwh', 'exportKwh', 'genRate', 'varCharges', 'total', 'outageHours', 'chargeKwh', 'dischargeKwh', 'homeLoadKwh'];
 const BILL_DATE = ['start', 'end'];
 
 const isBlank = (v) => v === '' || v === null || v === undefined;

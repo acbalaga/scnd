@@ -2,6 +2,10 @@
 // Pure: no DOM. Never a verdict, and no installer names anywhere (none are stored).
 import { PR_BANDS } from './calc.js';
 
+// PROPOSED, not yet confirmed by Fred: the degradation question goes on the sheet only from this many same-month
+// pairs. Monthly sun data is noisy (5 to 10%) against a yearly loss under 1%, so one or two pairs would raise false alarms.
+export const MIN_DEGRADATION_PAIRS = 6;
+
 const f0 = (v) => Math.round(v).toLocaleString('en-PH');
 const f2 = (v) => v.toFixed(2);
 const peso = (v) => '₱' + Math.round(v).toLocaleString('en-PH');
@@ -9,9 +13,11 @@ const span = (b) => `${b.start} to ${b.end}`;
 
 // bills: oldest first, each { start, end, pr, band, redRaised, actualKwh, expectedKwh, weather, flags, savings }
 //   weather: null, or { wi, uncertain, inferred, source, split: { weather, system, total } }
+//   hybridFlags: optional array, e.g. ['grid_charging']
 // payback: null, or { saved, promised } (pesos to date)
+// degradation: null, or { annualLossPct, pairs, exceedsWarranty, warrantyPct } from calc.degradation
 // Returns { items: [{ id, text }], requests: [text], uncertainty: [text], allClear: boolean }.
-export function findings({ bills, payback }) {
+export function findings({ bills, payback, degradation = null }) {
   const items = [];
   const last = bills[bills.length - 1];
   const raised = [...bills].reverse().find((b) => b.redRaised);
@@ -35,6 +41,12 @@ export function findings({ bills, payback }) {
   }
   if (bills.some((b) => b.flags.includes('no_export_after_activation'))) {
     items.push({ id: 'no_export', text: 'A bill shows 0 kWh exported although net metering is marked as active. Question: When was the bi-directional meter installed, and from what date does the utility credit exports?' });
+  }
+  if (bills.some((b) => b.hybridFlags?.includes('grid_charging'))) {
+    items.push({ id: 'grid_charging', text: 'In at least one bill the battery took in more energy than the solar left over after export, so some of it came from the grid. Question: Is the battery set to charge from the grid (for example overnight or in backup mode), and what schedule was intended?' });
+  }
+  if (degradation && degradation.exceedsWarranty && degradation.pairs >= MIN_DEGRADATION_PAIRS) {
+    items.push({ id: 'degradation', text: `Weather-adjusted PR is down about ${degradation.annualLossPct.toFixed(1)}% a year over ${degradation.pairs} same-month pair${degradation.pairs === 1 ? '' : 's'}, against a module warranty of ${degradation.warrantyPct}% a year. Monthly weather noise is large next to a yearly loss, so treat this as a reason to keep tracking. Questions: How does the installer measure degradation (IV curve, flash test)? What does the warranty require as evidence?` });
   }
   if (payback && payback.promised > 0 && payback.saved < payback.promised) {
     const gap = Math.round((1 - payback.saved / payback.promised) * 100);

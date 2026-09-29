@@ -38,15 +38,19 @@ const DECODE_FLAG_TEXT = {
   total_below_charges: 'Mas mababa ang total mo kaysa sa lumalabas sa kwenta. Baka may discount o carry-over na credit, o may maling numero. Balikan ang bill.',
 };
 
+const HYBRID_FLAG_TEXT = {
+  grid_charging: 'The battery took in more energy than the solar left over after export, so some of it came from the grid. That can be a charge schedule or backup mode setting. Worth checking it is what you intended.',
+};
+
 let nextId = 1;
-const newBill = () => ({ id: nextId++, start: '', end: '', inverterKwh: '', importKwh: '', exportKwh: '', genRate: '', varCharges: '', total: '', outageHours: '' });
+const newBill = () => ({ id: nextId++, start: '', end: '', inverterKwh: '', importKwh: '', exportKwh: '', genRate: '', varCharges: '', total: '', outageHours: '', chargeKwh: '', dischargeKwh: '', homeLoadKwh: '' });
 
 document.addEventListener('alpine:init', () => {
   Alpine.data('scnd', () => ({
     cities: CITIES,
     facings: FACINGS,
     place: '',
-    s: { lat: '', lon: '', kWp: '', acKw: '', tilt: 10, azimuth: 0, commissioned: '', hybrid: false, netMetering: true, cost: '', promisedYears: '' },
+    s: { lat: '', lon: '', kWp: '', acKw: '', tilt: 10, azimuth: 0, commissioned: '', hybrid: false, netMetering: true, cost: '', promisedYears: '', warrantyPct: '', batteryCost: '' },
     ready: false,
     setupError: '',
     climate: null,
@@ -160,10 +164,10 @@ document.addEventListener('alpine:init', () => {
       const cum = this.cumulative, perDay = this.promisedPerDay;
       const payback = perDay && cum.length ? { saved: cum[cum.length - 1].saved, promised: perDay * cum[cum.length - 1].day } : null;
       const f = findings({
-        payback,
+        payback, degradation: this.degradationResult,
         bills: rows.map(({ b, r }) => ({
           start: b.start, end: b.end, pr: r.pr, band: r.band, redRaised: this.redRaised(b), actualKwh: num(b.inverterKwh),
-          expectedKwh: r.expectedKwh, weather: r.weather, flags: r.flags, savings: r.savings,
+          expectedKwh: r.expectedKwh, weather: r.weather, flags: r.flags, savings: r.savings, hybridFlags: r.hybrid?.flags ?? [],
         })),
       });
       const s = this.s, face = FACINGS.find((x) => x.az === num(s.azimuth))?.label ?? `${s.azimuth}°`;
@@ -195,7 +199,7 @@ document.addEventListener('alpine:init', () => {
         const pr = calc.performanceRatio({ eKwh: g, kWp: num(s.kWp), hPoa: p.hPoa });
         if (calc.isError(pr)) errors.push(pr.message);
         else {
-          Object.assign(out, { pr, hPoa: p.hPoa, band: calc.prBand(pr, p.midMonth), midMonth: p.midMonth });
+          Object.assign(out, { pr, hPoa: p.hPoa, band: calc.prBand(pr, p.midMonth), midMonth: p.midMonth, midYear: p.midYear });
           out.expectedKwh = calc.expectedEnergy({ kWp: num(s.kWp), hPoa: p.hPoa, pr: 0.75 });
         }
       }
@@ -213,9 +217,45 @@ document.addEventListener('alpine:init', () => {
           out.shift = calc.loadShiftValue({ rImport, rExport });
         }
       }
+      // F9: hybrid balance, round-trip efficiency, battery value. Needs the battery's charge and discharge for the same period.
+      if (s.hybrid) {
+        const c = num(b.chargeKwh), d = num(b.dischargeKwh);
+        if ([g, x, i, c, d].every(Number.isFinite)) {
+          const hb = calc.hybridBalance({ i, gPv: g, x, c, d });
+          if (calc.isError(hb)) errors.push(hb.message);
+          else {
+            out.hybrid = hb;
+            const app = num(b.homeLoadKwh);
+            if (Number.isFinite(app)) { const lc = calc.loadCheck({ implied: hb.load, app }); if (!calc.isError(lc)) hb.loadCheck = lc; }
+            if (out.rImport !== undefined && Number.isFinite(num(b.genRate))) hb.value = calc.batteryValue({ d, rImport: out.rImport, rExport: num(b.genRate) });
+          }
+        }
+      }
       out.weather = this.weatherResult(b, out);
       out.flags = calc.sanityFlags({ kWp: num(s.kWp), acKw: num(s.acKw), exportKwh: Number.isFinite(x) ? x : undefined, netMeteringActive: s.netMetering, outageHours: num(b.outageHours) });
       return out;
+    },
+
+    // F8: same-month weather-adjusted PR, one year apart. Bills are paired by the month and year of their midpoint.
+    // Hidden (null) until the bills span 13 months and have a weather check.
+    get degradationResult() {
+      if (!this.ready) return null;
+      const records = [];
+      for (const b of this.bills) {
+        const r = this.result(b), pr = r?.weather?.prAdjusted;
+        if (r && Number.isFinite(pr) && pr > 0) records.push({ year: r.midYear, month: r.midMonth, pr });
+      }
+      const warrantyPct = num(this.s.warrantyPct), d = calc.degradation(records, warrantyPct);
+      return d && !calc.isError(d) ? { ...d, warrantyPct } : null;
+    },
+
+    // F9: what the battery has earned over the bills entered, against its cost if given.
+    get batteryTotal() {
+      if (!this.s.hybrid) return null;
+      const vals = this.bills.map((b) => this.result(b)?.hybrid?.value).filter(Number.isFinite);
+      if (!vals.length) return null;
+      const earned = vals.reduce((a, v) => a + v, 0), cost = num(this.s.batteryCost);
+      return { earned, bills: vals.length, cost: cost > 0 ? cost : null };
     },
 
     // Two consecutive red bills, oldest to newest, ending at this bill.
@@ -235,6 +275,7 @@ document.addEventListener('alpine:init', () => {
     weatherInferredText: (w) => w.source === 'nasa'
       ? 'Inferred. The satellite has no data for these dates, so this weather index comes from NASA POWER alone. It is not cross-checked, so treat the split as a rough guide.'
       : 'Inferred. NASA POWER has no data for these dates, so this weather index comes from the satellite alone. It is not cross-checked, so treat the split as a rough guide.',
+    hybridFlagText: (f) => HYBRID_FLAG_TEXT[f],
     bandLabel: (band) => BAND_LABEL[band],
     flagText: (f) => FLAG_TEXT[f],
     fmt: (v, d) => (Number.isFinite(v) ? v.toLocaleString('en-PH', { minimumFractionDigits: d, maximumFractionDigits: d }) : ''),

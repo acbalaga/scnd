@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { findings } from '../public/js/findings.js';
+import { findings, MIN_DEGRADATION_PAIRS } from '../public/js/findings.js';
 
 const bill = (o = {}) => ({ start: '2026-03-15', end: '2026-04-14', pr: 0.78, band: 'green', redRaised: false, actualKwh: 560, expectedKwh: 583, weather: null, flags: [], savings: 5000, ...o });
 
@@ -19,6 +19,16 @@ test('findings edge: sunny weather is worded as extra expected output, not "0 kW
   const w = { wi: 1.1, uncertain: false, inferred: false, split: { weather: -60, system: 160, total: 100 } };
   const t = findings({ bills: [bill({ band: 'red', pr: 0.4, weather: w })], payback: null }).items.find((i) => i.id === 'weather_split').text;
   assert.match(t, /sunnier than typical/); assert.match(t, /60 kWh/); assert.ok(!/About 0 kWh/.test(t));
+});
+test('findings golden: grid charging and degradation beyond warranty each produce a question', () => {
+  const r = findings({ bills: [bill({ hybridFlags: ['grid_charging'] })], payback: null, degradation: { annualLossPct: 2.3, pairs: MIN_DEGRADATION_PAIRS, exceedsWarranty: true, warrantyPct: 0.5 } });
+  assert.deepEqual(r.items.map((i) => i.id), ['grid_charging', 'degradation']);
+  assert.match(r.items[1].text, /2\.3%/); assert.match(r.items[1].text, /0\.5%/); assert.match(r.items[1].text, /noise/);
+});
+test('findings edge: too few pairs, within warranty or null raises no degradation question', () => {
+  assert.equal(findings({ bills: [bill()], payback: null, degradation: { annualLossPct: 3, pairs: MIN_DEGRADATION_PAIRS - 1, exceedsWarranty: true, warrantyPct: 0.5 } }).allClear, true);
+  assert.equal(findings({ bills: [bill()], payback: null, degradation: { annualLossPct: 0.3, pairs: 4, exceedsWarranty: false, warrantyPct: 0.5 } }).allClear, true);
+  assert.equal(findings({ bills: [bill()], payback: null, degradation: null }).allClear, true);
 });
 test('findings edge: everything in range is all clear, and the sheet never states a verdict or names an installer', () => {
   const r = findings({ bills: [bill(), bill()], payback: { saved: 12000, promised: 10000 } });
