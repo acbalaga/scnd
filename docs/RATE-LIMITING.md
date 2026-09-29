@@ -18,7 +18,7 @@ To change the numbers, edit `ratelimits` in `wrangler.jsonc` (`limit`, and `peri
 
 - **Every request is a Worker request.** Static asset requests are normally free and unlimited, but with `run_worker_first` they run the Worker. Free plan: 100,000 Worker requests a day. About 14,000 page loads a day would reach it. A flood that the limiter blocks still counts against the cap, so a big enough flood can take the site down for the rest of the day. Watch the daily request count in the Cloudflare dashboard during beta. If traffic or bots grow, move to the Workers Paid plan.
 - **Counts are approximate.** The binding is per Cloudflare location and eventually consistent, so the limit is permissive, not exact. That is fine for stopping floods.
-- **No cover for `workers.dev`?** It does cover it: the limiter is in the Worker, so preview URLs are limited too.
+- **Preview URLs are covered too.** The limiter is in the Worker, so `workers.dev` preview URLs are limited as well.
 - **Not a defence against a large distributed attack.** Cloudflare's built-in DDoS protection is the layer for that, and it is on by default.
 
 ## Checked
