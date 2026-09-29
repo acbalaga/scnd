@@ -13,10 +13,53 @@ export default {
     if (url.pathname === '/api/pvgis') {
       return pvgis(url, ctx);
     }
+    if (url.pathname === '/api/gsa') {
+      return gsa(url, ctx);
+    }
 
     return env.ASSETS.fetch(request);
   },
 };
+
+// /api/gsa: spike-only proxy to Global Solar Atlas long-term averages
+// (Solargis model, CC BY 4.0). Used as the independent climatology reference
+// because PVGIS SARAH-3 does not cover the Philippines.
+async function gsa(url, ctx) {
+  const lat = Number(url.searchParams.get('lat'));
+  const lon = Number(url.searchParams.get('lon'));
+  if (!inPH(lat, lon)) return json({ error: 'Coordinates must be in the Philippines.' }, 400);
+
+  const upstream = `https://api.globalsolaratlas.info/data/lta?loc=${lat.toFixed(3)},${lon.toFixed(3)}`;
+  return cachedFetch(upstream, ctx);
+}
+
+function inPH(lat, lon) {
+  return Number.isFinite(lat) && Number.isFinite(lon) &&
+    lat >= PH.latMin && lat <= PH.latMax && lon >= PH.lonMin && lon <= PH.lonMax;
+}
+
+async function cachedFetch(upstream, ctx) {
+  const cache = caches.default;
+  const cacheKey = new Request(upstream);
+  const hit = await cache.match(cacheKey);
+  if (hit) return withHeaders(hit, 'HIT');
+
+  const res = await fetch(upstream, {
+    headers: {
+      accept: 'application/json',
+      'user-agent': 'SCND/0.1 (+https://github.com/acbalaga/scnd; irradiance validation spike)',
+    },
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    return json({ error: `Upstream returned HTTP ${res.status}`, detail: text.slice(0, 500) }, 502);
+  }
+  const out = new Response(await res.text(), {
+    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'public, max-age=604800' },
+  });
+  ctx.waitUntil(cache.put(cacheKey, out.clone()));
+  return withHeaders(out, 'MISS');
+}
 
 async function pvgis(url, ctx) {
   const lat = Number(url.searchParams.get('lat'));

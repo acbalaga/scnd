@@ -24,14 +24,14 @@
 <body>
 <main>
   <h1>Which irradiance source can SCND trust?</h1>
-  <p class="sub">Monthly mean daily GHI, Jan 2020 to Dec 2023, five PH cities, each source compared against PVGIS SARAH-3 (reference). Wet season = Jun to Oct. Pass rule: wet-season bias within ±10% in every city.</p>
+  <p class="sub">Each source's 2020 to 2023 average for each calendar month, five PH cities, compared against the Global Solar Atlas long-term monthly GHI (Solargis satellite model; PVGIS SARAH-3 does not cover the Philippines). Wet season = Jun to Oct. Pass rule: wet-season bias within ±10% in every city. A 4-year mean against a long-term mean carries a few percent of year-to-year noise, so read ±5% as agreement.</p>
   <p><button id="run">Run comparison</button><button id="csv" disabled>Copy monthly data as CSV</button></p>
 
   <h2>Verdict</h2>
   <div class="scroll"><table id="verdict"></table></div>
 
-  <h2>Bias vs PVGIS by city (wet / dry season)</h2>
-  <p class="sub">Bias = source mean ÷ PVGIS mean − 1 over the months both have. MAPE in brackets = mean absolute monthly error.</p>
+  <h2>Bias vs Global Solar Atlas by city (wet / dry season)</h2>
+  <p class="sub">Bias = source mean ÷ GSA mean − 1 over the calendar months in that season. MAPE in brackets = mean absolute error across those calendar months.</p>
   <div class="scroll"><table id="bias"></table></div>
 
   <h2>Fetch log</h2>
@@ -80,15 +80,15 @@ function monthlyFromDaily(times, vals) {
 }
 
 const sources = {
-  pvgis: {
-    label: 'PVGIS SARAH-3 (reference)',
+  gsa: {
+    label: 'Global Solar Atlas (reference)',
     async load(c) {
-      const { j, ms } = await getJSON(`/api/pvgis?lat=${c.lat}&lon=${c.lon}&startyear=${Y0}&endyear=${Y1}`);
-      const out = new Map();
-      for (const row of j.outputs.monthly) {
-        const hk = Object.keys(row).find(k => k.startsWith('H(h)'));
-        if (hk && Number.isFinite(row[hk])) out.set(key(row.year, row.month), row[hk] / daysIn(row.year, row.month));
-      }
+      const { j, ms } = await getJSON(`/api/gsa?lat=${c.lat}&lon=${c.lon}`);
+      const ghi = j.monthly?.data?.GHI ?? j.monthly?.GHI;
+      if (!Array.isArray(ghi) || ghi.length !== 12) throw new Error('No monthly GHI in GSA response: ' + JSON.stringify(j).slice(0, 200));
+      const dim = [31, 28.25, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+      // keyed by calendar month 1..12, kWh/m²/day
+      const out = new Map(ghi.map((v, i) => [i + 1, v / dim[i]]));
       return { out, ms };
     },
   },
@@ -124,13 +124,18 @@ const candidates = ['omArchive', 'omSatellite', 'nasa'];
 // data[city][source] = Map(month -> kWh/m²/day)
 const data = {};
 
+// src: Map('YYYY-MM' -> value); ref: Map(calendar month -> long-term value)
 function stats(src, ref, wet) {
   let ss = 0, sr = 0, ape = 0, n = 0;
-  for (const [k, r] of ref) {
-    const m = Number(k.slice(5, 7));
+  for (const [m, r] of ref) {
     if (WET.has(m) !== wet) continue;
-    const s = src.get(k);
-    if (!Number.isFinite(s) || !(r > 0)) continue;
+    const vals = [];
+    for (let y = Y0; y <= Y1; y++) {
+      const v = src.get(key(y, m));
+      if (Number.isFinite(v)) vals.push(v);
+    }
+    if (vals.length < 2 || !(r > 0)) continue;
+    const s = vals.reduce((a, b) => a + b, 0) / vals.length;
     ss += s; sr += r; ape += Math.abs(s / r - 1); n += 1;
   }
   return n ? { bias: ss / sr - 1, mape: ape / n, n } : null;
@@ -150,7 +155,7 @@ function render() {
       h += `<tr><td>${sources[s].label}</td><td>${wet ? 'Wet' : 'Dry'}</td>`;
       for (const c of cities) {
         const d = data[c.name];
-        const st = d?.[s] && d?.pvgis ? stats(d[s], d.pvgis, wet) : null;
+        const st = d?.[s] && d?.gsa ? stats(d[s], d.gsa, wet) : null;
         if (wet) {
           if (!st) allWet = false; else worstWet = Math.max(worstWet, Math.abs(st.bias));
         }
@@ -172,15 +177,12 @@ function render() {
 }
 
 function csv() {
-  const cols = ['pvgis', ...candidates];
-  const rows = ['city,month,' + cols.join(',')];
+  const rows = ['city,month,gsa_longterm,' + candidates.join(',')];
+  const f = v => Number.isFinite(v) ? v.toFixed(3) : '';
   for (const c of cities) {
     for (let y = Y0; y <= Y1; y++) for (let m = 1; m <= 12; m++) {
       const k = key(y, m);
-      rows.push([c.name, k, ...cols.map(s => {
-        const v = data[c.name]?.[s]?.get(k);
-        return Number.isFinite(v) ? v.toFixed(3) : '';
-      })].join(','));
+      rows.push([c.name, k, f(data[c.name]?.gsa?.get(m)), ...candidates.map(s => f(data[c.name]?.[s]?.get(k)))].join(','));
     }
   }
   return rows.join('\n');
@@ -191,7 +193,7 @@ async function run() {
   logEl.textContent = '';
   for (const c of cities) {
     data[c.name] = {};
-    for (const s of ['pvgis', ...candidates]) {
+    for (const s of ['gsa', ...candidates]) {
       try {
         const { out, ms } = await sources[s].load(c);
         data[c.name][s] = out;
