@@ -10,7 +10,7 @@
     "binding": "ASSETS",
     "run_worker_first": true
   },
-  // 100 requests per 10 seconds per visitor. One page load is 7 requests. The limit is loose on purpose:
+  // 100 requests per 10 seconds per visitor. One page load is about 12 requests. The limit is loose on purpose:
   // many Philippine mobile users share one public IP behind carrier-grade NAT.
   "ratelimits": [
     {

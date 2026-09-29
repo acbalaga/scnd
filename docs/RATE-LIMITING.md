@@ -6,7 +6,7 @@ Decided 29 Sep 2026 (Fred): a Cloudflare WAF rate limiting rule was not availabl
 
 `src/worker.js` runs first on every request (`assets.run_worker_first` in `wrangler.jsonc`) and asks Cloudflare's Workers Rate Limiting binding (`LIMITER`) whether this visitor is over the limit.
 
-- **Limit:** 100 requests per 10 seconds per visitor. One page load is 7 requests to our own host (`/`, `/app.css`, `/js/app.js`, `/vendor/alpine.min.js`, `/js/calc.js`, `/js/grid.js`, `/data/ph-grid.json`). Save, load, print and the two weather calls do not touch our host. A person clicking around never gets near the limit.
+- **Limit:** 100 requests per 10 seconds per visitor. One page load is about 12 requests to our own host (the page, its stylesheet, 6 scripts, the sun-data file, the icon, and the manifest and home-screen icon that browsers fetch on their own). Save, load, print and the two weather calls do not touch our host. A person clicking around never gets near the limit.
 - **Why loose:** many Philippine mobile users share one public IP behind carrier-grade NAT. A tight limit would block real owners along with bots. Lower it only if the daily request count shows a real flood.
 - **Over the limit:** `429` with `Retry-After: 10` and `Cache-Control: no-store`, and a one-line plain message.
 - **Key:** the first 16 bytes of SHA-256 over `IP|UTC date`, in hex. The raw IP is never our key, and counters reset by themselves at midnight UTC. Cloudflare holds the counters. We do not log or store anything, and we never read user inputs.

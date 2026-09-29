@@ -91,3 +91,16 @@ Added 29 Sep 2026 at Fred's request. A Cloudflare WAF rate limiting rule was not
 - [x] Worker runs first (`run_worker_first`) and checks the Workers Rate Limiting binding: 100 requests per 10 seconds per visitor, keyed by a daily-rotating hash of the IP, fails open. `src/worker.js`, `wrangler.jsonc`, 4 tests.
 - [x] Checked in the Workers runtime under `wrangler dev`: 150 rapid requests gave 100 served and 50 `429`; another visitor unaffected; recovered after 10 seconds; static files served; `/api/pvgis` returns 404.
 - [ ] **Fred, after deploy:** run the curl check in the doc against the live hostname, and watch the daily Worker request count during beta (Free plan cap is 100,000 a day, and every request now counts).
+
+## 10. SLC pass before beta (Simple, Lovable, Complete)
+
+Requested by Fred 29 Sep 2026 after testing on Safari (iPhone). Decided: answer first, "meter dial" look, and all four extras.
+
+- [x] **Safari fixes** (own commit): date and month inputs no longer overflow or overlap, checkboxes sit beside their labels, the findings table no longer runs off the right edge on phones. Checked at 320, 375 and 390 px in Chromium. **Not run on Safari itself** (no WebKit here): please re-check on the iPhone.
+- [x] **Simple:** one job. A hero and a 3-step indicator (system, bill, answer). Setup collapses to a one-line summary once done, optional fields sit under "More details", coordinates under "Not on the list?". Each bill leads with a PR dial and one plain sentence; weather, energy split, savings, battery and the bill decoder are one tap each with a one-line teaser.
+- [x] **Lovable:** the dial (zones come from `PR_BANDS`, season-aware; the needle sweeps once and respects reduced motion), night-blue and sun-yellow palette, light and dark, system fonts only (rounded numerals on iOS), plain-language empty states and headlines.
+- [x] **Complete:** "Try an example" (made-up system and two bills, banner, "Start with mine"), a save prompt after the first answer, weather check button that says what it needs, a redesigned findings sheet (masthead, summary tiles, chips, striped table, tick boxes), home-screen icons and manifest.
+- [ ] **Feedback link:** built, but `FEEDBACK_EMAIL` in `public/js/app.js` is empty, so it is hidden. A mailto in the page source is public, so Fred chooses the address.
+- Verified in headless Chromium (phone width, live weather data): manual hybrid flow with 8 bills, dial, empty state, two-low-months flag, save nudge, weather teaser, worst-case sheet on one page (868 px of about 964 on Letter, A4 also one page), save and load, no horizontal overflow at 320/375/390 px, example and reset, only static files plus the click-triggered weather calls, no console errors. `node --test` 94 pass.
+- **Not verified:** Safari (iPhone) rendering and printing, and the 5-minute first-time-owner check.
+
