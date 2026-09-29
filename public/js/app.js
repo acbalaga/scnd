@@ -2,6 +2,7 @@
 // Nothing is sent anywhere. Sun data comes from public/data/ph-grid.json (static file).
 import * as calc from './calc.js';
 import { loadGrid, lookup, isLowDiffuse } from './grid.js';
+import { fetchSatellite, fetchNasa } from './weather.js';
 
 const num = (v) => (v === '' || v === null || v === undefined ? NaN : Number(v));
 const round1 = (v) => Math.round(v * 10) / 10;
@@ -49,6 +50,8 @@ document.addEventListener('alpine:init', () => {
     climate: null,
     lowDiffuse: false,
     bills: [newBill()],
+    // Actual-month weather, fetched only when the user clicks. status: idle | loading | done.
+    weather: { status: 'idle', sat: null, nasa: null, satBase: null, nasaBase: null, errors: [] },
 
     get clipping() {
       return calc.sanityFlags({ kWp: num(this.s.kWp), acKw: num(this.s.acKw) }).includes('clipping');
@@ -88,6 +91,38 @@ document.addEventListener('alpine:init', () => {
       this.ready = true;
     },
 
+    async checkWeather() {
+      const w = this.weather;
+      w.status = 'loading'; w.errors = [];
+      const [sat, nasa] = await Promise.allSettled([fetchSatellite(this.s.lat, this.s.lon), fetchNasa(this.s.lat, this.s.lon)]);
+      for (const [key, r, label] of [['sat', sat, 'Satellite (Himawari)'], ['nasa', nasa, 'NASA POWER']]) {
+        w[key] = null; w[key + 'Base'] = null;
+        if (r.status === 'rejected') { w.errors.push(`${label} could not be reached.`); continue; }
+        const base = calc.weatherBaseline(r.value);
+        if (calc.isError(base)) { w.errors.push(`${label}: ${base.message}`); continue; }
+        w[key] = r.value; w[key + 'Base'] = base;
+      }
+      w.status = 'done';
+    },
+
+    // F4 for one bill: two indices, combined, then the shortfall split. null until the user has checked the weather.
+    weatherResult(b, out) {
+      const w = this.weather;
+      if (w.status !== 'done' || out.pr === null) return null;
+      const idx = (daily, baseline) => {
+        if (!daily) return null;
+        const r = calc.weatherIndexPeriod({ daily, baseline, start: b.start, end: b.end });
+        return r && !calc.isError(r) ? r : null;
+      };
+      const sat = idx(w.sat, w.satBase), nasa = idx(w.nasa, w.nasaBase);
+      const call = calc.weatherCall(sat ? sat.wi : null, nasa ? nasa.wi : null);
+      if (call === null) return { missing: true };
+      const split = calc.weatherSplit({ eTypical: out.expectedKwh, wi: call.wi, eActual: num(b.inverterKwh) });
+      if (calc.isError(split)) return { missing: true };
+      const prAdjusted = calc.performanceRatio({ eKwh: num(b.inverterKwh), kWp: num(this.s.kWp), hPoa: out.hPoa * call.wi });
+      return { ...call, satWi: sat?.wi ?? null, nasaWi: nasa?.wi ?? null, validDays: (sat ?? nasa).validDays, days: (sat ?? nasa).days, split, prAdjusted: calc.isError(prAdjusted) ? null : prAdjusted };
+    },
+
     addBill() { this.bills.push(newBill()); },
     removeBill(id) { this.bills = this.bills.filter((b) => b.id !== id); },
 
@@ -121,6 +156,7 @@ document.addEventListener('alpine:init', () => {
           out.shift = calc.loadShiftValue({ rImport, rExport });
         }
       }
+      out.weather = this.weatherResult(b, out);
       out.flags = calc.sanityFlags({ kWp: num(s.kWp), acKw: num(s.acKw), exportKwh: Number.isFinite(x) ? x : undefined, netMeteringActive: s.netMetering, outageHours: num(b.outageHours) });
       return out;
     },
@@ -139,6 +175,9 @@ document.addEventListener('alpine:init', () => {
       return Object.values(v).every(Number.isFinite) ? calc.billDecode(v) : null;
     },
     decodeFlagText: (f) => DECODE_FLAG_TEXT[f],
+    weatherInferredText: (w) => w.source === 'nasa'
+      ? 'Inferred. The satellite has no data for these dates, so this weather index comes from NASA POWER alone. It is not cross-checked, so treat the split as a rough guide.'
+      : 'Inferred. NASA POWER has no data for these dates, so this weather index comes from the satellite alone. It is not cross-checked, so treat the split as a rough guide.',
     bandLabel: (band) => BAND_LABEL[band],
     flagText: (f) => FLAG_TEXT[f],
     fmt: (v, d) => (Number.isFinite(v) ? v.toLocaleString('en-PH', { minimumFractionDigits: d, maximumFractionDigits: d }) : ''),

@@ -93,11 +93,43 @@ test('weatherSplit edge: system part goes negative when output beats the weather
   assert.ok(c.isError(c.weatherSplit({ eTypical: 0, wi: 0.9, eActual: 1 })));
 });
 test('weatherCall golden: 0.92 and 0.90 agree', () => {
-  const r = c.weatherCall(0.92, 0.90); near(r.wi, 0.91); assert.equal(r.uncertain, false);
+  const r = c.weatherCall(0.92, 0.90); near(r.wi, 0.91); assert.equal(r.uncertain, false); assert.equal(r.source, 'both'); assert.equal(r.inferred, false);
 });
-test('weatherCall edge: more than 5 points apart is uncertain', () => {
+test('weatherCall edge: more than 5 points apart is uncertain; NaN is an error', () => {
   assert.equal(c.weatherCall(0.95, 0.88).uncertain, true);
   assert.ok(c.isError(c.weatherCall(NaN, 0.9)));
+});
+test('weatherCall edge: one missing source is inferred, both missing is null', () => {
+  assert.deepEqual(c.weatherCall(null, 0.9), { wi: 0.9, uncertain: false, source: 'nasa', inferred: true });
+  assert.deepEqual(c.weatherCall(0.93, null), { wi: 0.93, uncertain: false, source: 'satellite', inferred: true });
+  assert.equal(c.weatherCall(null, null), null);
+});
+
+// ---- weatherBaseline, weatherIndexPeriod ----
+// Synthetic daily series: 5.0 kWh/m2/day everywhere in 2020 to 2025 (a 2026 value must not enter the baseline).
+const dailySeries = (fn) => {
+  const out = {};
+  for (let t = Date.parse('2020-01-01'); t <= Date.parse('2026-09-20'); t += 86400000) { const d = new Date(t).toISOString().slice(0, 10); out[d] = fn(d); }
+  return out;
+};
+test('weatherBaseline golden: constant 5.0 in 2020 to 2025 gives 5.0 every month, ignoring 2026', () => {
+  const b = c.weatherBaseline(dailySeries((d) => (d < '2026' ? 5 : 99)));
+  assert.equal(b.length, 12); b.forEach((v) => near(v, 5));
+});
+test('weatherBaseline edge: too few valid days is an error', () => {
+  assert.equal(c.weatherBaseline(dailySeries((d) => (d.slice(5, 7) === '04' ? null : 5))).error, 'no_baseline');
+  assert.equal(c.weatherBaseline({}).error, 'no_baseline');
+});
+test('weatherIndexPeriod golden: 4.5 against a 5.0 baseline is 0.9 across a month boundary', () => {
+  const daily = dailySeries((d) => (d < '2026' ? 5 : 4.5));
+  const r = c.weatherIndexPeriod({ daily, baseline: Array(12).fill(5), start: '2026-01-15', end: '2026-02-14' });
+  near(r.wi, 0.9); assert.equal(r.days, 30); assert.equal(r.validDays, 30);
+});
+test('weatherIndexPeriod edge: under 80% coverage returns null, bad period is an error', () => {
+  const daily = dailySeries((d) => (d < '2026-01-25' ? 4.5 : null));
+  assert.equal(c.weatherIndexPeriod({ daily, baseline: Array(12).fill(5), start: '2026-01-15', end: '2026-02-14' }), null);
+  assert.ok(c.isError(c.weatherIndexPeriod({ daily, baseline: Array(12).fill(5), start: '2026-02-14', end: '2026-01-15' })));
+  assert.ok(c.isError(c.weatherIndexPeriod({ daily, baseline: [1], start: '2026-01-15', end: '2026-02-14' })));
 });
 
 // ---- energySplit ----

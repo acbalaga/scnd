@@ -73,6 +73,15 @@
       <h2>2. Your bills</h2>
       <p class="sub">One card per bill. Add the last few months to see a trend. Open the "Ano ito?" under a box if you're not sure where to find it.</p>
 
+      <section class="card">
+        <h3 style="margin-top:0">Weather or system?</h3>
+        <p class="help">A low month can be cloudy weather, not a fault. This compares each bill's dates with the sun that fell on your roof, from a satellite (Himawari, through Open-Meteo) and NASA POWER. It sends only your location, rounded to 0.1° (about 11 km), and a date range to those two services. Nothing else leaves your browser.</p>
+        <div class="row" style="margin-top:8px">
+          <button type="button" @click="checkWeather()" :disabled="weather.status === 'loading'" x-text="weather.status === 'loading' ? 'Checking...' : (weather.status === 'done' ? 'Check again' : 'Check the weather')"></button>
+        </div>
+        <template x-for="e in weather.errors" :key="e"><p class="err" x-text="e"></p></template>
+      </section>
+
       <template x-for="(b, i) in bills" :key="b.id">
         <article class="card">
           <div class="row" style="justify-content:space-between;margin-top:0">
@@ -143,6 +152,35 @@
                   <p class="help">This compares against a typical year's sun, not this month's actual weather. A cloudy month can read low even when the system is fine. Weather check comes later.</p>
                   <div class="flag red" x-show="redRaised(b)"><strong>Two low months in a row.</strong> This is worth asking your installer about. Questions, not a verdict: has anything shaded the panels, are there dirty panels, and what does the inverter's fault log say?</div>
                   <p class="help" x-show="result(b).band === 'red' && !redRaised(b)">One low month is not enough to raise a flag. Satellite sun data can be off by 5 to 10% for a single month, so we wait for a second low month.</p>
+                </div>
+              </template>
+
+              <template x-if="result(b).weather">
+                <div>
+                  <h3>Weather or system?</h3>
+                  <template x-if="result(b).weather.missing">
+                    <div class="flag">No weather data for these dates from either source, so the PR above is against a typical year only. It cannot tell weather from a system fault.</div>
+                  </template>
+                  <template x-if="!result(b).weather.missing">
+                    <div>
+                      <p class="help">The weather index is the sun in this period divided by the sun for the same dates in a typical year (the average of 2020 to 2025). 1.00 is typical. Below 1.00 is cloudier than usual.</p>
+                      <dl>
+                        <dt>Weather index</dt><dd x-text="fmt(result(b).weather.wi, 2)"></dd>
+                        <dt>PR adjusted for that weather</dt><dd x-text="fmt(result(b).weather.prAdjusted, 2)"></dd>
+                      </dl>
+                      <template x-if="result(b).weather.split.total > 0">
+                        <dl>
+                          <dt>Below a typical period by</dt><dd x-text="fmt(result(b).weather.split.total, 0) + ' kWh'"></dd>
+                          <dt x-text="result(b).weather.split.weather >= 0 ? 'Explained by weather' : 'Extra the sunny weather should have given'"></dt><dd x-text="fmt(Math.abs(result(b).weather.split.weather), 0) + ' kWh'"></dd>
+                          <dt>Left for the system to explain</dt><dd x-text="fmt(result(b).weather.split.system, 0) + ' kWh'"></dd>
+                        </dl>
+                      </template>
+                      <p class="help" x-show="result(b).weather.split.total <= 0">You produced at or above a typical period at PR 0.75, so there is no shortfall to split.</p>
+                      <div class="flag" x-show="result(b).weather.inferred" x-text="weatherInferredText(result(b).weather)"></div>
+                      <div class="flag" x-show="result(b).weather.uncertain"><strong>Uncertain.</strong> <span x-text="'The satellite (' + fmt(result(b).weather.satWi, 2) + ') and NASA POWER (' + fmt(result(b).weather.nasaWi, 2) + ') disagree by more than 5 points, so the weather call could be off. Treat the split as a rough guide.'"></span></div>
+                      <p class="help" x-show="result(b).weather.validDays < result(b).weather.days" x-text="'Based on ' + result(b).weather.validDays + ' of ' + result(b).weather.days + ' days with data.'"></p>
+                    </div>
+                  </template>
                 </div>
               </template>
 

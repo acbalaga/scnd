@@ -57,7 +57,11 @@ Himawari monthly ratio to its own climatology, cross-checked against NASA POWER;
 - 2026 has holes: Manila has 3 or fewer valid days per month for Jan to Apr and none for May to Aug; Laoag misses Jul and Aug; Cebu misses Feb to May; Davao is nearly complete. Sep 2026 is present to about the 14th. `jma_jaxa_himawari` behaves the same. Calling without `models` returns a full 2026, but it is a different product (values differ on almost every day; mean difference up to -0.45 kWh/m²/day at Davao), so it is not a drop-in fill.
 - The series steps down 2 to 6% between 2016 to 2019 and 2022 to 2025 at all four points (Manila 5.28 to 4.96, Davao 5.91 to 5.57 kWh/m²/day). Cause not established.
 
-**Decision (ask Fred):** Himawari climatology baseline period (the API's history depth decides this; check how far back `satellite_radiation_seamless` goes for PH points).
+**Decided (Fred, 29 Sep 2026):** baseline 2020 to 2025 (`BASELINE_FROM`, `BASELINE_TO` in `public/js/calc.js`; the NASA index uses the same window for its own baseline). Open-Meteo call approved. Months with no satellite data fall back to NASA POWER alone and are shown to the user as "Inferred", not cross-checked.
+
+**Done:** `weatherBaseline`, `weatherIndexPeriod`, `weatherCall` (accepts a missing source) in `calc.js`, 8 tests. `public/js/weather.js` fetches Open-Meteo satellite and NASA POWER daily GHI only when the user clicks "Check the weather", location rounded to 0.1°. Verified end to end against live data (Manila, 2 bills): 2 external calls after the click and none before; a bill with satellite gaps shows the Inferred notice; a bill with both sources shows none. The index is on GHI and applied to POA (actual diffuse is not available per period).
+
+**Was:** Himawari climatology baseline period (the API's history depth decides this; check how far back `satellite_radiation_seamless` goes for PH points).
 
 ## 6. F3 findings sheet, save/load JSON
 

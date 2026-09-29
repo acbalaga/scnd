@@ -147,10 +147,59 @@ export function weatherSplit({ eTypical, wi, eActual }) {
   return { weather, system, total: weather + system };
 }
 
-// Two weather indices (Himawari ratio, NASA POWER ratio). More than 5 points apart = "uncertain".
+// Climatology window for the weather index. Decided by Fred, 29 Sep 2026, after the Himawari history check
+// (docs/NEXT.md task 5): 2020 to 2025 overlaps the spike 2 window and carries less of the satellite series'
+// downward drift than 2016 to 2025. The NASA POWER index uses the same window for its own baseline so the
+// two indices are comparable.
+export const BASELINE_FROM = '2020-01-01';
+export const BASELINE_TO = '2025-12-31';
+const MIN_BASELINE_DAYS = 100;   // valid days needed in a calendar month over the six years
+const MIN_COVERAGE = 0.8;        // share of a bill period that needs valid daily data
+
+// daily: { 'YYYY-MM-DD': kWh/m2/day or null }. Returns 12 monthly mean GHI values over the baseline window,
+// or an error object if any month has too few valid days.
+export function weatherBaseline(daily) {
+  const sum = Array(12).fill(0), n = Array(12).fill(0);
+  for (const [date, v] of Object.entries(daily ?? {})) {
+    if (date < BASELINE_FROM || date > BASELINE_TO || !Number.isFinite(v)) continue;
+    const m = Number(date.slice(5, 7)) - 1;
+    sum[m] += v; n[m] += 1;
+  }
+  if (n.some((k) => k < MIN_BASELINE_DAYS)) return err('no_baseline', 'Not enough history to build a typical month from this source.');
+  return sum.map((t, m) => t / n[m]);
+}
+
+// Weather index for one bill period from one source: mean actual daily GHI over the days that have data,
+// divided by the baseline for the same days. Returns { wi, days, validDays }, or null when fewer than 80% of the
+// period's days have data (the caller treats that source as missing).
+// Approximation: the index is on GHI and is applied to POA. Actual diffuse is not available per period.
+export function weatherIndexPeriod({ daily, baseline, start, end }) {
+  const t0 = Date.parse(start), t1 = Date.parse(end);
+  if (!Number.isFinite(t0) || !Number.isFinite(t1) || t1 <= t0) return err('bad_period', 'Need a valid start and end date.');
+  if (!Array.isArray(baseline) || baseline.length !== 12) return err('no_baseline', 'Need a 12-month baseline.');
+  const days = Math.round((t1 - t0) / 86400000);
+  let actual = 0, base = 0, validDays = 0;
+  for (let k = 0; k < days; k++) {
+    const date = new Date(t0 + k * 86400000).toISOString().slice(0, 10);
+    const v = daily?.[date];
+    if (!Number.isFinite(v)) continue;
+    actual += v; base += baseline[Number(date.slice(5, 7)) - 1]; validDays += 1;
+  }
+  if (validDays < days * MIN_COVERAGE) return null;
+  return { wi: actual / base, days, validDays };
+}
+
+// Combines the two weather indices (Himawari ratio, NASA POWER ratio). Pass null for a source with no data.
+//  both: wi is the mean; uncertain if they are more than 5 points apart.
+//  one:  wi is that source alone, inferred = true (nothing to cross-check it against).
+//  none: returns null (typical-year only).
 export function weatherCall(wiSatellite, wiNasa) {
-  if (!Number.isFinite(wiSatellite) || !Number.isFinite(wiNasa)) return err('bad_input', 'Need two numeric weather indices.');
-  return { wi: (wiSatellite + wiNasa) / 2, uncertain: Math.abs(wiSatellite - wiNasa) > 0.05 };
+  const has = (v) => v !== null && v !== undefined;
+  if ((has(wiSatellite) && !Number.isFinite(wiSatellite)) || (has(wiNasa) && !Number.isFinite(wiNasa))) return err('bad_input', 'Weather indices must be numbers or null.');
+  if (has(wiSatellite) && has(wiNasa)) return { wi: (wiSatellite + wiNasa) / 2, uncertain: Math.abs(wiSatellite - wiNasa) > 0.05, source: 'both', inferred: false };
+  if (has(wiSatellite)) return { wi: wiSatellite, uncertain: false, source: 'satellite', inferred: true };
+  if (has(wiNasa)) return { wi: wiNasa, uncertain: false, source: 'nasa', inferred: true };
+  return null;
 }
 
 // ---------- F5: energy split ----------
