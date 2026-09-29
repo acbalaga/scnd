@@ -25,6 +25,7 @@ const FACINGS = [
   { label: 'Northeast', az: -135 }, { label: 'Northwest', az: 135 }, { label: 'North', az: 180 },
 ];
 
+const BAND_SHORT = { green: 'healthy', amber: 'a bit low', red: 'low' };
 const BAND_LABEL = { green: 'Within range', amber: 'A bit low, worth watching', red: 'Low' };
 const FLAG_TEXT = {
   no_export_after_activation: 'You said net metering is on, but this bill shows 0 kWh sent to the grid. Ask the utility whether your meter was actually changed to a bi-directional one.',
@@ -42,8 +43,12 @@ const HYBRID_FLAG_TEXT = {
   grid_charging: 'The battery took in more energy than the solar left over after export, so some of it came from the grid. That can be a charge schedule or backup mode setting. Worth checking it is what you intended.',
 };
 
+// Feedback link. Left empty on purpose: a mailto in the page source is public, so Fred picks the address.
+// When set, the footer shows "Send feedback". The link carries a subject only, never any user data.
+const FEEDBACK_EMAIL = '';
+
 let nextId = 1;
-const newBill = () => ({ id: nextId++, start: '', end: '', inverterKwh: '', importKwh: '', exportKwh: '', genRate: '', varCharges: '', total: '', outageHours: '', chargeKwh: '', dischargeKwh: '', homeLoadKwh: '' });
+const newBill = () => ({ id: nextId++, start: '', end: '', inverterKwh: '', importKwh: '', exportKwh: '', genRate: '', varCharges: '', total: '', outageHours: '', chargeKwh: '', dischargeKwh: '', homeLoadKwh: '', open: true });
 
 document.addEventListener('alpine:init', () => {
   Alpine.data('scnd', () => ({
@@ -59,6 +64,11 @@ document.addEventListener('alpine:init', () => {
     bills: [newBill()],
     // Actual-month weather, fetched only when the user clicks. status: idle | loading | done.
     fileMessage: '',
+    setupOpen: true,
+    example: false,
+    savedOnce: false,
+    saveNudgeHidden: false,
+    feedbackHref: FEEDBACK_EMAIL ? `mailto:${FEEDBACK_EMAIL}?subject=SCND%20feedback` : '',
     showSheet: false,
     weather: { status: 'idle', sat: null, nasa: null, satBase: null, nasaBase: null, errors: [] },
 
@@ -98,6 +108,7 @@ document.addEventListener('alpine:init', () => {
       this.lowDiffuse = isLowDiffuse(this.climate);
       this.setupError = '';
       this.ready = true;
+      this.setupOpen = false;
     },
 
     async checkWeather() {
@@ -140,6 +151,7 @@ document.addEventListener('alpine:init', () => {
       a.download = `scnd-${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       URL.revokeObjectURL(a.href);
+      this.savedOnce = true;
       this.fileMessage = 'Saved. Keep the file somewhere you can find it. Load it next month and add the new bill.';
     },
     async loadFile(ev) {
@@ -150,7 +162,8 @@ document.addEventListener('alpine:init', () => {
       if (r.error) { this.fileMessage = r.error; return; }
       this.place = r.setup.place;
       this.s = { ...this.s, ...r.setup };
-      this.bills = r.bills.length ? r.bills.map((b) => ({ ...b, id: nextId++ })) : [newBill()];
+      this.bills = r.bills.length ? r.bills.map((b, k, all) => ({ ...b, id: nextId++, open: k === all.length - 1 })) : [newBill()];
+      this.example = false; this.savedOnce = true;
       this.weather = { status: 'idle', sat: null, nasa: null, satBase: null, nasaBase: null, errors: [] };
       this.ready = false; this.showSheet = false;
       await this.continueSetup();
@@ -175,17 +188,111 @@ document.addEventListener('alpine:init', () => {
       return {
         ...f,
         date: new Date().toISOString().slice(0, 10),
-        system: `${s.kWp} kWp panels, ${s.acKw} kW inverter (DC/AC ${this.fmt(num(s.kWp) / num(s.acKw), 2)}), ${s.tilt}° tilt facing ${face.toLowerCase()}, ${s.hybrid ? 'hybrid with battery' : 'on-grid'}, location ${s.lat}, ${s.lon} (rounded), switched on ${s.commissioned || 'month not given'}.`,
+        system: [`${s.kWp} kWp panels`, `${s.acKw} kW inverter (DC/AC ${this.fmt(num(s.kWp) / num(s.acKw), 2)})`, `${s.tilt}° tilt, facing ${face.toLowerCase()}`, s.hybrid ? 'Hybrid with battery' : 'On-grid', `Location ${s.lat}, ${s.lon} (rounded)`, s.commissioned ? `Switched on ${s.commissioned}` : 'Switch-on month not given'],
         rows: rows.slice(-6).map(({ b, r }) => ({
           period: `${b.start} to ${b.end}`, actual: this.fmt(num(b.inverterKwh), 0), expected: this.fmt(r.expectedKwh, 0),
-          pr: this.fmt(r.pr, 2), band: BAND_LABEL[r.band], wi: r.weather && !r.weather.missing ? this.fmt(r.weather.wi, 2) : 'n/a',
+          pr: this.fmt(r.pr, 2), band: BAND_SHORT[r.band], wi: r.weather && !r.weather.missing ? this.fmt(r.weather.wi, 2) : 'n/a',
           exported: Number.isFinite(num(b.exportKwh)) ? this.fmt(num(b.exportKwh), 0) : 'n/a', saved: r.savings !== null ? '₱' + this.fmt(r.savings, 0) : 'n/a',
         })),
         shown: Math.min(rows.length, 6), total: rows.length,
+        latest: rows.length ? { period: this.fmtRange(rows[rows.length - 1].b.start, rows[rows.length - 1].b.end), pr: this.fmt(rows[rows.length - 1].r.pr, 2), band: BAND_SHORT[rows[rows.length - 1].r.band] } : null,
+        savedTotal: cum.length ? '₱' + this.fmt(cum[cum.length - 1].saved, 0) : null,
       };
     },
 
-    addBill() { this.bills.push(newBill()); },
+    // ---- Presentation helpers (no maths here) ----
+    get step() {
+      if (!this.ready) return 1;
+      return this.bills.some((b) => this.result(b)?.pr != null) ? 3 : 2;
+    },
+    scrollTo(id) {
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      document.getElementById(id)?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+    },
+    fmtDate(iso) {
+      const t = Date.parse(iso);
+      return Number.isFinite(t) ? new Date(t).toLocaleDateString('en-PH', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }) : '';
+    },
+    // "1 Jul to 1 Aug 2026", or with both years when the bill crosses New Year.
+    fmtRange(start, end) {
+      const a = Date.parse(start), b = Date.parse(end);
+      if (!Number.isFinite(a) || !Number.isFinite(b)) return '';
+      const f = (t, y) => new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', ...(y ? { year: 'numeric' } : {}), timeZone: 'UTC' });
+      const sameYear = new Date(a).getUTCFullYear() === new Date(b).getUTCFullYear();
+      return `${f(a, !sameYear)} to ${f(b, true)}`;
+    },
+    billTitle(b, i) { return b.start && b.end ? this.fmtRange(b.start, b.end) : `Bill ${i + 1}`; },
+    get summaryLine() {
+      const s = this.s, face = FACINGS.find((x) => x.az === num(s.azimuth))?.label.toLowerCase() ?? '';
+      return `${s.kWp} kWp, ${s.acKw} kW inverter, ${s.tilt}° ${face}${s.hybrid ? ', battery' : ''}${this.place ? ', ' + this.place : ''}`;
+    },
+    // What a bill still needs before each part of the answer can show.
+    needsPR(b) {
+      const need = [];
+      if (!b.start || !b.end) need.push('both reading dates');
+      if (!Number.isFinite(num(b.inverterKwh))) need.push(this.s.hybrid ? 'PV yield' : 'solar produced');
+      return need;
+    },
+    chipClass(b) { return this.result(b)?.band ?? 'none'; },
+    chipText(b) { const r = this.result(b); return r?.band ? `PR ${this.fmt(r.pr, 2)}, ${BAND_SHORT[r.band]}` : 'Not enough yet'; },
+    headline(b) {
+      const r = this.result(b);
+      if (!r || r.pr === null) return '';
+      if (r.band === 'green') return 'Looks healthy.';
+      if (r.band === 'amber') return 'A bit low. Worth watching, not worrying.';
+      return this.redRaised(b) ? 'Low two months in a row. Worth asking your installer.' : 'Low this month. One month is not enough to call a fault.';
+    },
+    answerSub(b) {
+      const r = this.result(b);
+      if (!r || r.pr === null) return '';
+      const g = num(b.inverterKwh), gap = (g / r.expectedKwh - 1) * 100;
+      return `${this.fmt(g, 0)} kWh made, against about ${this.fmt(r.expectedKwh, 0)} kWh for a healthy system in that sun (${this.fmt(Math.abs(gap), 0)}% ${gap < 0 ? 'under' : 'over'}).`;
+    },
+    // Half-dial: red, amber and green zones from PR_BANDS for this bill's season, and a needle at the PR.
+    dial(b) {
+      const r = this.result(b);
+      if (!r || r.pr === null) return '';
+      const amberFloor = calc.isDrySeason(r.midMonth) ? calc.PR_BANDS.amberDry : calc.PR_BANDS.amberWet, green = calc.PR_BANDS.green;
+      const pt = (v, rad) => { const a = Math.PI * (1 - v); return [100 + rad * Math.cos(a), 100 - rad * Math.sin(a)]; };
+      const arc = (v0, v1, cls) => { const [x0, y0] = pt(v0, 80), [x1, y1] = pt(v1, 80); return `<path class="arc" style="stroke:var(--${cls})" d="M${x0.toFixed(1)} ${y0.toFixed(1)} A80 80 0 0 1 ${x1.toFixed(1)} ${y1.toFixed(1)}"/>`; };
+      const v = Math.max(0, Math.min(r.pr, 1)), deg = -90 + v * 180, gap = 0.006;
+      const [gx, gy] = pt(green, 99), [ax, ay] = pt(amberFloor, 99);
+      return `<svg viewBox="-6 -4 212 142" role="img" aria-label="Performance ratio ${this.fmt(r.pr, 2)}, ${BAND_SHORT[r.band]}. Healthy is ${green} or more.">`
+        + arc(0, amberFloor - gap, 'd-red') + arc(amberFloor + gap, green - gap, 'd-amber') + arc(green + gap, 1, 'd-green')
+        + `<text class="scale" x="${ax.toFixed(1)}" y="${ay.toFixed(1)}" text-anchor="middle">${amberFloor}</text><text class="scale" x="${gx.toFixed(1)}" y="${gy.toFixed(1)}" text-anchor="middle">${green}</text>`
+        + `<g class="needle" style="--a:${deg.toFixed(1)}deg"><line x1="100" y1="100" x2="100" y2="34"/><circle cx="100" cy="100" r="6"/></g>`
+        + `<text class="dial-num" x="100" y="132" text-anchor="middle">${this.fmt(r.pr, 2)}</text></svg>`;
+    },
+    weatherTeaser(b) { const w = this.result(b)?.weather; return w && !w.missing ? `Index ${this.fmt(w.wi, 2)}` : (this.weather.status === 'done' ? 'No data' : 'Not checked'); },
+    get canCheckWeather() { return this.bills.some((b) => this.result(b)?.pr != null); },
+
+    // ---- Example: a made-up system with two bills, so an owner sees a full result in one tap ----
+    // Example numbers only. 9.70 PHP/kWh is Meralco's September 2026 generation charge (docs/SPEC.md); the rest is made up.
+    async loadExample() {
+      this.place = 'Manila';
+      this.s = { ...this.s, lat: 14.6, lon: 121, kWp: 5.5, acKw: 5, tilt: 10, azimuth: 0, commissioned: '', hybrid: false, netMetering: true, cost: '', promisedYears: '', warrantyPct: '', batteryCost: '' };
+      await this.continueSetup();
+      if (!this.ready) return;
+      const now = new Date(), y = now.getUTCFullYear(), m = now.getUTCMonth();
+      const iso = (mm) => new Date(Date.UTC(y, mm, 1)).toISOString().slice(0, 10);
+      const bills = [[iso(m - 2), iso(m - 1), 0.79], [iso(m - 1), iso(m), 0.70]].map(([start, end, pr], k, all) => {
+        const p = calc.poaPeriod({ ghi: this.climate.ghi, dif: this.climate.dif, tilt: 10, azimuth: 0, lat: this.s.lat, start, end });
+        const solar = Math.round(pr * 5.5 * p.hPoa), used = Math.round(solar * 0.4), sent = solar - used, bought = 450 - used;
+        const variable = Math.round(bought * 12), credit = sent * 9.7;
+        return { ...newBill(), start, end, inverterKwh: solar, importKwh: bought, exportKwh: sent, genRate: 9.7, varCharges: variable, total: Math.round(Math.max(variable - credit, 0) + 620), open: false };
+      });
+      this.bills = bills; this.example = true; this.savedOnce = false; this.saveNudgeHidden = false;
+      this.weather = { status: 'idle', sat: null, nasa: null, satBase: null, nasaBase: null, errors: [] };
+      this.$nextTick(() => this.scrollTo('bills'));
+    },
+    clearExample() {
+      this.example = false; this.ready = false; this.setupOpen = true; this.place = '';
+      this.s = { lat: '', lon: '', kWp: '', acKw: '', tilt: 10, azimuth: 0, commissioned: '', hybrid: false, netMetering: true, cost: '', promisedYears: '', warrantyPct: '', batteryCost: '' };
+      this.bills = [newBill()]; this.climate = null; this.lowDiffuse = false;
+      this.weather = { status: 'idle', sat: null, nasa: null, satBase: null, nasaBase: null, errors: [] };
+    },
+
+    addBill() { this.bills.forEach((x) => { x.open = false; }); this.bills.push(newBill()); this.$nextTick(() => this.scrollTo('bills-end')); },
     removeBill(id) { this.bills = this.bills.filter((b) => b.id !== id); },
 
     // One result object per bill. Only fields the bill has enough data for are filled.

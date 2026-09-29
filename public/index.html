@@ -2,203 +2,214 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>SCND: your second meter</title>
 <meta name="description" content="A free, private checker for Philippine rooftop solar. Your numbers stay in your browser.">
-<link rel="icon" href="data:,">
+<meta name="theme-color" content="#F3F6FA" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0A1424" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
 <link rel="stylesheet" href="/app.css">
 <script type="module" src="/js/app.js"></script>
 <script defer src="/vendor/alpine.min.js"></script>
 </head>
 <body>
 <main x-data="scnd" x-cloak :class="{ 'sheet-open': showSheet }">
-  <h1>SCND <small>Your second meter</small></h1>
-  <p class="sub">Checks your rooftop solar against your own bill. Free. Everything you type stays in this browser and is never sent anywhere.</p>
 
-  <section class="card">
-    <div class="row" style="margin-top:0">
-      <button type="button" @click="saveData()" :disabled="!ready">Save my data</button>
-      <button type="button" @click="$refs.file.click()">Load saved data</button>
+  <header class="top">
+    <div class="brand">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><rect width="40" height="40" rx="10" fill="#0E1B2C"/><path d="M8 27a12 12 0 0 1 24 0" fill="none" stroke="#FFC83D" stroke-width="4" stroke-linecap="round"/><path d="M20 27l6-9" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/><circle cx="20" cy="27" r="2.6" fill="#fff"/></svg>
+      <div><b>SCND</b><small>Your second meter</small></div>
+    </div>
+    <div class="tools">
+      <button type="button" class="link" @click="saveData()" :disabled="!ready">Save</button>
+      <button type="button" class="link" @click="$refs.file.click()">Load</button>
       <input type="file" accept="application/json,.json" x-ref="file" @change="loadFile($event)" hidden>
     </div>
-    <p class="help" style="margin-top:8px">Nothing is stored for you. "Save" downloads a file to your phone or computer. Next month, load it and add the new bill.</p>
-    <p class="help" x-show="fileMessage" x-text="fileMessage"></p>
+  </header>
+  <p class="help" x-show="fileMessage" x-text="fileMessage" style="margin:-6px 0 10px"></p>
+
+  <!-- Before setup: say what it is and offer the shortest path to an answer -->
+  <section class="hero" x-show="!ready">
+    <h1>Is your solar doing its job?</h1>
+    <p>Check your rooftop system against your own bill. Free, and everything you type stays in this browser.</p>
+    <div class="row" style="margin-top:12px">
+      <button type="button" class="primary" @click="scrollTo('setup')">Check my system</button>
+      <button type="button" @click="loadExample()">Try an example</button>
+    </div>
   </section>
 
+  <ol class="steps" aria-label="Steps">
+    <li :class="{ on: step === 1, done: step > 1 }"><b>Step 1</b>Your system</li>
+    <li :class="{ on: step === 2, done: step > 2 }"><b>Step 2</b>Your bill</li>
+    <li :class="{ on: step === 3 }"><b>Step 3</b>Your answer</li>
+  </ol>
+
   <!-- 1. System setup, once -->
-  <section class="card">
-    <h2 style="margin-top:0">1. Your system</h2>
-    <div class="grid">
-      <label class="wide">Where is it?
-        <select x-model="place" @change="pickPlace()">
-          <option value="">Pick the nearest city</option>
-          <template x-for="c in cities" :key="c.name"><option :value="c.name" x-text="c.name"></option></template>
-        </select>
-      </label>
-      <label>Latitude
-        <input type="number" inputmode="decimal" step="0.1" x-model.number="s.lat" placeholder="14.6">
-      </label>
-      <label>Longitude
-        <input type="number" inputmode="decimal" step="0.1" x-model.number="s.lon" placeholder="121.0">
-      </label>
-      <div class="wide">
-        <button type="button" class="link" @click="useMyLocation()">Use my phone's location</button>
-        <p class="help">We round it to 0.1° (about 11 km) and it stays in your browser. Sun data comes from a file we ship, so nothing is looked up online.</p>
+  <section class="card" id="setup">
+    <div class="summary-line" x-show="ready && !setupOpen">
+      <div><h2>Your system</h2><p class="sub" style="margin:2px 0 0" x-text="summaryLine"></p></div>
+      <button type="button" class="link" @click="setupOpen = true">Edit</button>
+    </div>
+
+    <div x-show="!ready || setupOpen">
+      <h2 style="margin-bottom:12px">Your system</h2>
+      <div class="grid">
+        <label class="wide">Where is it?
+          <select x-model="place" @change="pickPlace()">
+            <option value="">Pick the nearest city</option>
+            <template x-for="c in cities" :key="c.name"><option :value="c.name" x-text="c.name"></option></template>
+          </select>
+        </label>
+        <div class="wide">
+          <details class="optional"><summary>Not on the list? Enter coordinates</summary>
+            <div class="grid" style="margin-top:8px">
+              <label>Latitude<input type="number" inputmode="decimal" step="0.1" x-model.number="s.lat" placeholder="14.6"></label>
+              <label>Longitude<input type="number" inputmode="decimal" step="0.1" x-model.number="s.lon" placeholder="121.0"></label>
+              <div class="wide"><button type="button" class="link" @click="useMyLocation()">Use my phone's location</button>
+                <p class="help">We round it to 0.1° (about 11 km) and it stays in your browser. Sun data comes from a file we ship, so nothing is looked up online.</p></div>
+            </div>
+          </details>
+        </div>
+        <label>Panel size (kWp)
+          <span class="hint">On your quotation. Six 550 W panels is 3.3 kWp.</span>
+          <input type="number" inputmode="decimal" step="0.01" x-model.number="s.kWp" placeholder="5.5">
+        </label>
+        <label>Inverter size (kW)
+          <span class="hint">On the inverter label.</span>
+          <input type="number" inputmode="decimal" step="0.1" x-model.number="s.acKw" placeholder="5">
+        </label>
+        <label>Roof tilt (degrees)
+          <span class="hint">Most PH roofs are 10 to 15°.</span>
+          <input type="number" inputmode="decimal" step="1" x-model.number="s.tilt">
+        </label>
+        <label>Panels face
+          <span class="hint">Direction they point.</span>
+          <select x-model.number="s.azimuth">
+            <template x-for="f in facings" :key="f.az"><option :value="f.az" x-text="f.label"></option></template>
+          </select>
+        </label>
+        <label class="check wide"><input type="checkbox" x-model="s.hybrid"> <span>I have a battery (hybrid). Use my app's PV yield, not the inverter's AC output.</span></label>
+        <label class="check wide"><input type="checkbox" x-model="s.netMetering"> <span>My utility has already switched me to net metering (my meter can run backward).</span></label>
+        <div class="wide">
+          <details class="optional"><summary>More details (optional)</summary>
+            <div class="grid" style="margin-top:8px">
+              <label>Month it was switched on<input type="month" x-model="s.commissioned"></label>
+              <label>Module warranty (% loss per year)
+                <span class="hint">From the datasheet. Used for the year-over-year check.</span>
+                <input type="number" inputmode="decimal" step="0.05" x-model.number="s.warrantyPct">
+              </label>
+              <label class="wide" x-show="s.hybrid">Battery cost (₱)
+                <span class="hint">To see what share the battery has earned back.</span>
+                <input type="number" inputmode="decimal" x-model.number="s.batteryCost">
+              </label>
+            </div>
+          </details>
+        </div>
       </div>
-      <label>Panel size (kWp)
-        <span class="hint">Total on your quotation. A kWp is the panels' rated power. Example: 6 panels of 550 W is 3.3 kWp.</span>
-        <input type="number" inputmode="decimal" step="0.01" x-model.number="s.kWp" placeholder="5.5">
-      </label>
-      <label>Inverter size (kW AC)
-        <span class="hint">On the inverter label.</span>
-        <input type="number" inputmode="decimal" step="0.1" x-model.number="s.acKw" placeholder="5">
-      </label>
-      <label>Roof tilt (degrees)
-        <span class="hint">Most PH roofs are 10 to 15°.</span>
-        <input type="number" inputmode="decimal" step="1" x-model.number="s.tilt">
-      </label>
-      <label>Panels face
-        <span class="hint">Direction the panels point.</span>
-        <select x-model.number="s.azimuth">
-          <template x-for="f in facings" :key="f.az"><option :value="f.az" x-text="f.label"></option></template>
-        </select>
-      </label>
-      <label class="wide">Month it was switched on
-        <input type="month" x-model="s.commissioned">
-      </label>
-      <label>Module warranty (% loss per year)
-        <span class="hint">Optional. From the module datasheet. Used for the year-over-year check.</span>
-        <input type="number" inputmode="decimal" step="0.05" x-model.number="s.warrantyPct">
-      </label>
-      <label x-show="s.hybrid">Battery cost (₱)
-        <span class="hint">Optional. To see what share the battery has earned back.</span>
-        <input type="number" inputmode="decimal" x-model.number="s.batteryCost">
-      </label>
-      <label class="check wide"><input type="checkbox" x-model="s.hybrid"> <span>I have a battery (hybrid). Use my app's PV yield, not the inverter's AC output.</span></label>
-      <label class="check wide"><input type="checkbox" x-model="s.netMetering"> <span>My utility has already switched me to net metering (my meter can run backward).</span></label>
+      <p class="err" x-show="setupError" x-text="setupError"></p>
+      <div class="row">
+        <button type="button" class="primary" @click="continueSetup()" x-text="ready ? 'Save changes' : 'Continue to my bill'"></button>
+        <button type="button" class="link" x-show="!ready" @click="loadExample()">or try an example</button>
+      </div>
     </div>
-    <p class="err" x-show="setupError" x-text="setupError"></p>
-    <div class="flag" x-show="lowDiffuse"><strong>Read this location with care.</strong> Sun here is very clear from February to April, and the data source tends to read low in the dry months. Treat the dry-season expected yield as a range, not a single number.</div>
-    <div class="flag" x-show="clipping"><strong>DC/AC above 1.3.</strong> Your panels are much bigger than your inverter. On sunny days the inverter caps output, so a lower PR in bright months can be normal.</div>
-    <div class="row">
-      <button type="button" class="primary" @click="continueSetup()" x-text="ready ? 'Update system' : 'Continue to my bills'"></button>
-    </div>
+
+    <div class="flag" x-show="ready && lowDiffuse"><strong>Read this location with care.</strong> Sun here is very clear from February to April, and the data source tends to read low in the dry months. Treat the dry-season expected yield as a range, not a single number.</div>
+    <div class="flag" x-show="ready && clipping"><strong>Panels are much bigger than the inverter (DC/AC above 1.3).</strong> On sunny days the inverter caps output, so a lower PR in bright months can be normal.</div>
   </section>
 
   <!-- 2. One card per bill -->
   <template x-if="ready">
-    <section>
-      <h2>2. Your bills</h2>
-      <p class="sub">One card per bill. Add the last few months to see a trend. Open the "Ano ito?" under a box if you're not sure where to find it.</p>
-
-      <section class="card">
-        <h3 style="margin-top:0">Weather or system?</h3>
-        <p class="help">A low month can be cloudy weather, not a fault. This compares each bill's dates with the sun that fell on your roof, from a satellite (Himawari, through Open-Meteo) and NASA POWER. It sends only your location, rounded to 0.1° (about 11 km), and a date range to those two services. Nothing else leaves your browser.</p>
-        <div class="row" style="margin-top:8px">
-          <button type="button" @click="checkWeather()" :disabled="weather.status === 'loading'" x-text="weather.status === 'loading' ? 'Checking...' : (weather.status === 'done' ? 'Check again' : 'Check the weather')"></button>
-        </div>
-        <template x-for="e in weather.errors" :key="e"><p class="err" x-text="e"></p></template>
-      </section>
+    <section id="bills">
+      <div class="banner" x-show="example">
+        <span><strong>Example numbers.</strong> Made up, so you can see how it works.</span>
+        <button type="button" class="link" @click="clearExample()">Start with mine</button>
+      </div>
 
       <template x-for="(b, i) in bills" :key="b.id">
         <article class="card">
-          <div class="row" style="justify-content:space-between;margin-top:0">
-            <h3 style="margin:0" x-text="'Bill ' + (i + 1)"></h3>
+          <div class="bill-head">
+            <div><h3 style="display:inline" x-text="billTitle(b, i)"></h3><span class="chip" :class="chipClass(b)" x-text="chipText(b)"></span></div>
             <button type="button" class="link" @click="removeBill(b.id)" x-show="bills.length > 1">Remove</button>
           </div>
-          <div class="grid">
-            <label>Reading date, start
-              <input type="date" x-model="b.start">
-            </label>
-            <label>Reading date, end
-              <input type="date" x-model="b.end">
-            </label>
-            <div class="wide"><details><summary>Ano ito?</summary>
-              <p class="help">Nasa bill mo ang "Previous reading date" at "Present reading date". Hindi ito buong buwan, kaya ito ang ginagamit natin.</p></details></div>
 
-            <label class="wide"><span x-text="s.hybrid ? 'PV yield in that period (kWh)' : 'Solar produced in that period (kWh)'"></span>
-              <span class="hint">A kWh is one unit of electricity, what your meter counts.</span>
-              <input type="number" inputmode="decimal" x-model.number="b.inverterKwh">
-            </label>
-            <div class="wide"><details><summary>Ano ito?</summary>
-              <p class="help">Sa inverter app mo, hanapin ang total generation. Idagdag ang daily totals mula sa start hanggang end reading date ng bill.</p></details></div>
+          <details class="inputs" :open="b.open" @toggle="b.open = $event.target.open">
+            <summary>Numbers from this bill</summary>
+            <div class="grid" style="padding-top:2px">
+              <label>Reading date, start<input type="date" x-model="b.start"></label>
+              <label>Reading date, end<input type="date" x-model="b.end"></label>
+              <div class="wide"><details class="optional"><summary>Ano ito?</summary>
+                <p class="help">Nasa bill mo ang "Previous reading date" at "Present reading date". Hindi ito buong buwan, kaya ito ang ginagamit natin.</p></details></div>
 
-            <template x-if="s.hybrid">
-              <div class="wide grid">
-                <label>Battery charged (kWh)
-                  <span class="hint">Energy that went into the battery.</span>
-                  <input type="number" inputmode="decimal" x-model.number="b.chargeKwh">
-                </label>
-                <label>Battery discharged (kWh)
-                  <span class="hint">Energy that came out.</span>
-                  <input type="number" inputmode="decimal" x-model.number="b.dischargeKwh">
-                </label>
-                <label class="wide">Home load from your app (kWh, optional)
-                  <span class="hint">Only if your inverter has a CT meter.</span>
-                  <input type="number" inputmode="decimal" x-model.number="b.homeLoadKwh">
-                </label>
-                <div class="wide"><details><summary>Ano ito?</summary>
-                  <p class="help">Sa hybrid inverter app, hanapin ang "Battery charge" at "Battery discharge" para sa parehong petsa ng bill. Idagdag ang daily totals. Ang "Home load" ay lalabas lang kung may CT meter ang inverter mo.</p></details></div>
-              </div>
-            </template>
+              <label class="wide"><span x-text="s.hybrid ? 'PV yield in that period (kWh)' : 'Solar produced in that period (kWh)'"></span>
+                <span class="hint">A kWh is one unit of electricity, what your meter counts.</span>
+                <input type="number" inputmode="decimal" x-model.number="b.inverterKwh">
+              </label>
+              <div class="wide"><details class="optional"><summary>Ano ito?</summary>
+                <p class="help">Sa inverter app mo, hanapin ang total generation. Idagdag ang daily totals mula sa start hanggang end reading date ng bill.</p></details></div>
 
-            <label>Bought from the grid (kWh)
-              <input type="number" inputmode="decimal" x-model.number="b.importKwh">
-            </label>
-            <label>Sent to the grid (kWh)
-              <input type="number" inputmode="decimal" x-model.number="b.exportKwh">
-            </label>
-            <div class="wide"><details><summary>Ano ito?</summary>
-              <p class="help">Sa net metering bill, may dalawang linya: "Delivered" (bili mo sa grid) at "Received" (na-export mo). Kung 0 ang export, ilagay ang 0.</p></details></div>
-
-            <label>Generation charge (₱ per kWh)
-              <span class="hint">Export credit is what the utility pays you per kWh you send to the grid.</span>
-              <input type="number" inputmode="decimal" step="0.0001" x-model.number="b.genRate">
-            </label>
-            <label>Variable charges (₱)
-              <span class="hint">Bill lines that grow with kWh, before the export credit.</span>
-              <input type="number" inputmode="decimal" step="0.01" x-model.number="b.varCharges">
-            </label>
-            <div class="wide"><details><summary>Ano ito?</summary>
-              <p class="help">Generation charge: presyo bawat kWh sa "Generation" line ng bill. Variable charges: lahat ng singil na tumataas kapag mas marami kang kuryenteng ginamit (generation, transmission, distribution, buwis). Huwag isama ang fixed charges tulad ng metering at supply. Kung hindi sigurado, ilagay ang subtotal bago ang export credit.</p></details></div>
-
-            <label class="wide">Total amount due (₱)
-              <input type="number" inputmode="decimal" step="0.01" x-model.number="b.total">
-            </label>
-            <label class="wide">Outage hours in this period (optional)
-              <span class="hint">On-grid inverters stop during brownouts by design, so those hours are not a fault.</span>
-              <input type="number" inputmode="decimal" x-model.number="b.outageHours">
-            </label>
-          </div>
-
-          <template x-if="result(b)">
-            <div class="res">
-              <template x-for="e in result(b).errors" :key="e"><p class="err" x-text="e"></p></template>
-
-              <template x-if="result(b).pr !== null">
-                <div>
-                  <h3>Performance ratio (PR)
-                    <span class="badge" :class="result(b).band" x-text="bandLabel(result(b).band)"></span></h3>
-                  <p class="help">PR is how much of the sun's energy on your panels became electricity. It is your output divided by what the panels are rated for in that sun. 0.75 or higher is good.</p>
-                  <dl>
-                    <dt>PR</dt><dd x-text="fmt(result(b).pr, 2)"></dd>
-                    <dt>Sun on your panels (typical year)</dt><dd x-text="fmt(result(b).hPoa, 0) + ' kWh/m²'"></dd>
-                    <dt>Expected at PR 0.75</dt><dd x-text="fmt(result(b).expectedKwh, 0) + ' kWh'"></dd>
-                    <dt>Actual</dt><dd x-text="fmt(b.inverterKwh, 0) + ' kWh'"></dd>
-                  </dl>
-                  <p class="help">This compares against a typical year's sun, not this month's actual weather. A cloudy month can read low even when the system is fine. Weather check comes later.</p>
-                  <div class="flag red" x-show="redRaised(b)"><strong>Two low months in a row.</strong> This is worth asking your installer about. Questions, not a verdict: has anything shaded the panels, are there dirty panels, and what does the inverter's fault log say?</div>
-                  <p class="help" x-show="result(b).band === 'red' && !redRaised(b)">One low month is not enough to raise a flag. Satellite sun data can be off by 5 to 10% for a single month, so we wait for a second low month.</p>
+              <template x-if="s.hybrid">
+                <div class="wide grid">
+                  <label>Battery charged (kWh)<span class="hint">Energy that went into the battery.</span>
+                    <input type="number" inputmode="decimal" x-model.number="b.chargeKwh"></label>
+                  <label>Battery discharged (kWh)<span class="hint">Energy that came out.</span>
+                    <input type="number" inputmode="decimal" x-model.number="b.dischargeKwh"></label>
+                  <label class="wide">Home load from your app (kWh, optional)<span class="hint">Only if your inverter has a CT meter.</span>
+                    <input type="number" inputmode="decimal" x-model.number="b.homeLoadKwh"></label>
+                  <div class="wide"><details class="optional"><summary>Ano ito?</summary>
+                    <p class="help">Sa hybrid inverter app, hanapin ang "Battery charge" at "Battery discharge" para sa parehong petsa ng bill. Idagdag ang daily totals. Ang "Home load" ay lalabas lang kung may CT meter ang inverter mo.</p></details></div>
                 </div>
               </template>
 
-              <template x-if="result(b).weather">
+              <label>Bought from the grid (kWh)<input type="number" inputmode="decimal" x-model.number="b.importKwh"></label>
+              <label>Sent to the grid (kWh)<input type="number" inputmode="decimal" x-model.number="b.exportKwh"></label>
+              <div class="wide"><details class="optional"><summary>Ano ito?</summary>
+                <p class="help">Sa net metering bill, may dalawang linya: "Delivered" (bili mo sa grid) at "Received" (na-export mo). Kung 0 ang export, ilagay ang 0.</p></details></div>
+
+              <label>Generation charge (₱ per kWh)
+                <span class="hint">Export credit is what the utility pays you per kWh you send to the grid.</span>
+                <input type="number" inputmode="decimal" step="0.0001" x-model.number="b.genRate"></label>
+              <label>Variable charges (₱)
+                <span class="hint">Bill lines that grow with kWh, before the export credit.</span>
+                <input type="number" inputmode="decimal" step="0.01" x-model.number="b.varCharges"></label>
+              <div class="wide"><details class="optional"><summary>Ano ito?</summary>
+                <p class="help">Generation charge: presyo bawat kWh sa "Generation" line ng bill. Variable charges: lahat ng singil na tumataas kapag mas marami kang kuryenteng ginamit (generation, transmission, distribution, buwis). Huwag isama ang fixed charges tulad ng metering at supply. Kung hindi sigurado, ilagay ang subtotal bago ang export credit.</p></details></div>
+
+              <label class="wide">Total amount due (₱)<input type="number" inputmode="decimal" step="0.01" x-model.number="b.total"></label>
+              <label class="wide">Outage hours in this period (optional)
+                <span class="hint">On-grid inverters stop during brownouts by design, so those hours are not a fault.</span>
+                <input type="number" inputmode="decimal" x-model.number="b.outageHours"></label>
+            </div>
+          </details>
+
+          <!-- Empty state: say exactly what is missing -->
+          <p class="nudge" x-show="needsPR(b).length" x-text="'To see your answer, add ' + needsPR(b).join(' and ') + '.'"></p>
+          <template x-if="result(b)"><div>
+            <template x-for="e in result(b).errors" :key="e"><p class="err" x-text="e"></p></template>
+          </div></template>
+
+          <!-- The answer: dial and one plain sentence -->
+          <template x-if="result(b) && result(b).pr !== null">
+            <div>
+              <div class="answer">
+                <div class="dial" x-html="dial(b)"></div>
+                <p class="headline" x-text="headline(b)"></p>
+                <p class="sub" x-text="answerSub(b)"></p>
+                <p class="help" style="text-align:center">PR is how much of the sun's energy on your panels became electricity. Healthy is 0.75 or more.</p>
+                <div class="flag red" x-show="redRaised(b)"><strong>Two low months in a row.</strong> Questions, not a verdict: has anything shaded the panels, are they dirty, and what does the inverter's fault log say? The findings sheet has these ready.</div>
+                <p class="help" x-show="result(b).band === 'red' && !redRaised(b)" style="text-align:center">We wait for a second low month before raising a flag, because satellite sun data can be off by 5 to 10% for a single month.</p>
+              </div>
+
+              <!-- Weather or system? (F4) -->
+              <details class="sec">
+                <summary>Weather or system? <span class="teaser" x-text="weatherTeaser(b)"></span></summary>
                 <div>
-                  <h3>Weather or system?</h3>
-                  <template x-if="result(b).weather.missing">
+                  <template x-if="!result(b).weather"><p class="help">Not checked yet. Use "Check the weather" below your bills. The PR above is against a typical year's sun, so a cloudy month can read low even when the system is fine.</p></template>
+                  <template x-if="result(b).weather && result(b).weather.missing">
                     <div class="flag">No weather data for these dates from either source, so the PR above is against a typical year only. It cannot tell weather from a system fault.</div>
                   </template>
-                  <template x-if="!result(b).weather.missing">
+                  <template x-if="result(b).weather && !result(b).weather.missing">
                     <div>
                       <p class="help">The weather index is the sun in this period divided by the sun for the same dates in a typical year (the average of 2020 to 2025). 1.00 is typical. Below 1.00 is cloudier than usual.</p>
                       <dl>
@@ -219,63 +230,54 @@
                     </div>
                   </template>
                 </div>
-              </template>
+              </details>
 
-              <template x-if="result(b).hybrid">
-                <div>
-                  <h3>Battery</h3>
+              <!-- Energy split (F5) -->
+              <details class="sec" x-show="result(b).split">
+                <summary>How much solar you used yourself <span class="teaser" x-text="result(b).split ? fmt(result(b).split.selfConsumptionRatio * 100, 0) + '%' : ''"></span></summary>
+                <div><template x-if="result(b).split"><dl>
+                  <dt>Used in the house</dt><dd x-text="fmt(result(b).split.selfConsumed, 0) + ' kWh'"></dd>
+                  <dt>Share of your solar</dt><dd x-text="fmt(result(b).split.selfConsumptionRatio * 100, 0) + '%'"></dd>
+                  <dt>Whole-house use</dt><dd x-text="fmt(result(b).split.load, 0) + ' kWh'"></dd>
+                </dl></template></div>
+              </details>
+
+              <!-- Savings (F6, F7) -->
+              <details class="sec" x-show="result(b).savings !== null">
+                <summary>What solar saved you <span class="teaser" x-text="result(b).savings !== null ? '₱' + fmt(result(b).savings, 0) : ''"></span></summary>
+                <div><template x-if="result(b).savings !== null"><dl>
+                  <dt>Your buying rate</dt><dd x-text="'₱' + fmt(result(b).rImport, 2) + '/kWh'"></dd>
+                  <dt>Saved this bill</dt><dd x-text="'₱' + fmt(result(b).savings, 0)"></dd>
+                  <dt>Moving 1 kWh from night to noon is worth</dt><dd x-text="'₱' + fmt(result(b).shift, 2)"></dd>
+                </dl></template></div>
+              </details>
+
+              <!-- Battery (F9) -->
+              <details class="sec" x-show="result(b).hybrid">
+                <summary>Battery <span class="teaser" x-text="result(b).hybrid && result(b).hybrid.roundTripEfficiency !== null ? fmt(result(b).hybrid.roundTripEfficiency * 100, 0) + '% back' : ''"></span></summary>
+                <div><template x-if="result(b).hybrid"><div>
                   <p class="help">Round-trip efficiency is how much of the energy you put into the battery comes back out. Some is always lost as heat, so it stays below 100% over a long run.</p>
                   <dl>
                     <dt>Round-trip efficiency (out ÷ in)</dt><dd x-text="result(b).hybrid.roundTripEfficiency === null ? 'n/a' : fmt(result(b).hybrid.roundTripEfficiency * 100, 0) + '%'"></dd>
                     <dt>Whole-house use, worked out</dt><dd x-text="fmt(result(b).hybrid.load, 0) + ' kWh'"></dd>
-                    <template x-if="result(b).hybrid.loadCheck">
-                      <dt x-text="'Your app says ' + fmt(num(b.homeLoadKwh), 0) + ' kWh. Difference'"></dt>
-                    </template>
-                    <template x-if="result(b).hybrid.loadCheck">
-                      <dd x-text="(result(b).hybrid.loadCheck.gapKwh >= 0 ? '+' : '') + fmt(result(b).hybrid.loadCheck.gapKwh, 0) + ' kWh (' + fmt(result(b).hybrid.loadCheck.gapPct, 0) + '%)'"></dd>
-                    </template>
-                    <template x-if="result(b).hybrid.value !== undefined">
-                      <dt>Battery earned this bill</dt>
-                    </template>
-                    <template x-if="result(b).hybrid.value !== undefined">
-                      <dd x-text="'₱' + fmt(result(b).hybrid.value, 0)"></dd>
-                    </template>
+                    <template x-if="result(b).hybrid.loadCheck"><dt x-text="'Your app says ' + fmt(num(b.homeLoadKwh), 0) + ' kWh. Difference'"></dt></template>
+                    <template x-if="result(b).hybrid.loadCheck"><dd x-text="(result(b).hybrid.loadCheck.gapKwh >= 0 ? '+' : '') + fmt(result(b).hybrid.loadCheck.gapKwh, 0) + ' kWh (' + fmt(result(b).hybrid.loadCheck.gapPct, 0) + '%)'"></dd></template>
+                    <template x-if="result(b).hybrid.value !== undefined"><dt>Battery earned this bill</dt></template>
+                    <template x-if="result(b).hybrid.value !== undefined"><dd x-text="'₱' + fmt(result(b).hybrid.value, 0)"></dd></template>
                   </dl>
                   <p class="help" x-show="result(b).hybrid.roundTripEfficiency !== null && result(b).hybrid.roundTripEfficiency >= 1">Near or above 100% in one bill usually means the battery ended the period less full than it started. Look at a few bills together.</p>
                   <template x-for="f in result(b).hybrid.flags" :key="f"><div class="flag" x-text="hybridFlagText(f)"></div></template>
-                </div>
-              </template>
-
-              <template x-if="result(b).split">
-                <div>
-                  <h3>How much solar you used yourself</h3>
-                  <dl>
-                    <dt>Used in the house</dt><dd x-text="fmt(result(b).split.selfConsumed, 0) + ' kWh'"></dd>
-                    <dt>Share of your solar</dt><dd x-text="fmt(result(b).split.selfConsumptionRatio * 100, 0) + '%'"></dd>
-                    <dt>Whole-house use</dt><dd x-text="fmt(result(b).split.load, 0) + ' kWh'"></dd>
-                  </dl>
-                </div>
-              </template>
-
-              <template x-if="result(b).savings !== null">
-                <div>
-                  <h3>What solar saved you</h3>
-                  <dl>
-                    <dt>Your buying rate</dt><dd x-text="'₱' + fmt(result(b).rImport, 2) + '/kWh'"></dd>
-                    <dt>Saved this bill</dt><dd x-text="'₱' + fmt(result(b).savings, 0)"></dd>
-                    <dt>Moving 1 kWh from night to noon is worth</dt><dd x-text="'₱' + fmt(result(b).shift, 2)"></dd>
-                  </dl>
-                </div>
-              </template>
+                </div></template></div>
+              </details>
 
               <!-- F2 bill decoder. Copy claims (export credit at the generation charge, not retail; fixed charges keep
                    the bill above zero) come from docs/SPEC.md sources, dated 29 Sep 2026: Lakasolar "rebate vs net
                    metering" and SolarPro Install "reading the net-metered Meralco bill". No rates are hard-coded:
                    every peso figure below is read from the user's own bill. -->
-              <template x-if="decode(b) && !decode(b).error">
-                <details class="decoder" open>
-                  <summary><strong>Decode this bill</strong></summary>
-                  <ol>
+              <details class="sec" x-show="decode(b) && !decode(b).error">
+                <summary>Decode this bill <span class="teaser">Why it is not zero</span></summary>
+                <div><template x-if="decode(b) && !decode(b).error"><div>
+                  <ol class="steps-list">
                     <li><strong>Binili mo sa grid.</strong> Bumili ka ng <b x-text="fmt(num(b.importKwh), 0) + ' kWh'"></b>. Ang mga singil na tumataas kasabay ng kWh ay <b x-text="'₱' + fmt(num(b.varCharges), 2)"></b>. Average iyon na <b x-text="'₱' + fmt(decode(b).rImport, 2) + ' bawat kWh'"></b>.</li>
                     <li><strong>Na-export mo.</strong> Nag-export ka ng <b x-text="fmt(num(b.exportKwh), 0) + ' kWh'"></b>. Ang credit ay nasa presyo ng generation charge lang (<b x-text="'₱' + fmt(num(b.genRate), 2)"></b> bawat kWh), hindi sa buong presyo ng binibili mo. Kaya ang export credit mo ay <b x-text="'₱' + fmt(decode(b).exportCredit, 2)"></b>.
                       <span x-show="decode(b).exportGap > 0"> Mas malaki ang ipon kapag ginamit mo mismo sa bahay ang solar (<b x-text="'₱' + fmt(decode(b).rImport, 2)"></b>) kaysa i-export (<b x-text="'₱' + fmt(num(b.genRate), 2)"></b>).</span></li>
@@ -285,24 +287,44 @@
                     <li><strong>Total.</strong> <b x-text="'₱' + fmt(num(b.total), 2)"></b> ang binayaran mo.</li>
                   </ol>
                   <template x-for="f in decode(b).flags" :key="f"><div class="flag" x-text="decodeFlagText(f)"></div></template>
-                </details>
-              </template>
-              <template x-for="f in result(b).flags" :key="f"><div class="flag" x-text="flagText(f)"></div></template>
+                </div></template></div>
+              </details>
+
+              <div style="padding-top:16px" x-show="result(b).flags.length">
+                <template x-for="f in result(b).flags" :key="f"><div class="flag" x-text="flagText(f)"></div></template>
+              </div>
             </div>
           </template>
         </article>
       </template>
 
-      <div class="row">
+      <div id="bills-end" class="row">
         <button type="button" @click="addBill()">Add another bill</button>
-        <button type="button" class="primary" @click="showSheet = !showSheet" x-text="showSheet ? 'Hide findings sheet' : 'Findings sheet for my installer'"></button>
+        <button type="button" class="primary" @click="showSheet = !showSheet; if (showSheet) $nextTick(() => scrollTo('findings'))" x-text="showSheet ? 'Hide findings sheet' : 'Findings sheet for my installer'"></button>
       </div>
+
+      <!-- Save nudge: after the first answer, before they leave -->
+      <div class="card nudge-save" x-show="step === 3 && !savedOnce && !saveNudgeHidden && !example">
+        <div><strong>Save this so next month takes one minute.</strong><p class="help" style="margin:2px 0 0">The file stays on your device. Load it next month and add the new bill.</p></div>
+        <div class="row" style="margin:0"><button type="button" class="primary" @click="saveData()">Save my data</button><button type="button" class="link" @click="saveNudgeHidden = true">Not now</button></div>
+      </div>
+
+      <!-- Weather check (F4): only on click, only location and dates leave the browser -->
+      <section class="card">
+        <h3>Was it the weather?</h3>
+        <p class="help">A low month can be cloudy weather, not a fault. This compares each bill's dates with the sun that fell on your roof, from a satellite (Himawari, through Open-Meteo) and NASA POWER. It sends only your location, rounded to 0.1° (about 11 km), and a date range to those two services. Nothing else leaves your browser.</p>
+        <div class="row" style="margin-top:10px">
+          <button type="button" @click="checkWeather()" :disabled="weather.status === 'loading' || !canCheckWeather" x-text="weather.status === 'loading' ? 'Checking...' : (weather.status === 'done' ? 'Check again' : 'Check the weather')"></button>
+        </div>
+        <p class="help" x-show="!canCheckWeather">Add a bill's dates and solar kWh first.</p>
+        <template x-for="e in weather.errors" :key="e"><p class="err" x-text="e"></p></template>
+      </section>
 
       <template x-if="cumulative.length > 0">
         <section class="card">
-          <h2 style="margin-top:0">Payback so far</h2>
-          <p class="sub">Cumulative savings from the bills above. Add what you paid and the installer's promised payback to see if you are on track.</p>
-          <div class="grid">
+          <h3>Payback so far</h3>
+          <p class="help">Cumulative savings from the bills above. Add what you paid and the installer's promised payback to see if you are on track.</p>
+          <div class="grid" style="margin-top:10px">
             <label>System cost (₱)<input type="number" inputmode="decimal" x-model.number="s.cost"></label>
             <label>Promised payback (years)<input type="number" inputmode="decimal" step="0.1" x-model.number="s.promisedYears"></label>
           </div>
@@ -313,7 +335,7 @@
 
       <template x-if="batteryTotal">
         <section class="card">
-          <h2 style="margin-top:0">Battery so far</h2>
+          <h3>Battery so far</h3>
           <p x-text="'Over ' + batteryTotal.bills + ' bill' + (batteryTotal.bills === 1 ? '' : 's') + ', the battery earned about ₱' + fmt(batteryTotal.earned, 0) + '.' + (batteryTotal.cost ? ' That is ' + fmt(batteryTotal.earned / batteryTotal.cost * 100, 1) + '% of its cost.' : '')"></p>
           <p class="help">Each kWh from the battery is worth what you did not buy, minus what the same kWh would have earned as an export credit.</p>
           <template x-if="efficiencyTrend">
@@ -327,39 +349,47 @@
 
       <template x-if="degradationResult">
         <section class="card">
-          <h2 style="margin-top:0">Year over year</h2>
+          <h3>Year over year</h3>
           <p x-text="'Comparing the same months a year apart, weather-adjusted PR changed by about ' + fmt(Math.abs(degradationResult.annualLossPct), 1) + '% a year (' + (degradationResult.annualLossPct >= 0 ? 'down' : 'up') + '), across ' + degradationResult.pairs + ' pair' + (degradationResult.pairs === 1 ? '' : 's') + '.' + (degradationResult.exceedsWarranty === null ? '' : (degradationResult.exceedsWarranty ? ' That is more than the ' + fmt(degradationResult.warrantyPct, 2) + '% a year in your module warranty.' : ' That is within the ' + fmt(degradationResult.warrantyPct, 2) + '% a year in your module warranty.'))"></p>
           <p class="help">One year of degradation is small next to month-to-month noise in the sun data, so one or two pairs mean little. It becomes more useful as the pairs build up over two or more years.</p>
-          <div class="flag" x-show="degradationResult.pairs < minPairs"><strong>Early reading.</strong> <span x-text="'Fewer than ' + minPairs + ' pairs, so'"></span> this is too few months to act on. It is shown so you know it is being tracked. Keep adding bills.</div>
+          <div class="flag" x-show="degradationResult.pairs < minPairs"><strong>Early reading.</strong> <span x-text="'Fewer than ' + minPairs + ' pairs, so this is too few months to act on. It is shown so you know it is being tracked. Keep adding bills.'"></span></div>
         </section>
       </template>
     </section>
   </template>
 
   <!-- F3 findings sheet. Prints alone (see app.css). Framed as questions, never a verdict; no installer names.
-       Sources for the uncertainty wording: docs/SPEC.md risk table and README "Spike 2 result", 29 Sep 2026. -->
+       Sources for the uncertainty wording: docs/SPEC.md risk table and README "Sources decision", 29 Sep 2026. -->
   <section id="findings" class="card" x-show="showSheet && sheet">
     <template x-if="sheet">
       <div>
-        <div class="row" style="margin-top:0;justify-content:space-between" data-noprint>
+        <div class="row" style="margin:0 0 12px;justify-content:space-between" data-noprint>
           <strong>Findings sheet</strong>
           <button type="button" class="primary" @click="window.print()">Print or save as PDF</button>
         </div>
-        <h2 style="margin-top:8px">Solar system check: questions for my installer</h2>
-        <p class="sub" x-text="'Made with SCND on ' + sheet.date + ' from the owner\'s own bills and inverter figures. A screening check, not an inspection, and not a verdict on any installer or system.'"></p>
+        <div class="sheet-head">
+          <div><div class="sheet-brand">SCND · YOUR SECOND METER</div><h2>Solar system check: questions for my installer</h2></div>
+          <div class="sheet-date" x-text="sheet.date"></div>
+        </div>
+        <p class="sub" style="margin-bottom:6px">Made from the owner's own bills and inverter figures. A screening check, not an inspection, and not a verdict on any installer or system.</p>
+        <div class="tiles">
+          <div class="tile" x-show="sheet.latest"><small>Latest PR</small><b x-text="sheet.latest ? sheet.latest.pr : ''"></b><em x-text="sheet.latest ? sheet.latest.band : ''"></em></div>
+          <div class="tile"><small>Bills checked</small><b x-text="sheet.total"></b><em x-text="sheet.total > sheet.shown ? 'latest ' + sheet.shown + ' shown' : 'all shown'"></em></div>
+          <div class="tile" x-show="sheet.savedTotal"><small>Saved so far</small><b x-text="sheet.savedTotal"></b><em>from these bills</em></div>
+        </div>
         <h3>System</h3>
-        <p x-text="sheet.system"></p>
-        <h3 x-text="'Bills checked' + (sheet.total > sheet.shown ? ' (latest ' + sheet.shown + ' of ' + sheet.total + ')' : '')"></h3>
+        <div class="chips"><template x-for="c in sheet.system" :key="c"><span x-text="c"></span></template></div>
+        <h3>Bills checked</h3>
         <table class="sheet-table">
           <thead><tr><th>Period</th><th>Solar kWh</th><th>Expected kWh</th><th>PR</th><th>Weather</th><th>Exported</th><th>Saved</th></tr></thead>
           <tbody><template x-for="r in sheet.rows" :key="r.period"><tr>
-            <td x-text="r.period"></td><td x-text="r.actual"></td><td x-text="r.expected"></td><td x-text="r.pr + ' (' + r.band + ')'"></td><td x-text="r.wi"></td><td x-text="r.exported"></td><td x-text="r.saved"></td>
+            <td data-label="Period" x-text="r.period"></td><td data-label="Solar kWh" x-text="r.actual"></td><td data-label="Expected kWh" x-text="r.expected"></td><td data-label="PR" x-text="r.pr + ' (' + r.band + ')'"></td><td data-label="Weather" x-text="r.wi"></td><td data-label="Exported" x-text="r.exported"></td><td data-label="Saved" x-text="r.saved"></td>
           </tr></template></tbody>
         </table>
-        <p class="help">Expected kWh is what the panels should make in that sun at PR 0.75. PR is the share of the sun's energy on the panels that became electricity. Weather is the weather index: the sun in the period divided by a typical year's sun for the same dates (1.00 is typical).</p>
+        <p class="help">Expected: what a healthy system (PR 0.75) makes in that sun. PR: share of the sun's energy on the panels that became electricity. Weather: sun in the period against a typical year (1.00 is typical).</p>
         <h3>Questions to ask</h3>
         <p x-show="sheet.allClear">No questions raised: PR was within the usual range in every bill checked.</p>
-        <ol x-show="!sheet.allClear"><template x-for="i in sheet.items" :key="i.id"><li x-text="i.text"></li></template></ol>
+        <ol class="q" x-show="!sheet.allClear"><template x-for="i in sheet.items" :key="i.id"><li x-text="i.text"></li></template></ol>
         <h3>Please share</h3>
         <ul><template x-for="q in sheet.requests" :key="q"><li x-text="q"></li></template></ul>
         <h3>How sure are these numbers?</h3>
@@ -368,7 +398,7 @@
     </template>
   </section>
 
-  <p class="sub" style="margin-top:32px">Nothing here is a verdict. It is a set of questions to ask your installer.</p>
+  <p class="foot">Nothing here is a verdict. It is a set of questions to ask your installer. <a :href="feedbackHref" x-show="feedbackHref">Send feedback</a></p>
 </main>
 </body>
 </html>

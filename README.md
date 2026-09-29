@@ -20,7 +20,7 @@ Start here: `CLAUDE.md` (project rules), `docs/SPEC.md` (spec), `docs/NEXT.md` (
 | F8 | Year-over-year degradation against the module warranty, after 13 months of bills |
 | F9 | Hybrid systems: battery round-trip efficiency, implied house load, battery value, grid-charging flag |
 
-Save and load use a JSON file on the owner's own device.
+Save and load use a JSON file on the owner's own device. "Try an example" fills a made-up system and two bills so a first-time owner sees a full result in one tap.
 
 ## Privacy
 
@@ -30,7 +30,7 @@ Save and load use a JSON file on the owner's own device.
 
 ## Layout
 
-- `public/`: `index.html`, `app.css`, `js/` (`calc.js` all the maths, `grid.js`, `weather.js`, `findings.js`, `data.js`, `app.js`), `data/ph-grid.json`, `vendor/alpine.min.js` (Alpine 3.17.4, MIT, vendored so the page makes no third-party request)
+- `public/`: `index.html`, `app.css`, `manifest.webmanifest`, `icons/`, `js/` (`calc.js` all the maths, `grid.js`, `weather.js`, `findings.js`, `data.js`, `app.js`), `data/ph-grid.json`, `vendor/alpine.min.js` (Alpine 3.17.4, MIT, vendored so the page makes no third-party request)
 - `src/worker.js`: serves `public/` and rate-limits
 - `scripts/`: `build-grid.mjs` (builds the sun grid), `gen-poa-reference.py` (pvlib reference cases)
 - `test/`: golden-case tests
