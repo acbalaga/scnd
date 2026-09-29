@@ -11,9 +11,19 @@
 <script defer src="/vendor/alpine.min.js"></script>
 </head>
 <body>
-<main x-data="scnd" x-cloak>
+<main x-data="scnd" x-cloak :class="{ 'sheet-open': showSheet }">
   <h1>SCND <small>Your second meter</small></h1>
   <p class="sub">Checks your rooftop solar against your own bill. Free. Everything you type stays in this browser and is never sent anywhere.</p>
+
+  <section class="card">
+    <div class="row" style="margin-top:0">
+      <button type="button" @click="saveData()" :disabled="!ready">Save my data</button>
+      <button type="button" @click="$refs.file.click()">Load saved data</button>
+      <input type="file" accept="application/json,.json" x-ref="file" @change="loadFile($event)" hidden>
+    </div>
+    <p class="help" style="margin-top:8px">Nothing is stored for you. "Save" downloads a file to your phone or computer. Next month, load it and add the new bill.</p>
+    <p class="help" x-show="fileMessage" x-text="fileMessage"></p>
+  </section>
 
   <!-- 1. System setup, once -->
   <section class="card">
@@ -231,7 +241,10 @@
         </article>
       </template>
 
-      <div class="row"><button type="button" @click="addBill()">Add another bill</button></div>
+      <div class="row">
+        <button type="button" @click="addBill()">Add another bill</button>
+        <button type="button" class="primary" @click="showSheet = !showSheet" x-text="showSheet ? 'Hide findings sheet' : 'Findings sheet for my installer'"></button>
+      </div>
 
       <template x-if="cumulative.length > 0">
         <section class="card">
@@ -247,6 +260,38 @@
       </template>
     </section>
   </template>
+
+  <!-- F3 findings sheet. Prints alone (see app.css). Framed as questions, never a verdict; no installer names.
+       Sources for the uncertainty wording: docs/SPEC.md risk table and README "Spike 2 result", 29 Sep 2026. -->
+  <section id="findings" class="card" x-show="showSheet && sheet">
+    <template x-if="sheet">
+      <div>
+        <div class="row" style="margin-top:0;justify-content:space-between" data-noprint>
+          <strong>Findings sheet</strong>
+          <button type="button" class="primary" @click="window.print()">Print or save as PDF</button>
+        </div>
+        <h2 style="margin-top:8px">Solar system check: questions for my installer</h2>
+        <p class="sub" x-text="'Made with SCND on ' + sheet.date + ' from the owner\'s own bills and inverter figures. A screening check, not an inspection, and not a verdict on any installer or system.'"></p>
+        <h3>System</h3>
+        <p x-text="sheet.system"></p>
+        <h3 x-text="'Bills checked' + (sheet.total > sheet.shown ? ' (latest ' + sheet.shown + ' of ' + sheet.total + ')' : '')"></h3>
+        <table class="sheet-table">
+          <thead><tr><th>Period</th><th>Solar kWh</th><th>Expected kWh</th><th>PR</th><th>Weather</th><th>Exported</th><th>Saved</th></tr></thead>
+          <tbody><template x-for="r in sheet.rows" :key="r.period"><tr>
+            <td x-text="r.period"></td><td x-text="r.actual"></td><td x-text="r.expected"></td><td x-text="r.pr + ' (' + r.band + ')'"></td><td x-text="r.wi"></td><td x-text="r.exported"></td><td x-text="r.saved"></td>
+          </tr></template></tbody>
+        </table>
+        <p class="help">Expected kWh is what the panels should make in that sun at PR 0.75. PR is the share of the sun's energy on the panels that became electricity. Weather is the weather index: the sun in the period divided by a typical year's sun for the same dates (1.00 is typical).</p>
+        <h3>Questions to ask</h3>
+        <p x-show="sheet.allClear">No questions raised: PR was within the usual range in every bill checked.</p>
+        <ol x-show="!sheet.allClear"><template x-for="i in sheet.items" :key="i.id"><li x-text="i.text"></li></template></ol>
+        <h3>Please share</h3>
+        <ul><template x-for="q in sheet.requests" :key="q"><li x-text="q"></li></template></ul>
+        <h3>How sure are these numbers?</h3>
+        <ul><template x-for="u in sheet.uncertainty" :key="u"><li x-text="u"></li></template></ul>
+      </div>
+    </template>
+  </section>
 
   <p class="sub" style="margin-top:32px">Nothing here is a verdict. It is a set of questions to ask your installer.</p>
 </main>

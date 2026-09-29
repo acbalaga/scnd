@@ -3,6 +3,8 @@
 import * as calc from './calc.js';
 import { loadGrid, lookup, isLowDiffuse } from './grid.js';
 import { fetchSatellite, fetchNasa } from './weather.js';
+import { serialize, parse } from './data.js';
+import { findings } from './findings.js';
 
 const num = (v) => (v === '' || v === null || v === undefined ? NaN : Number(v));
 const round1 = (v) => Math.round(v * 10) / 10;
@@ -51,6 +53,8 @@ document.addEventListener('alpine:init', () => {
     lowDiffuse: false,
     bills: [newBill()],
     // Actual-month weather, fetched only when the user clicks. status: idle | loading | done.
+    fileMessage: '',
+    showSheet: false,
     weather: { status: 'idle', sat: null, nasa: null, satBase: null, nasaBase: null, errors: [] },
 
     get clipping() {
@@ -121,6 +125,59 @@ document.addEventListener('alpine:init', () => {
       if (calc.isError(split)) return { missing: true };
       const prAdjusted = calc.performanceRatio({ eKwh: num(b.inverterKwh), kWp: num(this.s.kWp), hPoa: out.hPoa * call.wi });
       return { ...call, satWi: sat?.wi ?? null, nasaWi: nasa?.wi ?? null, validDays: (sat ?? nasa).validDays, days: (sat ?? nasa).days, split, prAdjusted: calc.isError(prAdjusted) ? null : prAdjusted };
+    },
+
+    // Save and load: a JSON file on the user's own device. Nothing is stored by us.
+    saveData() {
+      const blob = new Blob([serialize({ ...this.s, place: this.place }, this.bills)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `scnd-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      this.fileMessage = 'Saved. Keep the file somewhere you can find it. Load it next month and add the new bill.';
+    },
+    async loadFile(ev) {
+      const file = ev.target.files?.[0];
+      ev.target.value = '';
+      if (!file) return;
+      const r = parse(await file.text());
+      if (r.error) { this.fileMessage = r.error; return; }
+      this.place = r.setup.place;
+      this.s = { ...this.s, ...r.setup };
+      this.bills = r.bills.length ? r.bills.map((b) => ({ ...b, id: nextId++ })) : [newBill()];
+      this.weather = { status: 'idle', sat: null, nasa: null, satBase: null, nasaBase: null, errors: [] };
+      this.ready = false; this.showSheet = false;
+      await this.continueSetup();
+      this.fileMessage = this.ready ? `Loaded ${this.bills.length} bill${this.bills.length === 1 ? '' : 's'}.` : '';
+    },
+
+    // Findings sheet (F3): the latest 6 bills as a table, plus questions built from the results.
+    get sheet() {
+      if (!this.ready) return null;
+      const rows = this.bills.filter((b) => b.start && b.end).sort((a, c) => (a.start < c.start ? -1 : 1))
+        .map((b) => ({ b, r: this.result(b) })).filter((x) => x.r && x.r.pr !== null);
+      const cum = this.cumulative, perDay = this.promisedPerDay;
+      const payback = perDay && cum.length ? { saved: cum[cum.length - 1].saved, promised: perDay * cum[cum.length - 1].day } : null;
+      const f = findings({
+        payback,
+        bills: rows.map(({ b, r }) => ({
+          start: b.start, end: b.end, pr: r.pr, band: r.band, redRaised: this.redRaised(b), actualKwh: num(b.inverterKwh),
+          expectedKwh: r.expectedKwh, weather: r.weather, flags: r.flags, savings: r.savings,
+        })),
+      });
+      const s = this.s, face = FACINGS.find((x) => x.az === num(s.azimuth))?.label ?? `${s.azimuth}°`;
+      return {
+        ...f,
+        date: new Date().toISOString().slice(0, 10),
+        system: `${s.kWp} kWp panels, ${s.acKw} kW inverter (DC/AC ${this.fmt(num(s.kWp) / num(s.acKw), 2)}), ${s.tilt}° tilt facing ${face.toLowerCase()}, ${s.hybrid ? 'hybrid with battery' : 'on-grid'}, location ${s.lat}, ${s.lon} (rounded), switched on ${s.commissioned || 'month not given'}.`,
+        rows: rows.slice(-6).map(({ b, r }) => ({
+          period: `${b.start} to ${b.end}`, actual: this.fmt(num(b.inverterKwh), 0), expected: this.fmt(r.expectedKwh, 0),
+          pr: this.fmt(r.pr, 2), band: BAND_LABEL[r.band], wi: r.weather && !r.weather.missing ? this.fmt(r.weather.wi, 2) : 'n/a',
+          exported: Number.isFinite(num(b.exportKwh)) ? this.fmt(num(b.exportKwh), 0) : 'n/a', saved: r.savings !== null ? '₱' + this.fmt(r.savings, 0) : 'n/a',
+        })),
+        shown: Math.min(rows.length, 6), total: rows.length,
+      };
     },
 
     addBill() { this.bills.push(newBill()); },

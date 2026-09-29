@@ -65,6 +65,11 @@ Himawari monthly ratio to its own climatology, cross-checked against NASA POWER;
 
 ## 6. F3 findings sheet, save/load JSON
 
+- [x] Done. `public/js/data.js` (save/load, copies only known fields, rejects text in number fields, bad dates, wrong version, files over 1 MB; no installer field exists) and `public/js/findings.js` (the questions), 13 tests. UI: "Save my data", "Load saved data", "Findings sheet for my installer" with a print stylesheet.
+- Verified in headless Chromium: save, reload, load restores all bills and results; a hostile file is rejected with a plain message; the sheet prints on one page in A4 and Letter in the worst case I could build (6 bills shown, 5 questions, 3 uncertainty notes, 851 px of the ~965 px Letter limit); zero external requests during save, load and print.
+- **Not verified:** Safari mobile printing (the SPEC "done when" line stays unticked). Needs a real iPhone.
+- The table shows the latest 6 bills. The questions use all bills.
+
 ## 7. F8 degradation, F9 hybrid
 
 ## 8. Clean-up before beta
