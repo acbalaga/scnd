@@ -65,6 +65,41 @@ export function poaMonth({ ghi, dif, tilt, azimuth, lat, month, days }) {
   return daily * nDays;
 }
 
+// Bills run reading date to reading date, not calendar month. Splits the days from start (included)
+// to end (excluded) into calendar months. Dates are 'YYYY-MM-DD'. Periods over 62 days are rejected.
+export function splitPeriod(start, end) {
+  const t0 = Date.parse(start), t1 = Date.parse(end);
+  if (!Number.isFinite(t0) || !Number.isFinite(t1)) return err('bad_input', 'Need two valid dates.');
+  const n = Math.round((t1 - t0) / 86400000);
+  if (n <= 0) return err('bad_period', 'The end reading date must be after the start.');
+  if (n > 62) return err('bad_period', 'A bill period is normally 25 to 35 days. This one is over 62.');
+  const parts = [];
+  for (let k = 0; k < n; k++) {
+    const d = new Date(t0 + k * 86400000);
+    const year = d.getUTCFullYear(), month = d.getUTCMonth() + 1;
+    const last = parts[parts.length - 1];
+    if (last && last.year === year && last.month === month) last.days += 1;
+    else parts.push({ year, month, days: 1 });
+  }
+  return parts;
+}
+
+// POA irradiation over a bill period: each calendar month's mean day, weighted by the days it covers.
+// ghi and dif are the 12 monthly means (kWh/m2/day). midMonth is the month holding the period's midpoint,
+// used to pick the wet or dry PR band.
+export function poaPeriod({ ghi, dif, tilt, azimuth, lat, start, end }) {
+  const parts = splitPeriod(start, end);
+  if (isError(parts)) return parts;
+  let hPoa = 0, days = 0;
+  for (const { month, days: d } of parts) {
+    const h = poaMonth({ ghi: ghi[month - 1], dif: dif[month - 1], tilt, azimuth, lat, month, days: d });
+    if (isError(h)) return h;
+    hPoa += h; days += d;
+  }
+  const mid = new Date(Date.parse(start) + (days / 2) * 86400000);
+  return { hPoa, days, midMonth: mid.getUTCMonth() + 1 };
+}
+
 // ---------- F1: performance ratio and bands ----------
 
 // PR = E_inverter / (kWp x H_POA). Use PV yield, not inverter AC output, for hybrids (F9).

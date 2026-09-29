@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SCND spike: weather source check</title>
+<style>
+  :root { --bg:#fbfbfa; --ink:#15191e; --muted:#5b6470; --line:#d9dde2; --ok:#1f7a4d; --bad:#b3261e; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#111418; --ink:#e8eaed; --muted:#9aa3ad; --line:#2a3038; --ok:#5cc28d; --bad:#f28b82; } }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 system-ui, sans-serif; }
+  main { max-width:720px; margin:0 auto; padding:24px 16px 48px; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  p.sub { color:var(--muted); margin:0 0 20px; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th, td { text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--muted); font-weight:600; }
+  .ok { color:var(--ok); font-weight:600; } .bad { color:var(--bad); font-weight:600; }
+  code { font-size:12px; color:var(--muted); word-break:break-all; }
+  button { font:inherit; padding:8px 14px; border-radius:8px; border:1px solid var(--line); background:transparent; color:var(--ink); cursor:pointer; }
+</style>
+</head>
+<body>
+<main>
+  <h1>SCND spike: can the browser reach the weather sources?</h1>
+  <p class="sub">Fetches last complete month's daily irradiance for three PH points, straight from this page. A CORS block shows as FAIL. Nothing you enter is sent anywhere; there are no inputs.</p>
+  <p><button id="run">Run check</button> <span id="when" class="sub"></span></p>
+  <table>
+    <thead><tr><th>Source</th><th>Point</th><th>Result</th><th>Avg GHI (kWh/m²/day)</th></tr></thead>
+    <tbody id="out"></tbody>
+  </table>
+  <p class="sub" id="ua"></p>
+  <p><a href="/spike2.html" style="color:inherit">Spike 2: which source matches PVGIS? →</a></p>
+</main>
+<script type="module">
+const points = [
+  { name: 'Manila', lat: 14.6, lon: 121.0 },
+  { name: 'Cebu',   lat: 10.3, lon: 123.9 },
+  { name: 'Davao',  lat: 7.1,  lon: 125.6 },
+];
+
+// Last complete calendar month (Open-Meteo archive lags ~5 days; NASA POWER a few days more)
+const now = new Date();
+const first = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+const last  = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0));
+const iso = d => d.toISOString().slice(0, 10);
+const compact = d => iso(d).replaceAll('-', '');
+
+const sources = [
+  {
+    name: 'Open-Meteo archive',
+    url: p => `https://archive-api.open-meteo.com/v1/archive?latitude=${p.lat}&longitude=${p.lon}&start_date=${iso(first)}&end_date=${iso(last)}&daily=shortwave_radiation_sum&timezone=Asia%2FManila`,
+    // MJ/m²/day -> kWh/m²/day
+    avg: j => mean(j.daily.shortwave_radiation_sum) / 3.6,
+  },
+  {
+    name: 'NASA POWER daily',
+    url: p => `https://power.larc.nasa.gov/api/temporal/daily/point?parameters=ALLSKY_SFC_SW_DWN&community=RE&latitude=${p.lat}&longitude=${p.lon}&start=${compact(first)}&end=${compact(last)}&format=JSON`,
+    // already kWh/m²/day; -999 = missing
+    avg: j => mean(Object.values(j.properties.parameter.ALLSKY_SFC_SW_DWN)),
+  },
+];
+
+function mean(arr) {
+  const v = arr.filter(x => typeof x === 'number' && x > -900);
+  return v.length ? v.reduce((a, b) => a + b, 0) / v.length : NaN;
+}
+
+async function check(src, p) {
+  const url = src.url(p);
+  const t0 = performance.now();
+  try {
+    const r = await fetch(url);
+    if (!r.ok) return { ok: false, msg: `HTTP ${r.status}`, url };
+    const j = await r.json();
+    const a = src.avg(j);
+    return { ok: Number.isFinite(a), msg: `${Math.round(performance.now() - t0)} ms`, avg: a, url };
+  } catch (e) {
+    return { ok: false, msg: 'Blocked or unreachable (likely CORS)', url };
+  }
+}
+
+async function run() {
+  const out = document.getElementById('out');
+  out.innerHTML = '';
+  document.getElementById('when').textContent = `Period ${iso(first)} to ${iso(last)}`;
+  for (const src of sources) {
+    for (const p of points) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${src.name}</td><td>${p.name}</td><td>…</td><td></td>`;
+      out.appendChild(tr);
+      const res = await check(src, p);
+      tr.children[2].innerHTML = `<span class="${res.ok ? 'ok' : 'bad'}">${res.ok ? 'PASS' : 'FAIL'}</span> ${res.msg}<br><code>${res.url}</code>`;
+      tr.children[3].textContent = res.ok ? res.avg.toFixed(2) : '';
+    }
+  }
+}
+
+document.getElementById('run').addEventListener('click', run);
+document.getElementById('ua').textContent = `Browser: ${navigator.userAgent}`;
+run();
+</script>
+</body>
+</html>

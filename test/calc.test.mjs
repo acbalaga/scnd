@@ -23,6 +23,31 @@ test('poaMonth edge: bad input returns an error object', () => {
   assert.ok(c.isError(c.poaMonth({ ghi: NaN, dif: 2, tilt: 10, azimuth: 0, lat: 14.6, month: 1 })));
 });
 
+// ---- splitPeriod, poaPeriod ----
+test('splitPeriod golden: 15 Jan to 14 Feb is 17 days in Jan and 13 in Feb', () => {
+  assert.deepEqual(c.splitPeriod('2026-01-15', '2026-02-14'), [{ year: 2026, month: 1, days: 17 }, { year: 2026, month: 2, days: 13 }]);
+});
+test('splitPeriod edge: reversed, same-day, over 62 days and bad dates are errors', () => {
+  assert.equal(c.splitPeriod('2026-02-14', '2026-01-15').error, 'bad_period');
+  assert.equal(c.splitPeriod('2026-01-15', '2026-01-15').error, 'bad_period');
+  assert.equal(c.splitPeriod('2026-01-01', '2026-04-01').error, 'bad_period');
+  assert.ok(c.isError(c.splitPeriod('', '2026-01-15')));
+});
+test('poaPeriod golden: a whole calendar month matches poaMonth', () => {
+  const ghi = Array(12).fill(5), dif = Array(12).fill(2);
+  const a = c.poaPeriod({ ghi, dif, tilt: 10, azimuth: 0, lat: 14.6, start: '2026-03-01', end: '2026-04-01' });
+  near(a.hPoa, c.poaMonth({ ghi: 5, dif: 2, tilt: 10, azimuth: 0, lat: 14.6, month: 3 }), 1e-9);
+  assert.equal(a.days, 31); assert.equal(a.midMonth, 3);
+});
+test('poaPeriod golden: a straddling period weights each month by its days', () => {
+  const ghi = [4, 6, ...Array(10).fill(5)], dif = Array(12).fill(2);
+  const a = c.poaPeriod({ ghi, dif, tilt: 0, azimuth: 0, lat: 14.6, start: '2026-01-16', end: '2026-02-16' });
+  near(a.hPoa, (16 * 4 + 15 * 6) * 1, 3); assert.equal(a.midMonth, 1);
+});
+test('poaPeriod edge: a bad period returns an error object', () => {
+  assert.ok(c.isError(c.poaPeriod({ ghi: Array(12).fill(5), dif: Array(12).fill(2), tilt: 10, azimuth: 0, lat: 14.6, start: '2026-03-10', end: '2026-03-01' })));
+});
+
 // ---- performanceRatio ----
 test('performanceRatio golden: 480 kWh, 4 kWp, 160 kWh/m2 = 0.75', () => near(c.performanceRatio({ eKwh: 480, kWp: 4, hPoa: 160 }), 0.75));
 test('performanceRatio edge: zero irradiation and negative energy are errors', () => {

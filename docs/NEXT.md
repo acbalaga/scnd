@@ -39,8 +39,8 @@ Build `scripts/build-grid.mjs` (Node, no dependencies) that writes `public/data/
 System setup once (location, kWp, tilt, facing, inverter AC kW, commissioning month, hybrid yes/no), then one card per bill. Results for F1, F5, F6, F7. Mobile first. English UI; Taglish for help text.
 
 - **Checks**
-    - [ ] A first-time owner can finish setup plus one bill in under 5 minutes on a phone.
-    - [ ] Network tab shows no request other than static files and the rounded-coordinate irradiance calls.
+    - [ ] A first-time owner can finish setup plus one bill in under 5 minutes on a phone. Not verified: needs a real first-time owner. Setup is 6 required fields, a bill is 8.
+    - [x] Network tab shows no request other than static files and the rounded-coordinate irradiance calls. Result (headless Chromium, 390 px wide, 3 bills): 7 requests, all static files from this origin, zero irradiance calls (typical-year sun comes from `public/data/ph-grid.json`), no console errors.
 
 ## 4. F2 bill decoder
 

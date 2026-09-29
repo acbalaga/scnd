@@ -3,101 +3,195 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SCND spike: weather source check</title>
-<style>
-  :root { --bg:#fbfbfa; --ink:#15191e; --muted:#5b6470; --line:#d9dde2; --ok:#1f7a4d; --bad:#b3261e; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#111418; --ink:#e8eaed; --muted:#9aa3ad; --line:#2a3038; --ok:#5cc28d; --bad:#f28b82; } }
-  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 system-ui, sans-serif; }
-  main { max-width:720px; margin:0 auto; padding:24px 16px 48px; }
-  h1 { font-size:20px; margin:0 0 4px; }
-  p.sub { color:var(--muted); margin:0 0 20px; }
-  table { width:100%; border-collapse:collapse; font-size:14px; }
-  th, td { text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); vertical-align:top; }
-  th { color:var(--muted); font-weight:600; }
-  .ok { color:var(--ok); font-weight:600; } .bad { color:var(--bad); font-weight:600; }
-  code { font-size:12px; color:var(--muted); word-break:break-all; }
-  button { font:inherit; padding:8px 14px; border-radius:8px; border:1px solid var(--line); background:transparent; color:var(--ink); cursor:pointer; }
-</style>
+<title>SCND: your second meter</title>
+<meta name="description" content="A free, private checker for Philippine rooftop solar. Your numbers stay in your browser.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/app.css">
+<script type="module" src="/js/app.js"></script>
+<script defer src="/vendor/alpine.min.js"></script>
 </head>
 <body>
-<main>
-  <h1>SCND spike: can the browser reach the weather sources?</h1>
-  <p class="sub">Fetches last complete month's daily irradiance for three PH points, straight from this page. A CORS block shows as FAIL. Nothing you enter is sent anywhere; there are no inputs.</p>
-  <p><button id="run">Run check</button> <span id="when" class="sub"></span></p>
-  <table>
-    <thead><tr><th>Source</th><th>Point</th><th>Result</th><th>Avg GHI (kWh/m²/day)</th></tr></thead>
-    <tbody id="out"></tbody>
-  </table>
-  <p class="sub" id="ua"></p>
-  <p><a href="/spike2.html" style="color:inherit">Spike 2: which source matches PVGIS? →</a></p>
+<main x-data="scnd" x-cloak>
+  <h1>SCND <small>Your second meter</small></h1>
+  <p class="sub">Checks your rooftop solar against your own bill. Free. Everything you type stays in this browser and is never sent anywhere.</p>
+
+  <!-- 1. System setup, once -->
+  <section class="card">
+    <h2 style="margin-top:0">1. Your system</h2>
+    <div class="grid">
+      <label class="wide">Where is it?
+        <select x-model="place" @change="pickPlace()">
+          <option value="">Pick the nearest city</option>
+          <template x-for="c in cities" :key="c.name"><option :value="c.name" x-text="c.name"></option></template>
+        </select>
+      </label>
+      <label>Latitude
+        <input type="number" inputmode="decimal" step="0.1" x-model.number="s.lat" placeholder="14.6">
+      </label>
+      <label>Longitude
+        <input type="number" inputmode="decimal" step="0.1" x-model.number="s.lon" placeholder="121.0">
+      </label>
+      <div class="wide">
+        <button type="button" class="link" @click="useMyLocation()">Use my phone's location</button>
+        <p class="help">We round it to 0.1° (about 11 km) and it stays in your browser. Sun data comes from a file we ship, so nothing is looked up online.</p>
+      </div>
+      <label>Panel size (kWp)
+        <span class="hint">Total on your quotation. A kWp is the panels' rated power. Example: 6 panels of 550 W is 3.3 kWp.</span>
+        <input type="number" inputmode="decimal" step="0.01" x-model.number="s.kWp" placeholder="5.5">
+      </label>
+      <label>Inverter size (kW AC)
+        <span class="hint">On the inverter label.</span>
+        <input type="number" inputmode="decimal" step="0.1" x-model.number="s.acKw" placeholder="5">
+      </label>
+      <label>Roof tilt (degrees)
+        <span class="hint">Most PH roofs are 10 to 15°.</span>
+        <input type="number" inputmode="decimal" step="1" x-model.number="s.tilt">
+      </label>
+      <label>Panels face
+        <span class="hint">Direction the panels point.</span>
+        <select x-model.number="s.azimuth">
+          <template x-for="f in facings" :key="f.az"><option :value="f.az" x-text="f.label"></option></template>
+        </select>
+      </label>
+      <label class="wide">Month it was switched on
+        <input type="month" x-model="s.commissioned">
+      </label>
+      <label class="check wide"><input type="checkbox" x-model="s.hybrid"> <span>I have a battery (hybrid). Use my app's PV yield, not the inverter's AC output.</span></label>
+      <label class="check wide"><input type="checkbox" x-model="s.netMetering"> <span>My utility has already switched me to net metering (my meter can run backward).</span></label>
+    </div>
+    <p class="err" x-show="setupError" x-text="setupError"></p>
+    <div class="flag" x-show="lowDiffuse"><strong>Read this location with care.</strong> Sun here is very clear from February to April, and the data source tends to read low in the dry months. Treat the dry-season expected yield as a range, not a single number.</div>
+    <div class="flag" x-show="clipping"><strong>DC/AC above 1.3.</strong> Your panels are much bigger than your inverter. On sunny days the inverter caps output, so a lower PR in bright months can be normal.</div>
+    <div class="row">
+      <button type="button" class="primary" @click="continueSetup()" x-text="ready ? 'Update system' : 'Continue to my bills'"></button>
+    </div>
+  </section>
+
+  <!-- 2. One card per bill -->
+  <template x-if="ready">
+    <section>
+      <h2>2. Your bills</h2>
+      <p class="sub">One card per bill. Add the last few months to see a trend. Open the "Ano ito?" under a box if you're not sure where to find it.</p>
+
+      <template x-for="(b, i) in bills" :key="b.id">
+        <article class="card">
+          <div class="row" style="justify-content:space-between;margin-top:0">
+            <h3 style="margin:0" x-text="'Bill ' + (i + 1)"></h3>
+            <button type="button" class="link" @click="removeBill(b.id)" x-show="bills.length > 1">Remove</button>
+          </div>
+          <div class="grid">
+            <label>Reading date, start
+              <input type="date" x-model="b.start">
+            </label>
+            <label>Reading date, end
+              <input type="date" x-model="b.end">
+            </label>
+            <div class="wide"><details><summary>Ano ito?</summary>
+              <p class="help">Nasa bill mo ang "Previous reading date" at "Present reading date". Hindi ito buong buwan, kaya ito ang ginagamit natin.</p></details></div>
+
+            <label class="wide"><span x-text="s.hybrid ? 'PV yield in that period (kWh)' : 'Solar produced in that period (kWh)'"></span>
+              <span class="hint">A kWh is one unit of electricity, what your meter counts.</span>
+              <input type="number" inputmode="decimal" x-model.number="b.inverterKwh">
+            </label>
+            <div class="wide"><details><summary>Ano ito?</summary>
+              <p class="help">Sa inverter app mo, hanapin ang total generation. Idagdag ang daily totals mula sa start hanggang end reading date ng bill.</p></details></div>
+
+            <label>Bought from the grid (kWh)
+              <input type="number" inputmode="decimal" x-model.number="b.importKwh">
+            </label>
+            <label>Sent to the grid (kWh)
+              <input type="number" inputmode="decimal" x-model.number="b.exportKwh">
+            </label>
+            <div class="wide"><details><summary>Ano ito?</summary>
+              <p class="help">Sa net metering bill, may dalawang linya: "Delivered" (bili mo sa grid) at "Received" (na-export mo). Kung 0 ang export, ilagay ang 0.</p></details></div>
+
+            <label>Generation charge (₱ per kWh)
+              <span class="hint">Export credit is what the utility pays you per kWh you send to the grid.</span>
+              <input type="number" inputmode="decimal" step="0.0001" x-model.number="b.genRate">
+            </label>
+            <label>Variable charges (₱)
+              <span class="hint">Bill lines that grow with kWh, before the export credit.</span>
+              <input type="number" inputmode="decimal" step="0.01" x-model.number="b.varCharges">
+            </label>
+            <div class="wide"><details><summary>Ano ito?</summary>
+              <p class="help">Generation charge: presyo bawat kWh sa "Generation" line ng bill. Variable charges: lahat ng singil na tumataas kapag mas marami kang kuryenteng ginamit (generation, transmission, distribution, buwis). Huwag isama ang fixed charges tulad ng metering at supply. Kung hindi sigurado, ilagay ang subtotal bago ang export credit.</p></details></div>
+
+            <label class="wide">Total amount due (₱)
+              <input type="number" inputmode="decimal" step="0.01" x-model.number="b.total">
+            </label>
+            <label class="wide">Outage hours in this period (optional)
+              <span class="hint">On-grid inverters stop during brownouts by design, so those hours are not a fault.</span>
+              <input type="number" inputmode="decimal" x-model.number="b.outageHours">
+            </label>
+          </div>
+
+          <template x-if="result(b)">
+            <div class="res">
+              <template x-for="e in result(b).errors" :key="e"><p class="err" x-text="e"></p></template>
+
+              <template x-if="result(b).pr !== null">
+                <div>
+                  <h3>Performance ratio (PR)
+                    <span class="badge" :class="result(b).band" x-text="bandLabel(result(b).band)"></span></h3>
+                  <p class="help">PR is how much of the sun's energy on your panels became electricity. It is your output divided by what the panels are rated for in that sun. 0.75 or higher is good.</p>
+                  <dl>
+                    <dt>PR</dt><dd x-text="fmt(result(b).pr, 2)"></dd>
+                    <dt>Sun on your panels (typical year)</dt><dd x-text="fmt(result(b).hPoa, 0) + ' kWh/m²'"></dd>
+                    <dt>Expected at PR 0.75</dt><dd x-text="fmt(result(b).expectedKwh, 0) + ' kWh'"></dd>
+                    <dt>Actual</dt><dd x-text="fmt(b.inverterKwh, 0) + ' kWh'"></dd>
+                  </dl>
+                  <p class="help">This compares against a typical year's sun, not this month's actual weather. A cloudy month can read low even when the system is fine. Weather check comes later.</p>
+                  <div class="flag red" x-show="redRaised(b)"><strong>Two low months in a row.</strong> This is worth asking your installer about. Questions, not a verdict: has anything shaded the panels, are there dirty panels, and what does the inverter's fault log say?</div>
+                  <p class="help" x-show="result(b).band === 'red' && !redRaised(b)">One low month is not enough to raise a flag. Satellite sun data can be off by 5 to 10% for a single month, so we wait for a second low month.</p>
+                </div>
+              </template>
+
+              <template x-if="result(b).split">
+                <div>
+                  <h3>How much solar you used yourself</h3>
+                  <dl>
+                    <dt>Used in the house</dt><dd x-text="fmt(result(b).split.selfConsumed, 0) + ' kWh'"></dd>
+                    <dt>Share of your solar</dt><dd x-text="fmt(result(b).split.selfConsumptionRatio * 100, 0) + '%'"></dd>
+                    <dt>Whole-house use</dt><dd x-text="fmt(result(b).split.load, 0) + ' kWh'"></dd>
+                  </dl>
+                </div>
+              </template>
+
+              <template x-if="result(b).savings !== null">
+                <div>
+                  <h3>What solar saved you</h3>
+                  <dl>
+                    <dt>Your buying rate</dt><dd x-text="'₱' + fmt(result(b).rImport, 2) + '/kWh'"></dd>
+                    <dt>Saved this bill</dt><dd x-text="'₱' + fmt(result(b).savings, 0)"></dd>
+                    <dt>Moving 1 kWh from night to noon is worth</dt><dd x-text="'₱' + fmt(result(b).shift, 2)"></dd>
+                  </dl>
+                </div>
+              </template>
+
+              <template x-for="f in result(b).flags" :key="f"><div class="flag" x-text="flagText(f)"></div></template>
+            </div>
+          </template>
+        </article>
+      </template>
+
+      <div class="row"><button type="button" @click="addBill()">Add another bill</button></div>
+
+      <template x-if="cumulative.length > 0">
+        <section class="card">
+          <h2 style="margin-top:0">Payback so far</h2>
+          <p class="sub">Cumulative savings from the bills above. Add what you paid and the installer's promised payback to see if you are on track.</p>
+          <div class="grid">
+            <label>System cost (₱)<input type="number" inputmode="decimal" x-model.number="s.cost"></label>
+            <label>Promised payback (years)<input type="number" inputmode="decimal" step="0.1" x-model.number="s.promisedYears"></label>
+          </div>
+          <div x-html="chart"></div>
+          <p class="help" x-text="paybackText"></p>
+        </section>
+      </template>
+    </section>
+  </template>
+
+  <p class="sub" style="margin-top:32px">Nothing here is a verdict. It is a set of questions to ask your installer.</p>
 </main>
-<script type="module">
-const points = [
-  { name: 'Manila', lat: 14.6, lon: 121.0 },
-  { name: 'Cebu',   lat: 10.3, lon: 123.9 },
-  { name: 'Davao',  lat: 7.1,  lon: 125.6 },
-];
-
-// Last complete calendar month (Open-Meteo archive lags ~5 days; NASA POWER a few days more)
-const now = new Date();
-const first = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
-const last  = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 0));
-const iso = d => d.toISOString().slice(0, 10);
-const compact = d => iso(d).replaceAll('-', '');
-
-const sources = [
-  {
-    name: 'Open-Meteo archive',
-    url: p => `https://archive-api.open-meteo.com/v1/archive?latitude=${p.lat}&longitude=${p.lon}&start_date=${iso(first)}&end_date=${iso(last)}&daily=shortwave_radiation_sum&timezone=Asia%2FManila`,
-    // MJ/m²/day -> kWh/m²/day
-    avg: j => mean(j.daily.shortwave_radiation_sum) / 3.6,
-  },
-  {
-    name: 'NASA POWER daily',
-    url: p => `https://power.larc.nasa.gov/api/temporal/daily/point?parameters=ALLSKY_SFC_SW_DWN&community=RE&latitude=${p.lat}&longitude=${p.lon}&start=${compact(first)}&end=${compact(last)}&format=JSON`,
-    // already kWh/m²/day; -999 = missing
-    avg: j => mean(Object.values(j.properties.parameter.ALLSKY_SFC_SW_DWN)),
-  },
-];
-
-function mean(arr) {
-  const v = arr.filter(x => typeof x === 'number' && x > -900);
-  return v.length ? v.reduce((a, b) => a + b, 0) / v.length : NaN;
-}
-
-async function check(src, p) {
-  const url = src.url(p);
-  const t0 = performance.now();
-  try {
-    const r = await fetch(url);
-    if (!r.ok) return { ok: false, msg: `HTTP ${r.status}`, url };
-    const j = await r.json();
-    const a = src.avg(j);
-    return { ok: Number.isFinite(a), msg: `${Math.round(performance.now() - t0)} ms`, avg: a, url };
-  } catch (e) {
-    return { ok: false, msg: 'Blocked or unreachable (likely CORS)', url };
-  }
-}
-
-async function run() {
-  const out = document.getElementById('out');
-  out.innerHTML = '';
-  document.getElementById('when').textContent = `Period ${iso(first)} to ${iso(last)}`;
-  for (const src of sources) {
-    for (const p of points) {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${src.name}</td><td>${p.name}</td><td>…</td><td></td>`;
-      out.appendChild(tr);
-      const res = await check(src, p);
-      tr.children[2].innerHTML = `<span class="${res.ok ? 'ok' : 'bad'}">${res.ok ? 'PASS' : 'FAIL'}</span> ${res.msg}<br><code>${res.url}</code>`;
-      tr.children[3].textContent = res.ok ? res.avg.toFixed(2) : '';
-    }
-  }
-}
-
-document.getElementById('run').addEventListener('click', run);
-document.getElementById('ua').textContent = `Browser: ${navigator.userAgent}`;
-run();
-</script>
 </body>
 </html>
