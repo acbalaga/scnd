@@ -45,10 +45,10 @@ const HYBRID_FLAG_TEXT = {
   grid_charging: 'The battery took in more energy than the solar left over after export, so some of it came from the grid. That can be a charge schedule or backup mode setting. Worth checking it is what you intended.',
 };
 
-// Feedback: a link to Fred's Google Form. Left empty until he has the form's URL; the footer link only shows when it is set.
+// Feedback: a link to Fred's Google Form (SCND Beta Feedback, set 30 Sep 2026). The footer link only shows when this is set.
 // It is a plain link the user chooses to click (no request from this page). The form is Google's, so the footer
-// asks people not to type bill numbers or personal details into it.
-const FEEDBACK_URL = '';
+// asks people not to type bill or account numbers into it. Name and email in the form are optional.
+const FEEDBACK_URL = 'https://forms.gle/uaUyhAR2PLqakpME8';
 
 let nextId = 1;
 const newBill = () => ({ id: nextId++, start: '', end: '', inverterKwh: '', importKwh: '', exportKwh: '', genRate: '', varCharges: '', total: '', outageHours: '', chargeKwh: '', dischargeKwh: '', homeLoadKwh: '', open: true });
