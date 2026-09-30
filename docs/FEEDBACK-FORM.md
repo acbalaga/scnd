@@ -8,7 +8,7 @@ The app shows a "Give feedback" link in the footer when `FEEDBACK_URL` in `publi
 2. Click **Send**, choose the link tab, copy the link (it starts with `https://forms.gle/` or `https://docs.google.com/forms/`).
 3. Paste it as the value of `FEEDBACK_URL` in `public/js/app.js`, commit, and push. (Or send the link here and I will do it.)
 
-The link opens the form in a new tab. Nothing from the app is sent to Google: the app does not pass any of the owner's numbers to the form. The footer tells people not to type bill numbers or personal details into it. Google's form collects whatever people type, so treat the answers as personal data.
+The link opens the form in a new tab. Nothing from the app is sent to Google: the app does not pass any of the owner's numbers to the form. The footer tells people not to type bill or account numbers into it, and that the form's name and email fields are optional. Google's form collects whatever people type, so treat the answers as personal data.
 
 ## Suggested questions
 

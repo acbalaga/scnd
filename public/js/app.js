@@ -47,7 +47,7 @@ const HYBRID_FLAG_TEXT = {
 
 // Feedback: a link to Fred's Google Form (SCND Beta Feedback, set 30 Sep 2026). The footer link only shows when this is set.
 // It is a plain link the user chooses to click (no request from this page). The form is Google's, so the footer
-// asks people not to type bill numbers or personal details into it.
+// asks people not to type bill or account numbers into it. Name and email in the form are optional.
 const FEEDBACK_URL = 'https://forms.gle/uaUyhAR2PLqakpME8';
 
 let nextId = 1;
