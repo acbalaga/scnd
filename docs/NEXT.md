@@ -122,3 +122,28 @@ Requested by Fred 29 Sep 2026 after testing on Safari (iPhone). Decided: answer 
 - [x] **Custom domain guide** in `docs/CUSTOM-DOMAIN.md` (three paths, steps, undo). Written without access to Cloudflare's docs, so check menu names against the dashboard.
 - **Not verified:** Safari (iPhone) printing of the sheet.
 
+
+## 11. Audit while waiting for beta feedback (30 Sep 2026)
+
+Requested by Fred: look for what was missed, keep to Simple, Lovable, Complete. Read calc, app, findings, save/load, weather, Worker and the SPEC end to end.
+
+**Fixed (bugs, no threshold or source changed):**
+- [x] **Hybrid savings overstated.** Savings and "whole-house use" used S = G − X, which counts battery losses (C − D) as solar used in the house. At 120 kWh in and 108 out that is 12 kWh a month, about PHP 145 at PHP 12/kWh, every bill. `energySplit` now takes C and D: S = G − X − C + D, and L matches `hybridBalance`. Hybrids need both battery numbers before savings show. 2 tests.
+- [x] **Stale weather after a location change.** Editing the location after "Check the weather" kept the old point's weather data and applied it to the new one. It is now dropped when the rounded point changes.
+- [x] **Findings sheet over-claimed.** With no questions raised, the sheet said "PR was within the usual range in every bill reviewed" even when an older bill was amber or red. It now says that only when every bill is green (`allGreen` in `findings.js`, 1 test).
+- [x] **Dates in UTC.** The sheet date, its reference number and the save file name used UTC, so before 8 am in PH they showed yesterday. Now local.
+- [x] Small: expected yield reads `PR_BANDS.green` instead of a second hard-coded 0.75; sheet table rows keyed by index (two bills with the same dates broke the key).
+- Checked in headless Chromium at 390 px: hybrid split equals the F9 balance, weather resets on a move and not on a re-save, sheet wording, no console errors. `node --test`: 101 pass.
+
+**Decided (Fred, 30 Sep 2026): items 1 to 5, and the prompt for item 6. Done.**
+- [x] **1. Judge on weather-adjusted PR once the weather call is trusted.** `judgedPr` in `calc.js`: with a weather call that is not "uncertain", a bill's PR, expected kWh, band, chip, dial, headline, two-low-months flag and sheet row all use the weather-adjusted figures. Unchecked, uncertain or missing weather stays against a typical year. An inferred call (one source) is used; it already carries its own notice. Dial says which basis it used; the sheet adds a basis line and marks an unused index "(not used)". Two cloudy months at WI 0.75 and typical PR 0.58 now read 0.77, green, no flag; with the sources 7 points apart they stay red and flagged. 2 tests.
+- [x] **2. Payback question waits.** Raised only after about a year of bills (`PAYBACK_MIN_DAYS` = 360) or when more than 15% behind (`PAYBACK_GAP`), in `findings.js`. Before that a gap is an awareness note under "Basis and limitations". 1 test.
+- [x] **3. Skipped months break the run.** `isConsecutive` in `calc.js`: the next bill must start within 7 days (`CONSECUTIVE_GAP_DAYS`) of the previous one's end for two red bills to count as in a row. 2 tests.
+- [x] **4. Overlapping bills flagged.** `overlapDays` in `calc.js`; the later bill (or the second copy of the same dates) gets "These dates overlap another bill, so savings and payback count the shared days twice." One shared day is let through as a reading-date slip. 2 tests.
+- [x] **5. Zero-export hybrids.** Kept the default. With the battery box ticked, setup says "Battery set to zero export (nothing sent to the grid)? Leave this unticked.", and the 0 kWh export flag ends with "If your system is set to zero export, untick net metering in setup."
+- [x] **6. Unsaved-changes prompt.** Leaving the page asks first when setup or bills differ from the last save or load. It compares what a save would write with what was last written; nothing is stored. Off for the example. **Limit:** iPhone Safari ignores leave-page prompts, so on iPhones the save nudge is still the only guard.
+- Checked in headless Chromium: every case above, plus the handler blocks only when there are changes (the native prompt itself does not show under automation). No console errors. `node --test`: 108 pass.
+
+**Still open (Fred):** 7. Content-Security-Policy so the browser enforces the privacy claim (`connect-src 'self' https://satellite-api.open-meteo.com https://power.larc.nasa.gov`, `Referrer-Policy: no-referrer`). Alpine's standard build needs `'unsafe-eval'` and the theme script needs a hash. Test under `wrangler dev` first.
+
+**Noted, not proposed for v1:** temperature is in the grid (`t2m`) but unused; the dry-season band already absorbs heat loss. No offline mode although the app installs to the home screen.

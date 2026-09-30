@@ -8,6 +8,8 @@ import { findings, MIN_DEGRADATION_PAIRS } from './findings.js';
 
 const num = (v) => (v === '' || v === null || v === undefined ? NaN : Number(v));
 const round1 = (v) => Math.round(v * 10) / 10;
+// Today on the owner's own clock, as YYYY-MM-DD. toISOString() is UTC, which is yesterday in PH before 8 am.
+const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
 // Nearest-city shortcuts, coordinates rounded to 0.1 degree.
 const CITIES = [
@@ -33,6 +35,7 @@ const FLAG_TEXT = {
   no_export_after_activation: 'You said net metering is on, but this bill shows 0 kWh sent to the grid. Ask the utility whether your meter was actually changed to a bi-directional one.',
   outage: 'Outage hours were entered. On-grid inverters shut off during brownouts by design, so some of the gap is expected.',
   clipping: 'Panels are more than 1.3 times the inverter size, so the inverter caps output on sunny days.',
+  overlap: 'These dates overlap another bill, so savings and payback count the shared days twice. Check the reading dates.',
 };
 
 const DECODE_FLAG_TEXT = {
@@ -74,6 +77,8 @@ document.addEventListener('alpine:init', () => {
     feedbackHref: FEEDBACK_URL,
     showSheet: false,
     weather: { status: 'idle', sat: null, nasa: null, satBase: null, nasaBase: null, errors: [] },
+    weatherAt: null,
+    resetWeather() { this.weather = { status: 'idle', sat: null, nasa: null, satBase: null, nasaBase: null, errors: [] }; this.weatherAt = null; },
 
     get clipping() {
       return calc.sanityFlags({ kWp: num(this.s.kWp), acKw: num(this.s.acKw) }).includes('clipping');
@@ -100,6 +105,8 @@ document.addEventListener('alpine:init', () => {
         return;
       }
       s.lat = round1(lat); s.lon = round1(lon);       // only ever use the rounded point
+      // Weather fetched for another point would be applied to this one, so drop it when the location changes.
+      if (this.weatherAt && (this.weatherAt.lat !== s.lat || this.weatherAt.lon !== s.lon)) this.resetWeather();
       try {
         this.climate = lookup(await loadGrid(), s.lat, s.lon);
       } catch (e) {
@@ -117,6 +124,7 @@ document.addEventListener('alpine:init', () => {
     async checkWeather() {
       const w = this.weather;
       w.status = 'loading'; w.errors = [];
+      this.weatherAt = { lat: this.s.lat, lon: this.s.lon };
       const [sat, nasa] = await Promise.allSettled([fetchSatellite(this.s.lat, this.s.lon), fetchNasa(this.s.lat, this.s.lon)]);
       for (const [key, r, label] of [['sat', sat, 'Satellite (Himawari)'], ['nasa', nasa, 'NASA POWER']]) {
         w[key] = null; w[key + 'Base'] = null;
@@ -151,10 +159,10 @@ document.addEventListener('alpine:init', () => {
       const blob = new Blob([serialize({ ...this.s, place: this.place }, this.bills)], { type: 'application/json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = `scnd-${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `scnd-${today()}.json`;
       a.click();
       URL.revokeObjectURL(a.href);
-      this.savedOnce = true;
+      this.savedOnce = true; this.savedSnap = this.snap();
       this.fileMessage = 'Saved. Keep the file somewhere you can find it. Load it next month and add the new bill.';
     },
     async loadFile(ev) {
@@ -167,9 +175,10 @@ document.addEventListener('alpine:init', () => {
       this.s = { ...this.s, ...r.setup };
       this.bills = r.bills.length ? r.bills.map((b, k, all) => ({ ...b, id: nextId++, open: k === all.length - 1 })) : [newBill()];
       this.example = false; this.savedOnce = true;
-      this.weather = { status: 'idle', sat: null, nasa: null, satBase: null, nasaBase: null, errors: [] };
+      this.resetWeather();
       this.ready = false; this.showSheet = false;
       await this.continueSetup();
+      this.savedSnap = this.snap();
       this.fileMessage = this.ready ? `Loaded ${this.bills.length} bill${this.bills.length === 1 ? '' : 's'}.` : '';
     },
 
@@ -179,7 +188,7 @@ document.addEventListener('alpine:init', () => {
       const rows = this.bills.filter((b) => b.start && b.end).sort((a, c) => (a.start < c.start ? -1 : 1))
         .map((b) => ({ b, r: this.result(b) })).filter((x) => x.r && x.r.pr !== null);
       const cum = this.cumulative, perDay = this.promisedPerDay;
-      const payback = perDay && cum.length ? { saved: cum[cum.length - 1].saved, promised: perDay * cum[cum.length - 1].day } : null;
+      const payback = perDay && cum.length ? { saved: cum[cum.length - 1].saved, promised: perDay * cum[cum.length - 1].day, days: cum[cum.length - 1].day } : null;
       const f = findings({
         payback, degradation: this.degradationResult, efficiency: this.efficiencyTrend,
         bills: rows.map(({ b, r }) => ({
@@ -188,14 +197,16 @@ document.addEventListener('alpine:init', () => {
         })),
       });
       const s = this.s, face = (FACINGS.find((x) => x.az === num(s.azimuth))?.label ?? `${s.azimuth}°`).toLowerCase();
-      const date = new Date().toISOString().slice(0, 10), lastRow = rows.length ? rows[rows.length - 1] : null;
+      const date = today(), lastRow = rows.length ? rows[rows.length - 1] : null;
       const latest = lastRow ? { period: this.fmtRange(lastRow.b.start, lastRow.b.end), pr: this.fmt(lastRow.r.pr, 2), band: lastRow.r.band } : null;
       const nq = f.items.length;
       // Basis lines: what the numbers rest on. Data sources are ours (README "Sources decision", 29 Sep 2026).
       const weatherUsed = rows.some((x) => x.r.weather && !x.r.weather.missing);
+      const adjusted = rows.some((x) => x.r.basis === 'weather');
       const sources = [
         `PR is the electricity produced divided by what the panels are rated to produce in the sun received. Within the usual range is ${calc.PR_BANDS.green} or more, with a lower limit of ${calc.PR_BANDS.amberWet} (June to October) or ${calc.PR_BANDS.amberDry} (November to May). Expected output assumes a PR of ${calc.PR_BANDS.green}.`,
         `Sun data: NASA POWER typical-year climatology (2001 to 2020), transposed to the panel tilt and facing.${weatherUsed ? ' Weather index compares each period with a 2020 to 2025 baseline from satellite data (Himawari, through Open-Meteo) and NASA POWER, where 1.00 is a typical year.' : ''}`,
+        ...(adjusted ? ['Where the weather check gave a result and its sources agreed within 5 points, PR and expected output are adjusted for that period\'s weather. Otherwise they are against a typical year (marked "not used" in the weather column).'] : []),
       ];
       return {
         ...f,
@@ -208,7 +219,8 @@ document.addEventListener('alpine:init', () => {
         ],
         rows: rows.slice(-5).map(({ b, r }) => ({
           period: this.fmtRange(b.start, b.end), actual: this.fmt(num(b.inverterKwh), 0), expected: this.fmt(r.expectedKwh, 0),
-          pr: this.fmt(r.pr, 2), band: REPORT_BAND[r.band], low: r.band === 'red', wi: r.weather && !r.weather.missing ? this.fmt(r.weather.wi, 2) : 'n/a',
+          pr: this.fmt(r.pr, 2), band: REPORT_BAND[r.band], low: r.band === 'red',
+          wi: r.weather && !r.weather.missing ? this.fmt(r.weather.wi, 2) + (r.basis === 'weather' ? '' : ' (not used)') : 'n/a',
           exported: Number.isFinite(num(b.exportKwh)) ? this.fmt(num(b.exportKwh), 0) : 'n/a', saved: r.savings !== null ? this.fmt(r.savings, 0) : 'n/a',
         })),
         shown: Math.min(rows.length, 5), total: rows.length, latest,
@@ -302,14 +314,15 @@ document.addEventListener('alpine:init', () => {
         return { ...newBill(), start, end, inverterKwh: solar, importKwh: bought, exportKwh: sent, genRate: 9.7, varCharges: variable, total: Math.round(Math.max(variable - credit, 0) + 620), open: false };
       });
       this.bills = bills; this.example = true; this.savedOnce = false; this.saveNudgeHidden = false;
-      this.weather = { status: 'idle', sat: null, nasa: null, satBase: null, nasaBase: null, errors: [] };
+      this.resetWeather();
       this.$nextTick(() => this.scrollTo('bills'));
     },
     clearExample() {
       this.example = false; this.ready = false; this.setupOpen = true; this.place = '';
       this.s = { lat: '', lon: '', kWp: '', acKw: '', tilt: 10, azimuth: 0, commissioned: '', hybrid: false, netMetering: true, cost: '', promisedYears: '', warrantyPct: '', batteryCost: '' };
       this.bills = [newBill()]; this.climate = null; this.lowDiffuse = false;
-      this.weather = { status: 'idle', sat: null, nasa: null, satBase: null, nasaBase: null, errors: [] };
+      this.resetWeather();
+      this.savedSnap = this.snap();   // a fresh start has nothing to lose
     },
 
     addBill() { this.bills.forEach((x) => { x.open = false; }); this.bills.push(newBill()); this.$nextTick(() => this.scrollTo('bills-end')); },
@@ -328,11 +341,13 @@ document.addEventListener('alpine:init', () => {
         if (calc.isError(pr)) errors.push(pr.message);
         else {
           Object.assign(out, { pr, hPoa: p.hPoa, band: calc.prBand(pr, p.midMonth), midMonth: p.midMonth, midYear: p.midYear });
-          out.expectedKwh = calc.expectedEnergy({ kWp: num(s.kWp), hPoa: p.hPoa, pr: 0.75 });
+          out.expectedKwh = calc.expectedEnergy({ kWp: num(s.kWp), hPoa: p.hPoa, pr: calc.PR_BANDS.green });
         }
       }
-      if (Number.isFinite(g) && Number.isFinite(x) && Number.isFinite(i)) {
-        const split = calc.energySplit({ g, x, i });
+      // Hybrids need the battery numbers too, or battery losses would count as solar used (F9 balance).
+      const battery = s.hybrid ? { c: num(b.chargeKwh), d: num(b.dischargeKwh) } : {};
+      if (Number.isFinite(g) && Number.isFinite(x) && Number.isFinite(i) && Object.values(battery).every(Number.isFinite)) {
+        const split = calc.energySplit({ g, x, i, ...battery });
         if (calc.isError(split)) errors.push(split.message);
         else out.split = split;
       }
@@ -360,7 +375,17 @@ document.addEventListener('alpine:init', () => {
         }
       }
       out.weather = this.weatherResult(b, out);
+      // Judge on weather-adjusted PR once the weather call is trusted (calc.judgedPr). The typical-year values are kept.
+      if (out.pr !== null) {
+        const j = calc.judgedPr({ pr: out.pr, expectedKwh: out.expectedKwh, call: out.weather && !out.weather.missing ? out.weather : null });
+        if (!calc.isError(j)) Object.assign(out, { prTypical: out.pr, expectedTypical: out.expectedKwh, pr: j.pr, expectedKwh: j.expectedKwh, basis: j.basis, band: calc.prBand(j.pr, out.midMonth) });
+      }
       out.flags = calc.sanityFlags({ kWp: num(s.kWp), acKw: num(s.acKw), exportKwh: Number.isFinite(x) ? x : undefined, netMeteringActive: s.netMetering, outageHours: num(b.outageHours) });
+      // Overlap with an earlier bill (or the same dates entered twice): flagged on the later one. One shared day is
+      // an off-by-one in the reading dates, not a duplicate, so it is let through.
+      const k = this.bills.indexOf(b);
+      const earlier = this.bills.filter((o, n) => o !== b && o.start && o.end && (o.start < b.start || (o.start === b.start && n < k)));
+      if (earlier.some((o) => calc.overlapDays(o, b) > 1)) out.flags.push('overlap');
       return out;
     },
 
@@ -398,7 +423,7 @@ document.addEventListener('alpine:init', () => {
     redRaised(b) {
       const ordered = this.bills.filter((x) => x.start).sort((a, c) => (a.start < c.start ? -1 : 1));
       const k = ordered.findIndex((x) => x.id === b.id);
-      if (k < 1) return false;
+      if (k < 1 || !calc.isConsecutive(ordered[k - 1], ordered[k])) return false;   // a skipped month breaks the run
       return calc.redFlag(ordered.slice(0, k + 1).map((x) => this.result(x)?.band ?? null));
     },
 
@@ -413,7 +438,9 @@ document.addEventListener('alpine:init', () => {
       : 'Inferred. NASA POWER has no data for these dates, so this weather index comes from the satellite alone. It is not cross-checked, so treat the split as a rough guide.',
     hybridFlagText: (f) => HYBRID_FLAG_TEXT[f],
     bandLabel: (band) => BAND_LABEL[band],
-    flagText: (f) => FLAG_TEXT[f],
+    flagText(f) {
+      return f === 'no_export_after_activation' && this.s.hybrid ? FLAG_TEXT[f] + ' If your system is set to zero export, untick net metering in setup.' : FLAG_TEXT[f];
+    },
     fmt: (v, d) => (Number.isFinite(v) ? v.toLocaleString('en-PH', { minimumFractionDigits: d, maximumFractionDigits: d }) : ''),
 
     // ---- Payback (F6) ----
@@ -510,7 +537,13 @@ document.addEventListener('alpine:init', () => {
 
     // ---- Theme: Auto follows the phone; Light and Dark override it. Stored on this device only. ----
     theme: 'auto',
+    // Unsaved-changes prompt: compares what a save would write with what was last saved or loaded. Nothing is stored.
+    savedSnap: '',
+    snap() { return serialize({ ...this.s, place: this.place }, this.bills, new Date(0)); },
+    get unsaved() { return !this.example && this.snap() !== this.savedSnap; },
     init() {
+      this.savedSnap = this.snap();
+      window.addEventListener('beforeunload', (e) => { if (this.unsaved) { e.preventDefault(); e.returnValue = ''; } });
       try { const t = localStorage.getItem('scnd-theme'); if (t === 'light' || t === 'dark') this.theme = t; } catch { /* storage blocked: stay on auto */ }
       this.applyTheme();
     },
