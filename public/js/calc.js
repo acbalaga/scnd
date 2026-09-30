@@ -204,12 +204,17 @@ export function weatherCall(wiSatellite, wiNasa) {
 
 // ---------- F5: energy split ----------
 
-// G = inverter kWh, X = exported kWh, I = imported kWh, all for the same period.
+// G = inverter kWh (PV yield for hybrids), X = exported kWh, I = imported kWh, all for the same period.
 // S = G - X (used in the house), L = I + S (household load), ratio = S / G.
-export function energySplit({ g, x, i }) {
+// Hybrids pass C (battery charge) and D (battery discharge): S = G - X - C + D, so battery losses are not counted
+// as solar used, and L = I + S matches hybridBalance (F9). Without this, savings overstate by (C - D) x r_import.
+export function energySplit({ g, x, i, c, d }) {
   if (![g, x, i].every(Number.isFinite) || g < 0 || x < 0 || i < 0) return err('bad_input', 'Need G, X and I as numbers >= 0.');
-  const s = g - x;
-  if (s < 0) return err('period_misalignment', 'Exported kWh is more than generated kWh. The inverter and bill periods probably do not line up.');
+  const battery = c !== undefined || d !== undefined;
+  if (battery && (![c, d].every(Number.isFinite) || c < 0 || d < 0)) return err('bad_input', 'Need battery charge and discharge as numbers >= 0.');
+  if (g - x < 0) return err('period_misalignment', 'Exported kWh is more than generated kWh. The inverter and bill periods probably do not line up.');
+  const s = battery ? g - x - c + d : g - x;
+  if (s < 0) return err('period_misalignment', 'Solar used in the house works out below zero. Check that the battery numbers cover the same dates as the bill.');
   return { selfConsumed: s, load: i + s, selfConsumptionRatio: g > 0 ? s / g : null };
 }
 

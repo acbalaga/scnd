@@ -122,3 +122,26 @@ Requested by Fred 29 Sep 2026 after testing on Safari (iPhone). Decided: answer 
 - [x] **Custom domain guide** in `docs/CUSTOM-DOMAIN.md` (three paths, steps, undo). Written without access to Cloudflare's docs, so check menu names against the dashboard.
 - **Not verified:** Safari (iPhone) printing of the sheet.
 
+
+## 11. Audit while waiting for beta feedback (30 Sep 2026)
+
+Requested by Fred: look for what was missed, keep to Simple, Lovable, Complete. Read calc, app, findings, save/load, weather, Worker and the SPEC end to end.
+
+**Fixed (bugs, no threshold or source changed):**
+- [x] **Hybrid savings overstated.** Savings and "whole-house use" used S = G − X, which counts battery losses (C − D) as solar used in the house. At 120 kWh in and 108 out that is 12 kWh a month, about PHP 145 at PHP 12/kWh, every bill. `energySplit` now takes C and D: S = G − X − C + D, and L matches `hybridBalance`. Hybrids need both battery numbers before savings show. 2 tests.
+- [x] **Stale weather after a location change.** Editing the location after "Check the weather" kept the old point's weather data and applied it to the new one. It is now dropped when the rounded point changes.
+- [x] **Findings sheet over-claimed.** With no questions raised, the sheet said "PR was within the usual range in every bill reviewed" even when an older bill was amber or red. It now says that only when every bill is green (`allGreen` in `findings.js`, 1 test).
+- [x] **Dates in UTC.** The sheet date, its reference number and the save file name used UTC, so before 8 am in PH they showed yesterday. Now local.
+- [x] Small: expected yield reads `PR_BANDS.green` instead of a second hard-coded 0.75; sheet table rows keyed by index (two bills with the same dates broke the key).
+- Checked in headless Chromium at 390 px: hybrid split equals the F9 balance, weather resets on a move and not on a re-save, sheet wording, no console errors. `node --test`: 101 pass.
+
+**Decision (Fred): open, in priority order.**
+1. **False red after a weather check.** The dial, the "two low months" flag and sheet Q1 judge the typical-year PR even after the weather check shows a cloudy period. Two cloudy months (WI 0.75, typical PR 0.58, weather-adjusted PR 0.77) still say "Worth asking your installer". This is the SPEC's top risk. Proposal: once a bill has a weather call that is not "uncertain", band it on the weather-adjusted PR; keep typical-year PR when unchecked, uncertain or missing.
+2. **Payback question fires too early.** Sheet Q "x% behind the promised pace" fires from the first bill, 1% behind. A first bill in the rainy season will nearly always read behind. Proposal: raise it only after 12 months of bills, or when more than 15% behind; show it as an awareness note before that.
+3. **Two red bills with a gap count as "in a row".** `redRaised` ignores missing months between bills. Proposal: treat bills as consecutive only if the next start is within 7 days of the previous end.
+4. **Overlapping or duplicate bills** double-count savings with no warning. Proposal: a plain flag on the later bill ("These dates overlap another bill").
+5. **Zero-export hybrids** get the "0 kWh sent to the grid" flag on every bill if they leave the net-metering box ticked (it defaults to ticked). Proposal: default it to unticked for hybrids, or add "My system is set to zero export".
+6. **Unsaved work is lost on a closed tab.** Only the save nudge protects it. Proposal: a `beforeunload` prompt when bills changed since the last save (no storage). Autosave to local storage is the alternative, but SPEC says no persistence by default, so it is Fred's call.
+7. **Make the privacy claim enforceable.** A Content-Security-Policy with `connect-src 'self' https://satellite-api.open-meteo.com https://power.larc.nasa.gov` would have the browser block any other outbound call, plus `Referrer-Policy: no-referrer`. Alpine's standard build needs `'unsafe-eval'`, and the theme script needs a hash. Set in the Worker or a `_headers` file; test under `wrangler dev` first.
+
+**Noted, not proposed for v1:** temperature is in the grid (`t2m`) but unused; the dry-season band already absorbs heat loss. No offline mode although the app installs to the home screen.

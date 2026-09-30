@@ -17,7 +17,7 @@ const span = (b) => `${b.start} to ${b.end}`;
 // payback: null, or { saved, promised } (pesos to date)
 // efficiency: null, or { baseline, latest, dropPoints, flagged } from calc.efficiencyDrop (fractions of 1)
 // degradation: null, or { annualLossPct, pairs, exceedsWarranty, warrantyPct } from calc.degradation
-// Returns { items: [{ id, text }], requests: [text], uncertainty: [text], allClear: boolean }.
+// Returns { items: [{ id, text }], requests: [text], uncertainty: [text], allClear: boolean, allGreen: boolean }.
 export function findings({ bills, payback, degradation = null, efficiency = null }) {
   const items = [];
   const last = bills[bills.length - 1];
@@ -74,5 +74,7 @@ export function findings({ bills, payback, degradation = null, efficiency = null
   if (bills.some((b) => b.weather?.uncertain)) uncertainty.push('For at least one period the two weather sources disagreed by more than 5 points, so the weather call is uncertain.');
   if (bills.some((b) => b.weather?.inferred)) uncertainty.push('For at least one period the weather index came from a single source with no cross-check.');
 
-  return { items, requests, uncertainty, allClear: items.length === 0 };
+  // allGreen backs the sheet's "within the usual range in every bill" line. allClear alone does not: an older
+  // amber month raises no question once a later month is back in range.
+  return { items, requests, uncertainty, allClear: items.length === 0, allGreen: bills.length > 0 && bills.every((b) => b.band === 'green') };
 }

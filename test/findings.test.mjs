@@ -54,3 +54,8 @@ test('findings edge: uncertain and inferred weather are stated in the uncertaint
 test('findings edge: no bills gives an all-clear empty result, not a crash', () => {
   assert.deepEqual(findings({ bills: [], payback: null }).items, []);
 });
+test('findings edge: an older amber month clears the questions but not the "every bill in range" claim', () => {
+  const r = findings({ bills: [bill({ band: 'amber', pr: 0.7 }), bill()], payback: null });
+  assert.equal(r.allClear, true); assert.equal(r.allGreen, false);
+  assert.equal(findings({ bills: [bill(), bill()], payback: null }).allGreen, true);
+});

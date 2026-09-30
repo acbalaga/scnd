@@ -74,7 +74,7 @@ Bands (tunable, `PR_BANDS` in `calc.js`): green ≥ 0.75; amber 0.65 to 0.75 in 
 \Delta E = \underbrace{E_{typ}(1 - WI)}_{weather} + \underbrace{(E_{typ} \cdot WI - E_{inverter})}_{system}
 ```
 
-**F5 Energy split.** With G = inverter kWh, X = exported kWh and I = imported kWh for the same billing period: self-consumed S = G − X, household load L = I + S, self-consumption ratio = S ÷ G. Bill periods are not calendar months, so the form asks for the bill's reading dates and the inverter kWh between them (every major app shows daily totals).
+**F5 Energy split.** With G = inverter kWh, X = exported kWh and I = imported kWh for the same billing period: self-consumed S = G − X, household load L = I + S, self-consumption ratio = S ÷ G. For hybrids S = G − X − C + D (battery charge C, discharge D), so battery losses are not counted as solar used and L matches the F9 balance. Bill periods are not calendar months, so the form asks for the bill's reading dates and the inverter kWh between them (every major app shows daily totals).
 
 **F6 True savings.** Savings = S × r\_import + X × r\_export, where r\_import = the bill's variable charges ÷ I, and r\_export = the generation charge printed on the bill. Cumulative savings are plotted against the installer's promised payback pace (system cost divided by promised years), and the sheet asks how the promise was worked out.
 

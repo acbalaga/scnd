@@ -133,6 +133,15 @@ test('weatherIndexPeriod edge: under 80% coverage returns null, bad period is an
 });
 
 // ---- energySplit ----
+test('energySplit golden, hybrid: G 400, X 50, C 120, D 108, I 200 -> S 338, L 538 (matches hybridBalance)', () => {
+  const r = c.energySplit({ g: 400, x: 50, i: 200, c: 120, d: 108 });
+  near(r.selfConsumed, 338); near(r.load, 538); near(r.selfConsumptionRatio, 0.845);
+  near(r.load, c.hybridBalance({ i: 200, gPv: 400, x: 50, c: 120, d: 108 }).load);
+});
+test('energySplit edge, hybrid: missing discharge is an error; S below zero is a misalignment error', () => {
+  assert.ok(c.isError(c.energySplit({ g: 400, x: 50, i: 200, c: 120 })));
+  assert.equal(c.energySplit({ g: 100, x: 0, i: 200, c: 300, d: 150 }).error, 'period_misalignment');
+});
 test('energySplit golden: G 400, X 150, I 200 -> S 250, L 450, ratio 0.625', () => {
   const r = c.energySplit({ g: 400, x: 150, i: 200 });
   near(r.selfConsumed, 250); near(r.load, 450); near(r.selfConsumptionRatio, 0.625);

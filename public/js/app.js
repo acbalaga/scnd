@@ -8,6 +8,8 @@ import { findings, MIN_DEGRADATION_PAIRS } from './findings.js';
 
 const num = (v) => (v === '' || v === null || v === undefined ? NaN : Number(v));
 const round1 = (v) => Math.round(v * 10) / 10;
+// Today on the owner's own clock, as YYYY-MM-DD. toISOString() is UTC, which is yesterday in PH before 8 am.
+const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 
 // Nearest-city shortcuts, coordinates rounded to 0.1 degree.
 const CITIES = [
@@ -74,6 +76,8 @@ document.addEventListener('alpine:init', () => {
     feedbackHref: FEEDBACK_URL,
     showSheet: false,
     weather: { status: 'idle', sat: null, nasa: null, satBase: null, nasaBase: null, errors: [] },
+    weatherAt: null,
+    resetWeather() { this.weather = { status: 'idle', sat: null, nasa: null, satBase: null, nasaBase: null, errors: [] }; this.weatherAt = null; },
 
     get clipping() {
       return calc.sanityFlags({ kWp: num(this.s.kWp), acKw: num(this.s.acKw) }).includes('clipping');
@@ -100,6 +104,8 @@ document.addEventListener('alpine:init', () => {
         return;
       }
       s.lat = round1(lat); s.lon = round1(lon);       // only ever use the rounded point
+      // Weather fetched for another point would be applied to this one, so drop it when the location changes.
+      if (this.weatherAt && (this.weatherAt.lat !== s.lat || this.weatherAt.lon !== s.lon)) this.resetWeather();
       try {
         this.climate = lookup(await loadGrid(), s.lat, s.lon);
       } catch (e) {
@@ -117,6 +123,7 @@ document.addEventListener('alpine:init', () => {
     async checkWeather() {
       const w = this.weather;
       w.status = 'loading'; w.errors = [];
+      this.weatherAt = { lat: this.s.lat, lon: this.s.lon };
       const [sat, nasa] = await Promise.allSettled([fetchSatellite(this.s.lat, this.s.lon), fetchNasa(this.s.lat, this.s.lon)]);
       for (const [key, r, label] of [['sat', sat, 'Satellite (Himawari)'], ['nasa', nasa, 'NASA POWER']]) {
         w[key] = null; w[key + 'Base'] = null;
@@ -151,7 +158,7 @@ document.addEventListener('alpine:init', () => {
       const blob = new Blob([serialize({ ...this.s, place: this.place }, this.bills)], { type: 'application/json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = `scnd-${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `scnd-${today()}.json`;
       a.click();
       URL.revokeObjectURL(a.href);
       this.savedOnce = true;
@@ -167,7 +174,7 @@ document.addEventListener('alpine:init', () => {
       this.s = { ...this.s, ...r.setup };
       this.bills = r.bills.length ? r.bills.map((b, k, all) => ({ ...b, id: nextId++, open: k === all.length - 1 })) : [newBill()];
       this.example = false; this.savedOnce = true;
-      this.weather = { status: 'idle', sat: null, nasa: null, satBase: null, nasaBase: null, errors: [] };
+      this.resetWeather();
       this.ready = false; this.showSheet = false;
       await this.continueSetup();
       this.fileMessage = this.ready ? `Loaded ${this.bills.length} bill${this.bills.length === 1 ? '' : 's'}.` : '';
@@ -188,7 +195,7 @@ document.addEventListener('alpine:init', () => {
         })),
       });
       const s = this.s, face = (FACINGS.find((x) => x.az === num(s.azimuth))?.label ?? `${s.azimuth}°`).toLowerCase();
-      const date = new Date().toISOString().slice(0, 10), lastRow = rows.length ? rows[rows.length - 1] : null;
+      const date = today(), lastRow = rows.length ? rows[rows.length - 1] : null;
       const latest = lastRow ? { period: this.fmtRange(lastRow.b.start, lastRow.b.end), pr: this.fmt(lastRow.r.pr, 2), band: lastRow.r.band } : null;
       const nq = f.items.length;
       // Basis lines: what the numbers rest on. Data sources are ours (README "Sources decision", 29 Sep 2026).
@@ -302,14 +309,14 @@ document.addEventListener('alpine:init', () => {
         return { ...newBill(), start, end, inverterKwh: solar, importKwh: bought, exportKwh: sent, genRate: 9.7, varCharges: variable, total: Math.round(Math.max(variable - credit, 0) + 620), open: false };
       });
       this.bills = bills; this.example = true; this.savedOnce = false; this.saveNudgeHidden = false;
-      this.weather = { status: 'idle', sat: null, nasa: null, satBase: null, nasaBase: null, errors: [] };
+      this.resetWeather();
       this.$nextTick(() => this.scrollTo('bills'));
     },
     clearExample() {
       this.example = false; this.ready = false; this.setupOpen = true; this.place = '';
       this.s = { lat: '', lon: '', kWp: '', acKw: '', tilt: 10, azimuth: 0, commissioned: '', hybrid: false, netMetering: true, cost: '', promisedYears: '', warrantyPct: '', batteryCost: '' };
       this.bills = [newBill()]; this.climate = null; this.lowDiffuse = false;
-      this.weather = { status: 'idle', sat: null, nasa: null, satBase: null, nasaBase: null, errors: [] };
+      this.resetWeather();
     },
 
     addBill() { this.bills.forEach((x) => { x.open = false; }); this.bills.push(newBill()); this.$nextTick(() => this.scrollTo('bills-end')); },
@@ -328,11 +335,13 @@ document.addEventListener('alpine:init', () => {
         if (calc.isError(pr)) errors.push(pr.message);
         else {
           Object.assign(out, { pr, hPoa: p.hPoa, band: calc.prBand(pr, p.midMonth), midMonth: p.midMonth, midYear: p.midYear });
-          out.expectedKwh = calc.expectedEnergy({ kWp: num(s.kWp), hPoa: p.hPoa, pr: 0.75 });
+          out.expectedKwh = calc.expectedEnergy({ kWp: num(s.kWp), hPoa: p.hPoa, pr: calc.PR_BANDS.green });
         }
       }
-      if (Number.isFinite(g) && Number.isFinite(x) && Number.isFinite(i)) {
-        const split = calc.energySplit({ g, x, i });
+      // Hybrids need the battery numbers too, or battery losses would count as solar used (F9 balance).
+      const battery = s.hybrid ? { c: num(b.chargeKwh), d: num(b.dischargeKwh) } : {};
+      if (Number.isFinite(g) && Number.isFinite(x) && Number.isFinite(i) && Object.values(battery).every(Number.isFinite)) {
+        const split = calc.energySplit({ g, x, i, ...battery });
         if (calc.isError(split)) errors.push(split.message);
         else out.split = split;
       }
