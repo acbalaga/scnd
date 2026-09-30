@@ -132,6 +132,33 @@ test('weatherIndexPeriod edge: under 80% coverage returns null, bad period is an
   assert.ok(c.isError(c.weatherIndexPeriod({ daily, baseline: [1], start: '2026-01-15', end: '2026-02-14' })));
 });
 
+test('judgedPr golden: a trusted weather call judges on adjusted PR and scales the expectation', () => {
+  const r = c.judgedPr({ pr: 0.58, expectedKwh: 600, call: { wi: 0.75, uncertain: false } });
+  near(r.pr, 0.58 / 0.75); near(r.expectedKwh, 450); assert.equal(r.basis, 'weather');
+  assert.equal(c.prBand(r.pr, 7), 'green');
+});
+test('judgedPr edge: no call or an uncertain one stays on the typical year; bad input is an error', () => {
+  assert.deepEqual(c.judgedPr({ pr: 0.58, expectedKwh: 600, call: null }), { pr: 0.58, expectedKwh: 600, basis: 'typical' });
+  assert.equal(c.judgedPr({ pr: 0.58, expectedKwh: 600, call: { wi: 0.75, uncertain: true } }).basis, 'typical');
+  assert.ok(c.isError(c.judgedPr({ pr: NaN, expectedKwh: 600, call: null })));
+});
+test('isConsecutive golden: next starts on the end date, or up to 7 days either side', () => {
+  assert.equal(c.isConsecutive({ end: '2026-07-01' }, { start: '2026-07-01' }), true);
+  assert.equal(c.isConsecutive({ end: '2026-07-01' }, { start: '2026-07-08' }), true);
+});
+test('isConsecutive edge: a skipped month or a missing date is not consecutive', () => {
+  assert.equal(c.isConsecutive({ end: '2026-07-01' }, { start: '2026-08-01' }), false);
+  assert.equal(c.isConsecutive({ end: '' }, { start: '2026-07-01' }), false);
+});
+test('overlapDays golden: shared days; back-to-back bills share none', () => {
+  assert.equal(c.overlapDays({ start: '2026-06-01', end: '2026-07-01' }, { start: '2026-06-21', end: '2026-07-21' }), 10);
+  assert.equal(c.overlapDays({ start: '2026-06-01', end: '2026-07-01' }, { start: '2026-07-01', end: '2026-08-01' }), 0);
+});
+test('overlapDays edge: identical periods share all days; bad dates share none', () => {
+  assert.equal(c.overlapDays({ start: '2026-06-01', end: '2026-07-01' }, { start: '2026-06-01', end: '2026-07-01' }), 30);
+  assert.equal(c.overlapDays({ start: '', end: '2026-07-01' }, { start: '2026-06-01', end: '2026-07-01' }), 0);
+});
+
 // ---- energySplit ----
 test('energySplit golden, hybrid: G 400, X 50, C 120, D 108, I 200 -> S 338, L 538 (matches hybridBalance)', () => {
   const r = c.energySplit({ g: 400, x: 50, i: 200, c: 120, d: 108 });

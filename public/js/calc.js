@@ -127,6 +127,34 @@ export function prBand(pr, month) {
   return pr >= PR_BANDS.green ? 'green' : pr >= amber ? 'amber' : 'red';
 }
 
+// Which PR a bill is judged on (Fred, 30 Sep 2026, docs/NEXT.md task 11). Once the weather check gives a call that
+// is not "uncertain", the bill is judged on weather-adjusted PR, so a cloudy month does not read as a fault. With no
+// call, or an uncertain one, it stays against a typical year. An inferred call (one source) is used: it is labelled.
+// pr and expectedKwh are the typical-year values; call is weatherCall's result or null.
+// Returns { pr, expectedKwh, basis: 'weather' | 'typical' }. Adjusted PR = pr / WI (same as PR on H_POA x WI).
+export function judgedPr({ pr, expectedKwh, call }) {
+  if (!Number.isFinite(pr) || !Number.isFinite(expectedKwh)) return err('bad_input', 'Need a numeric PR and expected energy.');
+  if (!call || call.uncertain || !Number.isFinite(call.wi) || call.wi <= 0) return { pr, expectedKwh, basis: 'typical' };
+  return { pr: pr / call.wi, expectedKwh: expectedKwh * call.wi, basis: 'weather' };
+}
+
+// Two bills count as back to back when the second starts within this many days of the first one's end
+// (Fred, 30 Sep 2026). Reading dates can shift by a few days; a skipped month cannot.
+export const CONSECUTIVE_GAP_DAYS = 7;
+export function isConsecutive(prev, next) {
+  const t0 = Date.parse(prev?.end), t1 = Date.parse(next?.start);
+  if (!Number.isFinite(t0) || !Number.isFinite(t1)) return false;
+  return Math.abs(t1 - t0) / 86400000 <= CONSECUTIVE_GAP_DAYS;
+}
+
+// Days two bill periods share. Periods run start (included) to end (excluded), so a bill that starts on the
+// previous one's end date shares 0 days.
+export function overlapDays(a, b) {
+  const s = Math.max(Date.parse(a.start), Date.parse(b.start)), e = Math.min(Date.parse(a.end), Date.parse(b.end));
+  if (![s, e].every(Number.isFinite)) return 0;
+  return Math.max(Math.round((e - s) / 86400000), 0);
+}
+
 // Red is raised only after two consecutive red months (satellite monthly irradiance is +/-5 to 10% at a point).
 // bands: chronological array of 'green' | 'amber' | 'red', oldest first, one per consecutive month.
 export function redFlag(bands) {

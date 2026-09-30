@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { findings, MIN_DEGRADATION_PAIRS } from '../public/js/findings.js';
+import { findings, MIN_DEGRADATION_PAIRS, PAYBACK_MIN_DAYS } from '../public/js/findings.js';
 
 const bill = (o = {}) => ({ start: '2026-03-15', end: '2026-04-14', pr: 0.78, band: 'green', redRaised: false, actualKwh: 560, expectedKwh: 583, weather: null, flags: [], savings: 5000, ...o });
 
@@ -11,7 +11,7 @@ test('findings golden: two low months raise a question with the latest period an
 });
 test('findings golden: weather split, clipping, no export and payback each produce their own question', () => {
   const w = { wi: 0.9, uncertain: false, inferred: false, split: { weather: 58, system: 40, total: 98 } };
-  const r = findings({ bills: [bill({ band: 'amber', pr: 0.7, weather: w, flags: ['clipping', 'no_export_after_activation'] })], payback: { saved: 8000, promised: 10000 } });
+  const r = findings({ bills: [bill({ band: 'amber', pr: 0.7, weather: w, flags: ['clipping', 'no_export_after_activation'] })], payback: { saved: 8000, promised: 10000, days: 30 } });
   assert.deepEqual(r.items.map((i) => i.id), ['one_low', 'weather_split', 'clipping', 'no_export', 'payback']);
   assert.match(r.items[4].text, /20% behind/);
 });
@@ -58,4 +58,11 @@ test('findings edge: an older amber month clears the questions but not the "ever
   const r = findings({ bills: [bill({ band: 'amber', pr: 0.7 }), bill()], payback: null });
   assert.equal(r.allClear, true); assert.equal(r.allGreen, false);
   assert.equal(findings({ bills: [bill(), bill()], payback: null }).allGreen, true);
+});
+test('findings edge: a small payback gap early on is a note, not a question; after a year it is a question', () => {
+  const early = findings({ bills: [bill()], payback: { saved: 9000, promised: 10000, days: 60 } });
+  assert.equal(early.items.length, 0); assert.match(early.uncertainty.at(-1), /10% behind/);
+  const year = findings({ bills: [bill()], payback: { saved: 9000, promised: 10000, days: PAYBACK_MIN_DAYS } });
+  assert.deepEqual(year.items.map((i) => i.id), ['payback']);
+  assert.equal(findings({ bills: [bill()], payback: { saved: 12000, promised: 10000, days: 60 } }).uncertainty.length, 1);
 });

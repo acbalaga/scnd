@@ -101,6 +101,7 @@
         </label>
         <label class="check wide"><input type="checkbox" x-model="s.hybrid"> <span>I have a battery (hybrid). Use my app's PV yield, not the inverter's AC output.</span></label>
         <label class="check wide"><input type="checkbox" x-model="s.netMetering"> <span>My utility has already switched me to net metering (my meter can run backward).</span></label>
+        <p class="help wide" x-show="s.hybrid" style="margin-top:-4px">Battery set to zero export (nothing sent to the grid)? Leave this unticked.</p>
         <div class="wide">
           <details class="optional"><summary>More details (optional)</summary>
             <div class="grid" style="margin-top:8px">
@@ -205,7 +206,7 @@
                 <div class="dial" x-html="dial(b)"></div>
                 <p class="headline" x-text="headline(b)"></p>
                 <p class="sub" x-text="answerSub(b)"></p>
-                <p class="help" style="text-align:center">PR is how much of the sun's energy on your panels became electricity. Healthy is 0.75 or more.</p>
+                <p class="help" style="text-align:center">PR is how much of the sun's energy on your panels became electricity. Healthy is 0.75 or more. <span x-text="result(b).basis === 'weather' ? 'Adjusted for the weather in this period.' : 'Against a typical year\'s sun.'"></span></p>
                 <div class="flag red" x-show="redRaised(b)"><strong>Two low months in a row.</strong> Questions, not a verdict: has anything shaded the panels, are they dirty, and what does the inverter's fault log say? The findings sheet has these ready.</div>
                 <p class="help" x-show="result(b).band === 'red' && !redRaised(b)" style="text-align:center">We wait for a second low month before raising a flag, because satellite sun data can be off by 5 to 10% for a single month.</p>
               </div>
@@ -234,7 +235,7 @@
                       </template>
                       <p class="help" x-show="result(b).weather.split.total <= 0">You produced at or above a typical period at PR 0.75, so there is no shortfall to split.</p>
                       <div class="flag" x-show="result(b).weather.inferred" x-text="weatherInferredText(result(b).weather)"></div>
-                      <div class="flag" x-show="result(b).weather.uncertain"><strong>Uncertain.</strong> <span x-text="'The satellite (' + fmt(result(b).weather.satWi, 2) + ') and NASA POWER (' + fmt(result(b).weather.nasaWi, 2) + ') disagree by more than 5 points, so the weather call could be off. Treat the split as a rough guide.'"></span></div>
+                      <div class="flag" x-show="result(b).weather.uncertain"><strong>Uncertain.</strong> <span x-text="'The satellite (' + fmt(result(b).weather.satWi, 2) + ') and NASA POWER (' + fmt(result(b).weather.nasaWi, 2) + ') disagree by more than 5 points, so the weather call could be off. The PR above stays against a typical year. Treat the split as a rough guide.'"></span></div>
                       <p class="help" x-show="result(b).weather.validDays < result(b).weather.days" x-text="'Based on ' + result(b).weather.validDays + ' of ' + result(b).weather.days + ' days with data.'"></p>
                     </div>
                   </template>
