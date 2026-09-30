@@ -100,8 +100,13 @@ document.addEventListener('alpine:init', () => {
     async continueSetup() {
       const s = this.s;
       const lat = num(s.lat), lon = num(s.lon), kWp = num(s.kWp), acKw = num(s.acKw), tilt = num(s.tilt);
-      if (![lat, lon, kWp, acKw, tilt].every(Number.isFinite) || kWp <= 0 || acKw <= 0 || tilt < 0 || tilt > 90) {
-        this.setupError = 'Please fill in location, panel size, inverter size and tilt (0 to 90).';
+      const missing = [];
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) missing.push('location');
+      if (!Number.isFinite(kWp) || kWp <= 0) missing.push('panel size (kWp)');
+      if (!Number.isFinite(acKw) || acKw <= 0) missing.push('inverter size (kW)');
+      if (!Number.isFinite(tilt) || tilt < 0 || tilt > 90) missing.push('roof tilt (0 to 90)');
+      if (missing.length) {
+        this.setupError = `Please fill in: ${missing.join(', ')}.`;
         return;
       }
       s.lat = round1(lat); s.lon = round1(lon);       // only ever use the rounded point
