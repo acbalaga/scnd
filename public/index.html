@@ -49,6 +49,46 @@
     </div>
   </section>
 
+  <!-- Explainer: purpose and the four checks. Copy makes no claims about regulation, rates or programs. Open by default for new visitors; the collapsed choice is kept on this device only (localStorage). -->
+  <section class="explainer" aria-labelledby="explainer-h">
+    <button type="button" class="link explainer-toggle" @click="toggleIntro()" :aria-expanded="introOpen" aria-controls="explainer-body">
+      <span id="explainer-h" x-text="introOpen ? 'What is SCND?' : 'What is SCND? Tap to read'"></span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" :style="introOpen ? 'transform:rotate(180deg)' : ''"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div id="explainer-body" class="card explainer-body" x-show="introOpen">
+      <p class="why"><strong>Your inverter app tells you what the panels made. Your bill tells you what you paid.</strong> Nobody puts the two side by side. SCND does, so you can tell if your system is doing what it should, or if it is time to ask your installer.</p>
+      <ul class="tiles">
+        <li>
+          <svg viewBox="0 0 64 48" aria-hidden="true"><circle cx="14" cy="12" r="6" fill="var(--sun)" stroke="var(--ink)" stroke-width="1.5"/><path d="M6 40l8-12h36l8 12z" fill="var(--soft)" stroke="var(--ink)" stroke-width="1.5"/><path d="M22 28l-3 12M32 28v12M42 28l3 12" stroke="var(--edge)" stroke-width="1.5"/></svg>
+          <h3><span class="ltr">S</span>olar performance</h3>
+          <p>Is each month in the normal range for your roof, or was it just a cloudy month?</p>
+        </li>
+        <li>
+          <svg viewBox="0 0 64 48" aria-hidden="true"><path d="M32 6a18 18 0 1 0 18 18H32z" fill="var(--sun)" stroke="var(--ink)" stroke-width="1.5"/><path d="M36 2a18 18 0 0 1 18 18H36z" fill="var(--c-save)" stroke="var(--ink)" stroke-width="1.5"/></svg>
+          <h3><span class="ltr">C</span>onsumption split</h3>
+          <p>How much solar did your home use, and how much went back to the grid?</p>
+        </li>
+        <li>
+          <svg viewBox="0 0 64 48" aria-hidden="true"><path d="M14 4h30l6 6v34H14z" fill="var(--card)" stroke="var(--ink)" stroke-width="1.5"/><path d="M20 16h24M20 24h24M20 32h14" stroke="var(--edge)" stroke-width="2"/><circle cx="46" cy="34" r="9" fill="var(--sun)" stroke="var(--ink)" stroke-width="1.5"/><path d="M42 34h8" stroke="var(--ink)" stroke-width="2"/></svg>
+          <h3><span class="ltr">N</span>et-metering bill</h3>
+          <p>Why your bill is not zero, and what each exported kWh is really worth.</p>
+        </li>
+        <li>
+          <svg viewBox="0 0 64 48" aria-hidden="true"><path d="M6 8v34h52" fill="none" stroke="var(--edge)" stroke-width="1.5"/><path d="M10 14l14 4 14 6 20 6" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linecap="round"/><path d="M10 18l48 14" stroke="var(--c-promise)" stroke-width="1.5" stroke-dasharray="3 3"/></svg>
+          <h3><span class="ltr">D</span>egradation</h3>
+          <p>Are your panels losing output faster than the datasheet allows?</p>
+        </li>
+      </ul>
+      <ol class="flow" aria-label="How it works">
+        <li><b>1</b>Type your system details</li>
+        <li><b>2</b>Add a bill and your inverter kWh</li>
+        <li><b>3</b>Get a plain answer and a one-page list of questions for your installer</li>
+      </ol>
+      <p class="help">Free. No account. Everything you type stays in this browser. Not a verdict on your installer, only a reason to ask the right questions.</p>
+      <p class="help" lang="tl">Ito ang "second meter" mo: tinitingnan kung tama ang gawa ng solar mo, base sa sarili mong bill.</p>
+    </div>
+  </section>
+
   <ol class="steps" aria-label="Steps">
     <li :class="{ on: step === 1, done: step > 1 }"><b>Step 1</b>Your system</li>
     <li :class="{ on: step === 2, done: step > 2 }"><b>Step 2</b>Your bill</li>

@@ -7,6 +7,8 @@ Work top to bottom. Each task ends with its checks passing and a commit. Ask Fre
 - [x] **Spike 1: browser CORS.** Open-Meteo and NASA POWER both callable from the browser (desktop Chrome, iOS Brave). `public/spike1.html`, removed in task 8 (in git history).
 - [x] **Spike 2: source validation.** Against Global Solar Atlas, 2020 to 2023, five cities. NASA POWER for typical year, Himawari (Open-Meteo satellite) for weather index. `public/spike2.html` (removed in task 8, in git history), results in README.
 
+- [x] **Explainer section.** Inline HTML/SVG "What is SCND?" card above the steps (purpose, S/C/N/D tiles, 3-step flow). Open for new visitors, collapse choice kept in localStorage (`scnd-intro`) only. No new request or dependency (headless Chromium, 390 px: 0 external requests, no console errors). Video not used: it needs a rendered binary and a re-render per copy change. Can be a later task if wanted.
+
 ## 1. Typical-year irradiance grid
 
 Build `scripts/build-grid.mjs` (Node, no dependencies) that writes `public/data/ph-grid.json`.
