@@ -183,6 +183,13 @@ test('importRate golden: 3000 / 300 kWh = 10 per kWh', () => near(c.importRate({
 test('importRate edge: zero import is an error', () => assert.ok(c.isError(c.importRate({ variableCharges: 3000, i: 0 }))));
 test('savings golden: 250 x 10 + 150 x 5 = 3250', () => near(c.savings({ s: 250, x: 150, rImport: 10, rExport: 5 }), 3250));
 test('savings edge: negative self-consumption is an error', () => assert.ok(c.isError(c.savings({ s: -1, x: 0, rImport: 10, rExport: 5 }))));
+test('savings edge: export credit counts only up to the variable charges', () => {
+  // 500 kWh exported at 9.70 = 4,850 credit against 1,200 variable charges: only 1,200 counts.
+  near(c.savings({ s: 100, x: 500, rImport: 12, rExport: 9.7, creditCap: 1200 }), 100 * 12 + 1200);
+  near(c.uncountedCredit({ x: 500, rExport: 9.7, creditCap: 1200 }), 3650);
+  near(c.savings({ s: 250, x: 150, rImport: 10, rExport: 5, creditCap: 3600 }), 3250);   // under the cap: unchanged
+  assert.equal(c.uncountedCredit({ x: 150, rExport: 5, creditCap: 3600 }), 0);
+});
 test('loadShiftValue golden: 11 - 5 = 6', () => near(c.loadShiftValue({ rImport: 11, rExport: 5 }), 6));
 test('loadShiftValue edge: missing rate is an error', () => assert.ok(c.isError(c.loadShiftValue({ rImport: 11 }))));
 
@@ -196,6 +203,14 @@ test('billDecode golden: 300 kWh in, 220 out at 9.70, 3600 variable, 2100 total'
 test('billDecode edge: credit above variable charges keeps other charges above zero and is flagged', () => {
   const r = c.billDecode({ importKwh: 100, exportKwh: 500, genRate: 9.7, varCharges: 1200, total: 400 });
   near(r.afterCredit, 0); near(r.other, 400); assert.ok(r.flags.includes('credit_exceeds_variable'));
+  near(r.excess, 500 * 9.7 - 1200); assert.equal(r.noFixed, false);
+});
+test('billDecode edge: a total within rounding of the worked-out figure is not a mismatch; an exact match leaves nothing for fixed charges', () => {
+  // 3600 - 2134 = 1466 left after credit
+  const rounded = c.billDecode({ importKwh: 300, exportKwh: 220, genRate: 9.7, varCharges: 3600, total: 1465.7 });
+  assert.deepEqual(rounded.flags, []); assert.equal(rounded.noFixed, true); near(rounded.excess, 0);
+  const under = c.billDecode({ importKwh: 300, exportKwh: 220, genRate: 9.7, varCharges: 3600, total: 1465 });
+  assert.ok(under.flags.includes('total_below_charges')); assert.equal(under.noFixed, false);
 });
 test('billDecode edge: total below the charges, generation rate above buying rate, bad input', () => {
   assert.ok(c.billDecode({ importKwh: 300, exportKwh: 0, genRate: 9.7, varCharges: 3600, total: 3000 }).flags.includes('total_below_charges'));
@@ -279,4 +294,14 @@ test('sanityFlags edge: DC/AC exactly 1.3, zero export before activation, no out
 test('isError golden and edge', () => {
   assert.equal(c.isError({ error: 'x', message: 'y' }), true);
   assert.equal(c.isError(0), false); assert.equal(c.isError(null), false); assert.equal(c.isError([]), false);
+});
+
+test('billGaps golden: a skipped month between two bills is one gap, in date order whatever the entry order', () => {
+  const g = c.billGaps([{ start: '2026-09-01', end: '2026-10-01' }, { start: '2026-07-01', end: '2026-08-01' }]);
+  assert.equal(g.length, 1); assert.equal(g[0].from, '2026-08-01'); assert.equal(g[0].to, '2026-09-01'); near(g[0].days, 31);
+});
+test('billGaps edge: back-to-back bills, a slip within 7 days, and undated bills make no gap', () => {
+  assert.deepEqual(c.billGaps([{ start: '2026-07-01', end: '2026-08-01' }, { start: '2026-08-01', end: '2026-09-01' }]), []);
+  assert.deepEqual(c.billGaps([{ start: '2026-07-01', end: '2026-08-01' }, { start: '2026-08-06', end: '2026-09-05' }]), []);
+  assert.deepEqual(c.billGaps([{ start: '2026-07-01', end: '2026-08-01' }, { start: '', end: '' }]), []);
 });

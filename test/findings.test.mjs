@@ -72,3 +72,8 @@ test('findings edge: even a large payback gap waits for a year of bills (a wet-s
   const justShort = findings({ bills: [bill()], payback: { saved: 5000, promised: 10000, days: PAYBACK_MIN_DAYS - 1 } });
   assert.equal(justShort.items.length, 0);
 });
+test('findings: questions use the app\'s formatted period when given, raw dates otherwise', () => {
+  const t = findings({ bills: [bill({ band: 'amber', pr: 0.7, period: '15 Mar to 14 Apr 2026' })], payback: null }).items[0].text;
+  assert.match(t, /PR for 15 Mar to 14 Apr 2026 was 0\.70/);
+  assert.match(findings({ bills: [bill({ band: 'amber', pr: 0.7 })], payback: null }).items[0].text, /2026-03-15 to 2026-04-14/);
+});

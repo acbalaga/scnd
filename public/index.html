@@ -184,7 +184,7 @@
       <template x-for="(b, i) in bills" :key="b.id">
         <article class="card">
           <div class="bill-head">
-            <div class="bill-title"><h3 x-text="billTitle(b, i)"></h3><span class="chip" :class="chipClass(b)" x-text="chipText(b)"></span></div>
+            <div class="bill-title"><h3 tabindex="-1" x-text="billTitle(b, i)"></h3><span class="chip" :class="chipClass(b)" x-text="chipText(b)"></span></div>
             <button type="button" class="link" @click="askRemove(b, $el)" x-show="bills.length > 1 && removing !== b.id">Remove</button>
           </div>
           <div class="confirm" role="group" aria-label="Confirm remove" x-show="removing === b.id">
@@ -256,7 +256,9 @@
           </details>
 
           <!-- Empty state: say exactly what is missing -->
+          <div class="flag" x-show="gapBefore(b)" x-text="gapBefore(b) ? 'No bill for ' + fmtRange(gapBefore(b).from, gapBefore(b).to) + '. Add it if you have it: low months either side of a gap are not counted as two in a row, and savings to date leave out the missing days.' : ''"></div>
           <p class="nudge" x-show="needsPR(b).length" x-text="'To see your answer, add ' + needsPR(b).join(' and ') + '.'"></p>
+          <p class="nudge" x-show="needsSavings(b).length" x-text="'Your PR is below. To see what solar saved you, also add ' + listAnd(needsSavings(b)) + '.'"></p>
           <template x-if="result(b)"><div>
             <template x-for="e in result(b).errors" :key="e"><p class="err" x-text="e"></p></template>
           </div></template>
@@ -268,8 +270,19 @@
                 <div class="dial" x-html="dial(b)"></div>
                 <p class="headline" x-text="headline(b)"></p>
                 <p class="sub" x-text="answerSub(b)"></p>
-                <p class="help" style="text-align:center"><span x-show="i === firstAnswered">PR is how much of the sun's energy on your panels became electricity. </span>Healthy is 0.75 or more. <span x-text="result(b).basis === 'weather' ? 'Adjusted for the weather in this period.' : 'Against a typical year\'s sun.'"></span></p>
-                <div class="flag red" x-show="redRaised(b)"><strong>Two low months in a row.</strong> Questions, not a verdict: has anything shaded the panels, are they dirty, and what does the inverter's fault log say? The findings sheet has these ready.</div>
+                <!-- PR definition matches the findings sheet (app.js "sources") and docs/SPEC.md F1: energy made over what the rated panels would make in that sun. -->
+                <p class="help" style="text-align:center"><span x-show="i === firstAnswered">PR compares what your panels made with what panels their size would make in the sun they got, if nothing were lost. Heat, dust, wiring and the inverter always take some, so real systems sit below 1.00. </span>Healthy is 0.75 or more. <span x-text="result(b).basis === 'weather' ? 'Adjusted for the weather in this period.' : 'Against a typical year\'s sun.'"></span></p>
+                <!-- Two low months: a next step, not an alarm. Weather first while unchecked, because a cloudy stretch can clear the flag. -->
+                <div class="raise" x-show="redRaised(b)" role="group" :aria-label="'Two low months in a row, ' + billTitle(b, i)">
+                  <p class="raise-label"><i aria-hidden="true"></i>Two low months in a row</p>
+                  <p>Questions, not a verdict: has anything shaded the panels, are they dirty, and what does the inverter's fault log say?<span x-show="!result(b).weather && weather.status !== 'failed'"> A cloudy stretch can do this too, so check the weather first.</span></p>
+                  <!-- Always rendered so screen readers announce the change; says what is happening and, on failure, why. -->
+                  <p class="help" role="status" x-show="!result(b).weather" x-text="weatherStatusLine"></p>
+                  <div class="row">
+                    <button type="button" x-show="!result(b).weather" @click="checkWeather()" :aria-disabled="weather.status === 'loading'" x-text="weather.status === 'loading' ? 'Checking...' : (weather.status === 'failed' ? 'Try the weather again' : 'Check the weather first')"></button>
+                    <button type="button" :class="result(b).weather ? '' : 'link'" @click="showSheet = true; $nextTick(() => scrollTo('findings'))">Open findings sheet</button>
+                  </div>
+                </div>
                 <p class="help" x-show="result(b).band === 'red' && !redRaised(b)" style="text-align:center">We wait for a second low month before raising a flag, because satellite sun data can be off by 5 to 10% for a single month.</p>
               </div>
 
@@ -322,7 +335,8 @@
                   <dt>Your buying rate</dt><dd x-text="'₱' + fmt(result(b).rImport, 2) + '/kWh'"></dd>
                   <dt>Saved this bill</dt><dd x-text="'₱' + fmt(result(b).savings, 0)"></dd>
                   <dt>Moving 1 kWh from night to noon is worth</dt><dd x-text="'₱' + fmt(result(b).shift, 2)"></dd>
-                </dl></template></div>
+                </dl></template>
+                <p class="help" x-show="result(b).uncounted > 0" x-text="'Export credit is counted only up to your variable charges, because that is all it can take off this bill. The other ₱' + fmt(result(b).uncounted, 0) + ' is not counted here. Ask your utility whether it carries over.'"></p></div>
               </details>
 
               <!-- Battery (F9) -->
@@ -348,15 +362,19 @@
                    metering" and SolarPro Install "reading the net-metered Meralco bill". No rates are hard-coded:
                    every peso figure below is read from the user's own bill. -->
               <details class="sec" x-show="decode(b) && !decode(b).error">
-                <summary>Decode this bill <span class="teaser">Why it is not zero</span></summary>
+                <summary>Decode this bill <span class="teaser" x-text="decode(b)?.flags?.includes('total_below_charges') ? 'Check the total' : 'Why it is not zero'"></span></summary>
                 <div><template x-if="decode(b) && !decode(b).error"><div>
                   <ol class="steps-list">
                     <li><strong>Binili mo sa grid.</strong> Bumili ka ng <b x-text="fmt(num(b.importKwh), 0) + ' kWh'"></b>. Ang mga singil na tumataas kasabay ng kWh ay <b x-text="'₱' + fmt(num(b.varCharges), 2)"></b>. Average iyon na <b x-text="'₱' + fmt(decode(b).rImport, 2) + ' bawat kWh'"></b>.</li>
                     <li><strong>Na-export mo.</strong> Nag-export ka ng <b x-text="fmt(num(b.exportKwh), 0) + ' kWh'"></b>. Ang credit ay nasa presyo ng generation charge lang (<b x-text="'₱' + fmt(num(b.genRate), 2)"></b> bawat kWh), hindi sa buong presyo ng binibili mo. Kaya ang export credit mo ay <b x-text="'₱' + fmt(decode(b).exportCredit, 2)"></b>.
                       <span x-show="decode(b).exportGap > 0"> Mas malaki ang ipon kapag ginamit mo mismo sa bahay ang solar (<b x-text="'₱' + fmt(decode(b).rImport, 2)"></b>) kaysa i-export (<b x-text="'₱' + fmt(num(b.genRate), 2)"></b>).</span></li>
-                    <li><strong>Pagkatapos ng credit.</strong> <span x-text="'₱' + fmt(num(b.varCharges), 2) + ' minus ₱' + fmt(decode(b).exportCredit, 2) + ' ay ₱' + fmt(decode(b).afterCredit, 2) + '.'"></span>
+                    <!-- Steps 3 and 4 say what these numbers show: credit above the charges, a total below them, or nothing left for fixed charges. -->
+                    <li x-show="!decode(b).excess"><strong>Pagkatapos ng credit.</strong> <span x-text="'₱' + fmt(num(b.varCharges), 2) + ' minus ₱' + fmt(decode(b).exportCredit, 2) + ' ay ₱' + fmt(decode(b).afterCredit, 2) + '.'"></span>
                       <span x-show="decode(b).coverage !== null"> Na-offset ng credit ang <b x-text="fmt(Math.min(decode(b).coverage, 1) * 100, 0) + '%'"></b> ng variable charges.</span></li>
-                    <li><strong>Bakit hindi zero ang bill.</strong> Ang natitirang <b x-text="'₱' + fmt(Math.max(decode(b).other, 0), 2)"></b> ay fixed charges (tulad ng metering at supply) at iba pang singil na hindi sakop ng variable charges. Hindi ito bumababa kahit gaano karami ang i-export mo. Pambawas lang sa variable charges ang credit, kaya hindi kailanman zero ang bill.</li>
+                    <li x-show="decode(b).excess > 0"><strong>Pagkatapos ng credit.</strong> Mas malaki ang credit (<b x-text="'₱' + fmt(decode(b).exportCredit, 2)"></b>) kaysa sa variable charges (<b x-text="'₱' + fmt(num(b.varCharges), 2)"></b>), kaya <b>₱0.00</b> ang natira rito. Ang sobrang <b x-text="'₱' + fmt(decode(b).excess, 2)"></b> ay hindi kinukwenta ng SCND; tingnan ang paalala sa ibaba.</li>
+                    <li x-show="!decode(b).flags.includes('total_below_charges') && !decode(b).noFixed"><strong>Bakit hindi zero ang bill.</strong> Ang natitirang <b x-text="'₱' + fmt(decode(b).other, 2)"></b> ay fixed charges (tulad ng metering at supply) at iba pang singil na hindi sakop ng variable charges. Hindi ito bumababa kahit gaano karami ang i-export mo. Pambawas lang sa variable charges ang credit, kaya hindi kailanman zero ang bill.</li>
+                    <li x-show="decode(b).flags.includes('total_below_charges')"><strong>Hindi tugma ang total.</strong> Ang total mo ay mas mababa ng <b x-text="'₱' + fmt(-decode(b).other, 2)"></b> kaysa sa <b x-text="'₱' + fmt(decode(b).afterCredit, 2)"></b> na natira pagkatapos ng credit. Hindi ito maipapaliwanag ng fixed charges, kaya balikan ang mga numero; tingnan ang paalala sa ibaba.</li>
+                    <li x-show="decode(b).noFixed"><strong>Walang natira para sa fixed charges.</strong> Sa mga numerong inilagay mo, katumbas mismo ng total ang natira pagkatapos ng credit. Kadalasan may fixed charges ang bill (tulad ng metering at supply), kaya baka kasama na sila sa variable charges na inilagay mo. Kung ganoon, mas mataas nang kaunti ang lumalabas na presyo bawat kWh kaysa sa totoo.</li>
                     <li><strong>Total.</strong> <b x-text="'₱' + fmt(num(b.total), 2)"></b> ang binayaran mo.</li>
                   </ol>
                   <template x-for="f in decode(b).flags" :key="f"><div class="flag" x-text="decodeFlagText(f)"></div></template>
@@ -387,7 +405,7 @@
         <h3>Was it the weather?</h3>
         <p class="help">A low month can be cloudy weather, not a fault. This compares each bill's dates with the sun that fell on your roof, from a satellite (Himawari, through Open-Meteo) and NASA POWER. It sends only your location, rounded to 0.1° (about 11 km), and a date range to those two services. Nothing else leaves your browser.</p>
         <div class="row" style="margin-top:10px">
-          <button type="button" @click="checkWeather()" :disabled="weather.status === 'loading' || !canCheckWeather" x-text="weather.status === 'loading' ? 'Checking...' : (weather.status === 'done' ? 'Check again' : (weather.status === 'failed' ? 'Try again' : 'Check the weather'))"></button>
+          <button type="button" @click="checkWeather()" :disabled="!canCheckWeather" :aria-disabled="weather.status === 'loading'" x-text="weather.status === 'loading' ? 'Checking...' : (weather.status === 'done' ? 'Check again' : (weather.status === 'failed' ? 'Try again' : 'Check the weather'))"></button>
         </div>
         <p class="help" x-show="!canCheckWeather">Add a bill's dates and solar kWh first.</p>
         <div role="alert">
@@ -406,8 +424,8 @@
           </div>
           <div class="stats" x-show="paybackStats">
             <div class="stat"><small>Saved so far</small><b x-text="'₱' + fmt(paybackStats.saved, 0)"></b><em x-text="'over ' + fmt(paybackStats.days, 0) + ' days'"></em></div>
-            <div class="stat" x-show="paybackStats.promised !== null"><small>Promised pace</small><b x-text="'₱' + fmt(paybackStats.promised, 0)"></b><em x-text="fmt(Math.abs(paybackStats.gapPct), 0) + '% ' + (paybackStats.gapPct >= 0 ? 'ahead' : 'behind')"></em></div>
-            <div class="stat" x-show="paybackStats.years !== null"><small>Payback at your pace</small><b x-text="fmt(paybackStats.years, 1) + ' yr'"></b><em x-text="paybackStats.promisedYears ? 'promised ' + fmt(paybackStats.promisedYears, 1) + ' yr' : 'rough guide'"></em></div>
+            <div class="stat" x-show="paybackStats.promised !== null"><small>Promised pace</small><span class="early-tag" x-show="earlyTag" x-text="earlyTag"></span><b x-text="'₱' + fmt(paybackStats.promised, 0)"></b><em x-text="fmt(Math.abs(paybackStats.gapPct), 0) + '% ' + (paybackStats.gapPct >= 0 ? 'ahead' : 'behind')"></em></div>
+            <div class="stat" x-show="paybackStats.years !== null"><small>Payback at your pace</small><span class="early-tag" x-show="earlyTag" x-text="earlyTag"></span><b x-text="fmt(paybackStats.years, 1) + ' yr'"></b><em x-text="paybackStats.promisedYears ? 'promised ' + fmt(paybackStats.promisedYears, 1) + ' yr' : 'rough guide'"></em></div>
           </div>
           <div class="legend" x-show="promisedPerDay">
             <span><i class="key" style="border-color:var(--c-save)"></i>Your savings</span>

@@ -147,6 +147,20 @@ export function isConsecutive(prev, next) {
   return Math.abs(t1 - t0) / 86400000 <= CONSECUTIVE_GAP_DAYS;
 }
 
+// Gaps between bills: oldest first, a gap wherever the next bill starts more than CONSECUTIVE_GAP_DAYS after the
+// previous one ends. Bills without both dates are skipped. Returns [{ from, to, days }] (from = previous end,
+// to = next start). Red-flag and payback logic do not change across a gap; the UI only says it is there.
+export function billGaps(bills) {
+  const dated = bills.filter((b) => Number.isFinite(Date.parse(b?.start)) && Number.isFinite(Date.parse(b?.end)))
+    .sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
+  const gaps = [];
+  for (let k = 1; k < dated.length; k++) {
+    const days = (Date.parse(dated[k].start) - Date.parse(dated[k - 1].end)) / 86400000;
+    if (days > CONSECUTIVE_GAP_DAYS) gaps.push({ from: dated[k - 1].end, to: dated[k].start, days });
+  }
+  return gaps;
+}
+
 // Days two bill periods share. Periods run start (included) to end (excluded), so a bill that starts on the
 // previous one's end date shares 0 days.
 export function overlapDays(a, b) {
@@ -254,10 +268,17 @@ export function importRate({ variableCharges, i }) {
   return variableCharges / i;
 }
 
-// Savings = S x r_import + X x r_export.
-export function savings({ s, x, rImport, rExport }) {
+// Savings = S x r_import + export credit, where the credit is X x r_export capped at creditCap (the bill's variable
+// charges). Credit above the variable charges does not lower this bill, and how it carries over is not verified
+// (see billDecode), so it is not counted. Decided by Fred, 1 Oct 2026. Without creditCap the credit is uncapped.
+export function savings({ s, x, rImport, rExport, creditCap }) {
   if (![s, x, rImport, rExport].every(Number.isFinite) || s < 0 || x < 0) return err('bad_input', 'Need S, X >= 0 and numeric rates.');
-  return s * rImport + x * rExport;
+  const credit = x * rExport, cap = Number.isFinite(creditCap) && creditCap >= 0 ? creditCap : Infinity;
+  return s * rImport + Math.min(credit, cap);
+}
+// Export credit left out of savings by the cap (0 when the credit fits inside the variable charges).
+export function uncountedCredit({ x, rExport, creditCap }) {
+  return Number.isFinite(creditCap) && [x, rExport].every(Number.isFinite) ? Math.max(x * rExport - creditCap, 0) : 0;
 }
 
 // ---------- F2: bill decoder ----------
@@ -269,10 +290,15 @@ export function savings({ s, x, rImport, rExport }) {
 //   other         total minus afterCredit: fixed charges, taxes and anything not in "variable charges"
 //   coverage      share of variable charges the credit offsets (null if variable charges are 0)
 //   exportGap     rImport - genRate: what a kWh used at home earns over a kWh exported
+//   excess        credit above the variable charges (0 unless credit_exceeds_variable); not modelled, only shown
+//   noFixed       true when the total equals what is left after the credit (within rounding): nothing is left for
+//                 fixed charges, which usually means they were included in the variable charges entered
+// Bills print to the centavo but owners round, so totals within ROUND_PHP of the worked-out figure count as matching.
 // Claims behind it (docs/SPEC.md, sources dated 29 Sep 2026: Lakasolar "rebate vs net metering",
 // SolarPro Install "reading the net-metered Meralco bill"): exports are credited at the generation
 // charge, not the retail rate; fixed charges do not shrink with solar, so the bill stays above zero.
 // Not verified: how a credit larger than the variable charges is carried over. We flag it, not model it.
+export const ROUND_PHP = 0.5;
 export function billDecode({ importKwh, exportKwh, genRate, varCharges, total }) {
   if (![importKwh, exportKwh, genRate, varCharges, total].every(Number.isFinite) || [importKwh, exportKwh, genRate, varCharges, total].some((v) => v < 0)) {
     return err('bad_input', 'Need import kWh, export kWh, generation charge, variable charges and total as numbers >= 0.');
@@ -286,8 +312,9 @@ export function billDecode({ importKwh, exportKwh, genRate, varCharges, total })
   const flags = [];
   if (genRate > rImport) flags.push('gen_above_buy');
   if (raw < 0) flags.push('credit_exceeds_variable');
-  if (other < 0) flags.push('total_below_charges');
-  return { rImport, exportCredit, afterCredit, other, coverage: varCharges > 0 ? exportCredit / varCharges : null, exportGap: rImport - genRate, flags };
+  if (other < -ROUND_PHP) flags.push('total_below_charges');
+  return { rImport, exportCredit, afterCredit, other, excess: Math.max(-raw, 0), noFixed: Math.abs(other) <= ROUND_PHP,
+    coverage: varCharges > 0 ? exportCredit / varCharges : null, exportGap: rImport - genRate, flags };
 }
 
 // Payback tracker (F6). The installer's promise is a straight line: cost spread evenly over the promised years.

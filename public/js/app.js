@@ -4,7 +4,7 @@ import * as calc from './calc.js';
 import { loadGrid, lookup, isLowDiffuse } from './grid.js';
 import { fetchSatellite, fetchNasa } from './weather.js';
 import { serialize, parse } from './data.js';
-import { findings, MIN_DEGRADATION_PAIRS } from './findings.js';
+import { findings, MIN_DEGRADATION_PAIRS, PAYBACK_MIN_DAYS } from './findings.js';
 
 const num = (v) => (v === '' || v === null || v === undefined ? NaN : Number(v));
 const round1 = (v) => Math.round(v * 10) / 10;
@@ -133,12 +133,15 @@ document.addEventListener('alpine:init', () => {
       // Sun data reads low in very clear dry months (README "Spike 2 result", 29 Sep 2026): show a caveat.
       this.lowDiffuse = isLowDiffuse(this.climate);
       this.setupError = '';
+      // A hybrid needs battery numbers on every bill: open the bills that lack them so the owner sees the fields.
+      if (s.hybrid) this.bills.forEach((b) => { if (!Number.isFinite(num(b.chargeKwh)) || !Number.isFinite(num(b.dischargeKwh))) b.open = true; });
       this.ready = true;
       this.setupOpen = false;
     },
 
     async checkWeather() {
       const w = this.weather;
+      if (w.status === 'loading') return;   // buttons stay focusable while loading (aria-disabled), so guard here
       w.status = 'loading'; w.errors = [];
       this.weatherAt = { lat: this.s.lat, lon: this.s.lon };
       const [sat, nasa] = await Promise.allSettled([fetchSatellite(this.s.lat, this.s.lon), fetchNasa(this.s.lat, this.s.lon)]);
@@ -209,7 +212,7 @@ document.addEventListener('alpine:init', () => {
       const f = findings({
         payback, degradation: this.degradationResult, efficiency: this.efficiencyTrend,
         bills: rows.map(({ b, r }) => ({
-          start: b.start, end: b.end, pr: r.pr, band: r.band, redRaised: this.redRaised(b), actualKwh: num(b.inverterKwh),
+          start: b.start, end: b.end, period: this.fmtRange(b.start, b.end), pr: r.pr, band: r.band, redRaised: this.redRaised(b), actualKwh: num(b.inverterKwh),
           expectedKwh: r.expectedKwh, weather: r.weather, flags: r.flags, savings: r.savings, hybridFlags: r.hybrid?.flags ?? [],
         })),
       });
@@ -243,7 +246,8 @@ document.addEventListener('alpine:init', () => {
         shown: Math.min(rows.length, 5), total: rows.length, latest,
         latestWording: latest ? REPORT_WORDING[latest.band] : '',
         savedTotal: cum.length ? 'PHP ' + this.fmt(cum[cum.length - 1].saved, 0) : null,
-        sources: [...sources, ...f.uncertainty],
+        sources: [...sources, ...f.uncertainty,
+          ...(this.gaps.length ? [`Bills are missing for ${this.gaps.map((g) => this.fmtRange(g.from, g.to)).join(', ')}. Two low months either side of a gap are not counted as in a row, and savings to date leave out the missing ${this.gaps.length === 1 ? 'period' : 'periods'}, so the payback pace reads low.`] : [])],
       };
     },
 
@@ -287,6 +291,14 @@ document.addEventListener('alpine:init', () => {
       if (!Number.isFinite(num(b.inverterKwh))) need.push(this.s.hybrid ? 'PV yield' : 'solar produced');
       return need;
     },
+    // Once PR shows: what savings still need. Says the bill numbers are only for savings, and catches the battery
+    // numbers a hybrid needs (ticking "battery" after entering bills used to drop savings with no word why).
+    needsSavings(b) {
+      const r = this.result(b); if (!r || r.pr === null || r.savings !== null) return [];
+      const fields = [['importKwh', 'bought from the grid'], ['exportKwh', 'sent to the grid'], ['genRate', 'generation charge'], ['varCharges', 'variable charges'],
+        ...(this.s.hybrid ? [['chargeKwh', 'battery charged'], ['dischargeKwh', 'battery discharged']] : [])];
+      return fields.filter(([k]) => !Number.isFinite(num(b[k]))).map(([, label]) => label);
+    },
     chipClass(b) { return this.result(b)?.band ?? 'none'; },
     chipText(b) { const r = this.result(b); return r?.band ? `PR ${this.fmt(r.pr, 2)}, ${BAND_SHORT[r.band]}` : 'Not enough yet'; },
     headline(b) {
@@ -323,6 +335,14 @@ document.addEventListener('alpine:init', () => {
         + `<text class="lcd-ghost" x="152" y="135" text-anchor="end">8.88</text><text class="lcd-num" x="152" y="135" text-anchor="end">${pr}</text></svg>`;
     },
     weatherTeaser(b) { const w = this.result(b)?.weather; return w && !w.missing ? `Index ${this.fmt(w.wi, 2)}` : (this.weather.status === 'done' ? 'No data' : (this.weather.status === 'failed' ? "Couldn't check" : 'Not checked')); },
+    // Status line inside the two-low-months block: what the weather check is doing, and why it failed.
+    get weatherStatusLine() {
+      const w = this.weather;
+      if (w.status === 'loading') return 'Checking the weather for these dates.';
+      if (w.status !== 'failed') return '';
+      const unreachable = w.errors.length && w.errors.every((e) => e.endsWith('could not be reached.'));
+      return `The weather check did not get through: ${unreachable ? 'neither weather service could be reached. Check your connection and try again' : 'the weather services gave no usable data for these dates. Try again later'}, or go ahead with the findings sheet, which shows PR against a typical year's sun.`;
+    },
     get canCheckWeather() { return this.bills.some((b) => this.result(b)?.pr != null); },
 
     // ---- Example: a made-up system with two bills, so an owner sees a full result in one tap ----
@@ -352,7 +372,19 @@ document.addEventListener('alpine:init', () => {
       this.savedSnap = this.snap();   // a fresh start has nothing to lose
     },
 
-    addBill() { this.bills.forEach((x) => { x.open = false; }); this.bills.push(newBill()); this.$nextTick(() => this.scrollTo('bills-end')); },
+    // The new bill lands at the bottom of the list: bring it into view and put the cursor in its first date, so the
+    // owner sees it appear (scrolling to the end of the list left it above the screen on phones).
+    addBill() {
+      this.bills.forEach((x) => { x.open = false; });
+      this.bills.push(newBill());
+      this.$nextTick(() => this.focusBill(this.bills.length - 1, 'input[type=date]'));
+    },
+    focusBill(i, sel) {
+      const a = document.querySelectorAll('#bills article.card')[i]; if (!a) return;
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      a.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+      a.querySelector(sel)?.focus({ preventScroll: true });
+    },
     // A bill with numbers in it asks first (there is no undo); an empty one goes at once.
     removing: null,
     billHasData(b) { return BILL_FIELDS.some((k) => String(b[k] ?? '').trim() !== ''); },
@@ -361,7 +393,12 @@ document.addEventListener('alpine:init', () => {
       this.removing = b.id;
       this.$nextTick(() => el.closest('article')?.querySelector('.confirm .keep')?.focus());
     },
-    removeBill(id) { this.bills = this.bills.filter((b) => b.id !== id); this.removing = null; },
+    // After a remove, focus the bill that took its place (or the new last one), not the top of the page.
+    removeBill(id) {
+      const k = this.bills.findIndex((b) => b.id === id);
+      this.bills = this.bills.filter((b) => b.id !== id); this.removing = null;
+      this.$nextTick(() => this.focusBill(Math.min(k, this.bills.length - 1), '.bill-title h3'));
+    },
     // Index of the first bill with an answer: the PR definition is shown there only, not under every dial.
     get firstAnswered() { return this.bills.findIndex((b) => this.result(b)?.pr != null); },
 
@@ -395,7 +432,9 @@ document.addEventListener('alpine:init', () => {
         const rExport = num(b.genRate);
         if (!calc.isError(rImport) && Number.isFinite(rExport)) {
           out.rImport = rImport;
-          out.savings = calc.savings({ s: out.split.selfConsumed, x, rImport, rExport });
+          const creditCap = num(b.varCharges);
+          out.savings = calc.savings({ s: out.split.selfConsumed, x, rImport, rExport, creditCap });
+          out.uncounted = calc.uncountedCredit({ x, rExport, creditCap });
           out.shift = calc.loadShiftValue({ rImport, rExport });
         }
       }
@@ -458,6 +497,10 @@ document.addEventListener('alpine:init', () => {
       return { earned, bills: vals.length, cost: cost > 0 ? cost : null };
     },
 
+    // A missing month before this bill (calc.billGaps): shown on the later bill and on the sheet.
+    get gaps() { return calc.billGaps(this.bills); },
+    gapBefore(b) { return this.gaps.find((g) => g.to === b.start) ?? null; },
+
     // Two consecutive red bills, oldest to newest, ending at this bill.
     redRaised(b) {
       const ordered = this.bills.filter((x) => x.start).sort((a, c) => (a.start < c.start ? -1 : 1));
@@ -467,6 +510,7 @@ document.addEventListener('alpine:init', () => {
     },
 
     num,
+    listAnd: (xs) => (xs.length < 2 ? xs.join('') : xs.slice(0, -1).join(', ') + ' and ' + xs[xs.length - 1]),
     decode(b) {
       const v = { importKwh: num(b.importKwh), exportKwh: num(b.exportKwh), genRate: num(b.genRate), varCharges: num(b.varCharges), total: num(b.total) };
       return Object.values(v).every(Number.isFinite) ? calc.billDecode(v) : null;
@@ -506,14 +550,26 @@ document.addEventListener('alpine:init', () => {
       const okNum = (v) => (calc.isError(v) ? null : v);
       const promised = cost > 0 && yrs > 0 ? okNum(calc.promisedSavings({ cost, years: yrs, days: last.day })) : null;
       const years = cost > 0 ? okNum(calc.paybackYearsAtPace({ cost, saved: last.saved, days: last.day })) : null;
-      return { saved: last.saved, days: last.day, promised, gapPct: promised ? (last.saved / promised - 1) * 100 : null, years, promisedYears: yrs > 0 ? yrs : null, cost: cost > 0 ? cost : null };
+      // Before about a year of bills the pace leans on whichever season the bills cover (the sheet waits a year too).
+      const early = last.day < PAYBACK_MIN_DAYS;
+      const months = this.bills.map((b) => this.result(b)).filter((r) => r?.savings != null).map((r) => r.midMonth);
+      const dry = months.filter(calc.isDrySeason).length;
+      const season = dry === 0 ? 'wet' : dry === months.length ? 'dry' : 'mixed';
+      return { saved: last.saved, days: last.day, promised, gapPct: promised ? (last.saved / promised - 1) * 100 : null, years, promisedYears: yrs > 0 ? yrs : null, cost: cost > 0 ? cost : null, early, season };
+    },
+    // Tag on the pace tiles while early, worded for the season the bills actually cover.
+    get earlyTag() {
+      const t = this.paybackStats; if (!t?.early) return '';
+      return { wet: 'Early: rainy months read low', dry: 'Early: sunny months read high', mixed: 'Early: under a year of bills' }[t.season];
     },
     get paybackText() {
       const t = this.paybackStats; if (!t) return '';
+      // Early on, the tiles carry the numbers; this line only says why they will move.
+      if (t.early) return `Based on ${this.fmt(t.days, 0)} days of bills. Savings rise and fall with the seasons, so the pace and the payback year will move until you have about a year of bills.`;
       let out = `Over ${this.fmt(t.days, 0)} days you saved ₱${this.fmt(t.saved, 0)}.`;
       if (t.promised !== null) out += ` At the promised pace you would have saved ₱${this.fmt(t.promised, 0)}, so you are ${this.fmt(Math.abs(t.gapPct), 0)}% ${t.gapPct >= 0 ? 'ahead' : 'behind'}.`;
       if (t.years !== null) out += ` At your pace so far the system pays itself back in about ${this.fmt(t.years, 1)} years${t.promisedYears ? `, against ${this.fmt(t.promisedYears, 1)} promised` : ''}.`;
-      return out + ' Your bills may cover only some months, so treat this as a rough guide until you have a full year.';
+      return out;
     },
 
     // Chart model: pixel positions in a 340 x 200 box, clean axis ticks, one point per bill.
