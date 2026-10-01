@@ -196,6 +196,14 @@ test('billDecode golden: 300 kWh in, 220 out at 9.70, 3600 variable, 2100 total'
 test('billDecode edge: credit above variable charges keeps other charges above zero and is flagged', () => {
   const r = c.billDecode({ importKwh: 100, exportKwh: 500, genRate: 9.7, varCharges: 1200, total: 400 });
   near(r.afterCredit, 0); near(r.other, 400); assert.ok(r.flags.includes('credit_exceeds_variable'));
+  near(r.excess, 500 * 9.7 - 1200); assert.equal(r.noFixed, false);
+});
+test('billDecode edge: a total within rounding of the worked-out figure is not a mismatch; an exact match leaves nothing for fixed charges', () => {
+  // 3600 - 2134 = 1466 left after credit
+  const rounded = c.billDecode({ importKwh: 300, exportKwh: 220, genRate: 9.7, varCharges: 3600, total: 1465.7 });
+  assert.deepEqual(rounded.flags, []); assert.equal(rounded.noFixed, true); near(rounded.excess, 0);
+  const under = c.billDecode({ importKwh: 300, exportKwh: 220, genRate: 9.7, varCharges: 3600, total: 1465 });
+  assert.ok(under.flags.includes('total_below_charges')); assert.equal(under.noFixed, false);
 });
 test('billDecode edge: total below the charges, generation rate above buying rate, bad input', () => {
   assert.ok(c.billDecode({ importKwh: 300, exportKwh: 0, genRate: 9.7, varCharges: 3600, total: 3000 }).flags.includes('total_below_charges'));
