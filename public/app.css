@@ -68,8 +68,7 @@ button.theme svg { width:18px; height:18px; flex:none; }
 
 /* explainer */
 .explainer { margin:12px 0 0; }
-.explainer-toggle { display:flex; align-items:center; gap:8px; font:700 18px/1.2 var(--pixel); padding:8px 0; }
-.explainer-toggle svg { width:18px; height:18px; flex:none; transition:transform .2s; }
+.explainer-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; }
 .explainer-body { margin:4px 0 0; }
 .explainer .why { font-size:16px; }
 .tiles { list-style:none; margin:12px 0; padding:0; display:grid; grid-template-columns:1fr 1fr; gap:10px; }
@@ -81,7 +80,6 @@ button.theme svg { width:18px; height:18px; flex:none; }
 .flow li { display:flex; gap:10px; align-items:center; font-size:15px; }
 .flow b { flex:none; width:24px; height:24px; border-radius:50%; background:var(--sun); color:var(--sun-ink); font:700 14px/24px var(--pixel); text-align:center; }
 @media (min-width:520px) { .tiles { grid-template-columns:repeat(4,1fr); } }
-@media (prefers-reduced-motion: reduce) { .explainer-toggle svg { transition:none; } }
 
 /* cards and forms */
 .card { background:var(--card); border:1.5px solid var(--edge); border-radius:14px; padding:16px; margin:14px 0; box-shadow:3px 3px 0 var(--shadow); }

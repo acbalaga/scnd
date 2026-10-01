@@ -546,14 +546,11 @@ document.addEventListener('alpine:init', () => {
     savedSnap: '',
     snap() { return serialize({ ...this.s, place: this.place }, this.bills, new Date(0)); },
     get unsaved() { return !this.example && this.snap() !== this.savedSnap; },
-    // Explainer: open for new visitors, remembered as collapsed on this device only.
-    introOpen: true,
-    toggleIntro() {
-      this.introOpen = !this.introOpen;
-      try { localStorage.setItem('scnd-intro', this.introOpen ? 'open' : 'closed'); } catch { /* ignore */ }
-    },
+    // Explainer: hidden until asked for. Nothing is stored.
+    introOpen: false,
+    openIntro() { this.introOpen = true; this.$nextTick(() => this.scrollTo('about')); },
+    closeIntro() { this.introOpen = false; },
     init() {
-      try { if (localStorage.getItem('scnd-intro') === 'closed') this.introOpen = false; } catch { /* storage blocked: stay open */ }
       this.savedSnap = this.snap();
       window.addEventListener('beforeunload', (e) => { if (this.unsaved) { e.preventDefault(); e.returnValue = ''; } });
       try { const t = localStorage.getItem('scnd-theme'); if (t === 'light' || t === 'dark') this.theme = t; } catch { /* storage blocked: stay on auto */ }
