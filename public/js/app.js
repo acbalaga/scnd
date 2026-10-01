@@ -27,10 +27,11 @@ const FACINGS = [
   { label: 'Northeast', az: -135 }, { label: 'Northwest', az: 135 }, { label: 'North', az: 180 },
 ];
 
-const REPORT_BAND = { green: 'Within range', amber: 'Below range', red: 'Low' };
-const REPORT_WORDING = { green: 'within the usual range', amber: 'a little below the usual range', red: 'low' };
-const BAND_SHORT = { green: 'healthy', amber: 'a bit low', red: 'low' };
-const BAND_LABEL = { green: 'Within range', amber: 'A bit low, worth watching', red: 'Low' };
+// 'check': PR above calc.PR_PLAUSIBLE_MAX, more than panels can make, so a figure is likely wrong. Never called healthy.
+const REPORT_BAND = { green: 'Within range', amber: 'Below range', red: 'Low', check: 'Check figures' };
+const REPORT_WORDING = { green: 'within the usual range', amber: 'a little below the usual range', red: 'low', check: 'above what panels this size can make, so a figure is likely wrong' };
+const BAND_SHORT = { green: 'healthy', amber: 'a bit low', red: 'low', check: 'check numbers' };
+const BAND_LABEL = { green: 'Within range', amber: 'A bit low, worth watching', red: 'Low', check: 'Check figures' };
 const FLAG_TEXT = {
   no_export_after_activation: 'You said net metering is on, but this bill shows 0 kWh sent to the grid. Ask the utility whether your meter was actually changed to a bi-directional one.',
   outage: 'Outage hours were entered. On-grid inverters shut off during brownouts by design, so some of the gap is expected.',
@@ -247,6 +248,8 @@ document.addEventListener('alpine:init', () => {
         latestWording: latest ? REPORT_WORDING[latest.band] : '',
         savedTotal: cum.length ? 'PHP ' + this.fmt(cum[cum.length - 1].saved, 0) : null,
         sources: [...sources, ...f.uncertainty,
+          ...rows.filter((x) => x.r.weatherRejected).map(({ b, r }) => `For ${this.fmtRange(b.start, b.end)} the weather-adjusted PR came out at ${this.fmt(r.prWeather, 2)}, above what panels can make, so the weather data for those dates looks off. That period is judged against a typical year.`),
+          ...rows.filter((x) => x.r.band === 'check').map(({ b, r }) => `PR for ${this.fmtRange(b.start, b.end)} works out at ${this.fmt(r.pr, 2)}, above the ${calc.PR_PLAUSIBLE_MAX.toFixed(2)} panels reach in practice, so a figure is likely wrong (reading dates, solar kWh or panel size). Check it before relying on this sheet.`),
           ...(this.gaps.length ? [`Bills are missing for ${this.gaps.map((g) => this.fmtRange(g.from, g.to)).join(', ')}. Two low months either side of a gap are not counted as in a row, and savings to date leave out the missing ${this.gaps.length === 1 ? 'period' : 'periods'}, so the payback pace reads low.`] : [])],
       };
     },
@@ -304,6 +307,7 @@ document.addEventListener('alpine:init', () => {
     headline(b) {
       const r = this.result(b);
       if (!r || r.pr === null) return '';
+      if (r.band === 'check') return 'Higher than panels this size can make. Check the dates and kWh.';
       if (r.band === 'green') return 'Looks healthy.';
       if (r.band === 'amber') return 'A bit low. Worth watching, not worrying.';
       return this.redRaised(b) ? 'Low two months in a row. Worth asking your installer.' : 'Low this month. One month is not enough to call a fault.';
@@ -327,8 +331,11 @@ document.addEventListener('alpine:init', () => {
       const deg = -90 + pos(r.pr) * 180, gap = 0.004;
       const [gx, gy] = pt(green, 99), [ax, ay] = pt(amberFloor, 99);
       const pr = this.fmt(r.pr, 2);
-      return `<svg viewBox="-6 -4 212 150" role="img" aria-label="Performance ratio ${pr}, ${BAND_SHORT[r.band]}. Healthy is ${green} or more.">`
-        + arc(DIAL_MIN, amberFloor - gap, 'd-red') + arc(amberFloor + gap, green - gap, 'd-amber') + arc(green + gap, DIAL_MAX, 'd-green')
+      // PR above what panels can make: one grey arc, grey needle and digits, so the gauge reads as "check this", not a result.
+      const check = r.band === 'check';
+      return `<svg viewBox="-6 -4 212 150" role="img" class="${check ? 'is-check' : ''}" aria-label="Performance ratio ${pr}, ${BAND_SHORT[r.band]}. Healthy is ${green} or more.">`
+        + (check ? arc(DIAL_MIN, DIAL_MAX, 'd-grey')
+          : arc(DIAL_MIN, amberFloor - gap, 'd-red') + arc(amberFloor + gap, green - gap, 'd-amber') + arc(green + gap, DIAL_MAX, 'd-green'))
         + `<text class="scale" x="${ax.toFixed(1)}" y="${ay.toFixed(1)}" text-anchor="middle">${amberFloor}</text><text class="scale" x="${gx.toFixed(1)}" y="${gy.toFixed(1)}" text-anchor="middle">${green}</text>`
         + `<g class="needle" style="--a:${deg.toFixed(1)}deg"><line x1="100" y1="100" x2="100" y2="34"/><circle cx="100" cy="100" r="6"/></g>`
         + `<rect x="40" y="108" width="120" height="36" rx="7" fill="#0E1B2C"/><text class="lcd-lbl" x="48" y="130">PR</text>`
@@ -456,7 +463,10 @@ document.addEventListener('alpine:init', () => {
       // Judge on weather-adjusted PR once the weather call is trusted (calc.judgedPr). The typical-year values are kept.
       if (out.pr !== null) {
         const j = calc.judgedPr({ pr: out.pr, expectedKwh: out.expectedKwh, call: out.weather && !out.weather.missing ? out.weather : null });
-        if (!calc.isError(j)) Object.assign(out, { prTypical: out.pr, expectedTypical: out.expectedKwh, pr: j.pr, expectedKwh: j.expectedKwh, basis: j.basis, band: calc.prBand(j.pr, out.midMonth) });
+        if (!calc.isError(j)) Object.assign(out, { prTypical: out.pr, expectedTypical: out.expectedKwh, pr: j.pr, expectedKwh: j.expectedKwh, basis: j.basis, band: calc.prBand(j.pr, out.midMonth),
+          weatherRejected: !!j.weatherRejected, prWeather: j.prWeather ?? null });
+        // Above what panels can make: a wrong figure, not a healthy month (Fred, 1 Oct 2026).
+        if (calc.prTooHigh(out.pr)) out.band = 'check';
       }
       out.flags = calc.sanityFlags({ kWp: num(s.kWp), acKw: num(s.acKw), exportKwh: Number.isFinite(x) ? x : undefined, netMeteringActive: s.netMetering, outageHours: num(b.outageHours) });
       // Overlap with an earlier bill (or the same dates entered twice): flagged on the later one. One shared day is
@@ -474,7 +484,8 @@ document.addEventListener('alpine:init', () => {
       const records = [];
       for (const b of this.bills) {
         const r = this.result(b), pr = r?.weather?.prAdjusted;
-        if (r && Number.isFinite(pr) && pr > 0) records.push({ year: r.midYear, month: r.midMonth, pr });
+        // A rejected weather index or an implausible PR would put a wrong figure into the year-over-year pairs.
+        if (r && Number.isFinite(pr) && pr > 0 && !r.weatherRejected && !calc.prTooHigh(pr)) records.push({ year: r.midYear, month: r.midMonth, pr });
       }
       const warrantyPct = num(this.s.warrantyPct), d = calc.degradation(records, warrantyPct);
       return d && !calc.isError(d) ? { ...d, warrantyPct } : null;

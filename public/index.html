@@ -177,7 +177,7 @@
   <template x-if="ready">
     <section id="bills">
       <div class="banner" x-show="example">
-        <span><strong>Example numbers.</strong> Made up, so you can see how it works.</span>
+        <span><strong>Example numbers.</strong> Made up, so you can see how it works. The weather check uses real weather, so it will not match these made-up numbers.</span>
         <button type="button" class="link" @click="clearExample()">Start with mine</button>
       </div>
 
@@ -271,6 +271,7 @@
                 <p class="headline" x-text="headline(b)"></p>
                 <p class="sub" x-text="answerSub(b)"></p>
                 <!-- PR definition matches the findings sheet (app.js "sources") and docs/SPEC.md F1: energy made over what the rated panels would make in that sun. -->
+                <div class="flag" x-show="result(b).weatherRejected" x-text="'Against this period\'s weather, PR works out at ' + fmt(result(b).prWeather, 2) + ', above what panels can make, so the weather data for these dates looks off. Showing PR against a typical year instead.'"></div>
                 <p class="help" style="text-align:center"><span x-show="i === firstAnswered">PR compares what your panels made with what panels their size would make in the sun they got, if nothing were lost. Heat, dust, wiring and the inverter always take some, so real systems sit below 1.00. </span>Healthy is 0.75 or more. <span x-text="result(b).basis === 'weather' ? 'Adjusted for the weather in this period.' : 'Against a typical year\'s sun.'"></span></p>
                 <!-- Two low months: a next step, not an alarm. Weather first while unchecked, because a cloudy stretch can clear the flag. -->
                 <div class="raise" x-show="redRaised(b)" role="group" :aria-label="'Two low months in a row, ' + billTitle(b, i)">
@@ -300,7 +301,7 @@
                       <p class="help">The weather index is the sun in this period divided by the sun for the same dates in a typical year (the average of 2020 to 2025). 1.00 is typical. Below 1.00 is cloudier than usual.</p>
                       <dl>
                         <dt>Weather index</dt><dd x-text="fmt(result(b).weather.wi, 2)"></dd>
-                        <dt>PR adjusted for that weather</dt><dd x-text="fmt(result(b).weather.prAdjusted, 2)"></dd>
+                        <dt>PR adjusted for that weather</dt><dd x-text="fmt(result(b).weather.prAdjusted, 2) + (result(b).weatherRejected ? ' (not used)' : '')"></dd>
                       </dl>
                       <template x-if="result(b).weather.split.total > 0">
                         <dl>
@@ -513,7 +514,7 @@
         </table>
 
         <h3>3. Questions for the installer</h3>
-        <p x-show="sheet.allClear" x-text="sheet.allGreen ? 'No questions are raised: PR was within the usual range in every bill reviewed.' : 'No questions are raised: the latest bill is within the usual range and no earlier low months ran two in a row.'"></p>
+        <p x-show="sheet.allClear" x-text="sheet.latest && sheet.latest.band === 'check' ? 'No questions are raised, but the latest bill\'s PR is above what panels can make, so check its figures before relying on this sheet.' : sheet.allGreen ? 'No questions are raised: PR was within the usual range in every bill reviewed.' : 'No questions are raised: the latest bill is within the usual range and no earlier low months ran two in a row.'"></p>
         <ol class="q" x-show="!sheet.allClear"><template x-for="i in sheet.items" :key="i.id"><li x-text="i.text"></li></template></ol>
 
         <h3>4. Information requested</h3>
