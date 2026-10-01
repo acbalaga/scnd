@@ -269,7 +269,16 @@
                 <p class="headline" x-text="headline(b)"></p>
                 <p class="sub" x-text="answerSub(b)"></p>
                 <p class="help" style="text-align:center"><span x-show="i === firstAnswered">PR is how much of the sun's energy on your panels became electricity. </span>Healthy is 0.75 or more. <span x-text="result(b).basis === 'weather' ? 'Adjusted for the weather in this period.' : 'Against a typical year\'s sun.'"></span></p>
-                <div class="flag red" x-show="redRaised(b)"><strong>Two low months in a row.</strong> Questions, not a verdict: has anything shaded the panels, are they dirty, and what does the inverter's fault log say? The findings sheet has these ready.</div>
+                <!-- Two low months: a next step, not an alarm. Weather first while unchecked, because a cloudy stretch can clear the flag. -->
+                <div class="raise" x-show="redRaised(b)" role="group" :aria-label="'Two low months in a row, ' + billTitle(b, i)">
+                  <p class="raise-label"><i aria-hidden="true"></i>Two low months in a row</p>
+                  <p>Questions, not a verdict: has anything shaded the panels, are they dirty, and what does the inverter's fault log say?<span x-show="!result(b).weather && weather.status !== 'failed'"> A cloudy stretch can do this too, so check the weather first.</span></p>
+                  <p class="help" x-show="!result(b).weather && weather.status === 'failed'">The weather check did not get through. Try again, or go ahead with the findings sheet, which shows PR against a typical year's sun.</p>
+                  <div class="row">
+                    <button type="button" x-show="!result(b).weather" @click="checkWeather()" :disabled="weather.status === 'loading'" x-text="weather.status === 'loading' ? 'Checking...' : (weather.status === 'failed' ? 'Try the weather again' : 'Check the weather first')"></button>
+                    <button type="button" :class="result(b).weather ? '' : 'link'" @click="showSheet = true; $nextTick(() => scrollTo('findings'))">Open findings sheet</button>
+                  </div>
+                </div>
                 <p class="help" x-show="result(b).band === 'red' && !redRaised(b)" style="text-align:center">We wait for a second low month before raising a flag, because satellite sun data can be off by 5 to 10% for a single month.</p>
               </div>
 
