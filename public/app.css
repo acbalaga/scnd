@@ -12,7 +12,7 @@
   --sun:#FFC83D; --sun-ink:#0E1B2C; --btn-edge:#0E1B2C;
   --focus:#0B5FB0; --field:#74879E; /* focus ring and input border: both at least 3:1 on --bg and --card (WCAG 1.4.11) */
   --green:#17794F; --green-bg:#E1F4EA; --amber:#9A5B00; --amber-bg:#FFF0D3; --red:#B3261E; --red-bg:#FBE4E2;
-  --d-green:#2FB67A; --d-amber:#F0A020; --d-red:#E2534A; --d-track:#D6DFEA;
+  --d-green:#2FB67A; --d-amber:#F0A020; --d-red:#E2534A; --d-track:#D6DFEA; --d-grey:#9AA6B5;
   --c-save:#0B5FB0; --c-promise:#B45309;
   --pixel: "Pixelify Sans", ui-rounded, "SF Pro Rounded", system-ui, sans-serif;
   --lcd: "DSEG7 Classic", ui-monospace, "SF Mono", Menlo, monospace;
@@ -24,7 +24,7 @@
   --bg:#0A1424; --card:#122239; --soft:#0E1B2E; --ink:#E8EEF6; --muted:#9DB0C7; --line:#233650; --edge:#35506F; --shadow:#050B14; --grid:rgba(255,255,255,.035); --link:#7DB8F5;
   --btn-edge:#050B14; --focus:#FFC83D; --field:#5E7A9A;
   --green:#5FD3A0; --green-bg:#123326; --amber:#F5B24A; --amber-bg:#3A2B0D; --red:#FF8E85; --red-bg:#3F1D1B;
-  --d-green:#3FCB8C; --d-amber:#F5B24A; --d-red:#FF7A70; --d-track:#233650;
+  --d-green:#3FCB8C; --d-amber:#F5B24A; --d-red:#FF7A70; --d-track:#233650; --d-grey:#6B7A8D;
   --c-save:#3D8BDB; --c-promise:#C4820F;
 } }
 :root[data-theme="dark"] {
@@ -32,7 +32,7 @@
   --bg:#0A1424; --card:#122239; --soft:#0E1B2E; --ink:#E8EEF6; --muted:#9DB0C7; --line:#233650; --edge:#35506F; --shadow:#050B14; --grid:rgba(255,255,255,.035); --link:#7DB8F5;
   --btn-edge:#050B14; --focus:#FFC83D; --field:#5E7A9A;
   --green:#5FD3A0; --green-bg:#123326; --amber:#F5B24A; --amber-bg:#3A2B0D; --red:#FF8E85; --red-bg:#3F1D1B;
-  --d-green:#3FCB8C; --d-amber:#F5B24A; --d-red:#FF7A70; --d-track:#233650;
+  --d-green:#3FCB8C; --d-amber:#F5B24A; --d-red:#FF7A70; --d-track:#233650; --d-grey:#6B7A8D;
   --c-save:#3D8BDB; --c-promise:#C4820F;
 }
 * { box-sizing:border-box; }
@@ -166,6 +166,8 @@ fieldset.src .grid > .help-row:last-child { margin-bottom:-12px; }   /* summary 
 .dial .scale { fill:var(--muted); font:600 10px var(--body); }
 .dial .lcd-num { font:700 23px var(--lcd); fill:#FFC83D; } .dial .lcd-ghost { font:700 23px var(--lcd); fill:#fff; opacity:.09; } .dial .lcd-lbl { font:400 9px var(--pixel); fill:#B9C7D8; }
 @keyframes sweep { from { transform:rotate(-90deg); } }
+/* Dial for a PR above what panels can make: everything grey (arc via --d-grey in app.js). */
+.dial .is-check .needle line { stroke:var(--d-grey); } .dial .is-check .needle circle { fill:var(--d-grey); } .dial .is-check .lcd-num { fill:#B9C7D8; }
 @media (prefers-reduced-motion: reduce) { .dial .needle { animation:none; } }
 .headline { font:700 24px/1.2 var(--pixel); text-align:center; margin:8px 0 6px; }
 .answer .sub { text-align:center; max-width:30em; margin:0 auto 10px; }

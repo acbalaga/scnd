@@ -331,8 +331,11 @@ document.addEventListener('alpine:init', () => {
       const deg = -90 + pos(r.pr) * 180, gap = 0.004;
       const [gx, gy] = pt(green, 99), [ax, ay] = pt(amberFloor, 99);
       const pr = this.fmt(r.pr, 2);
-      return `<svg viewBox="-6 -4 212 150" role="img" aria-label="Performance ratio ${pr}, ${BAND_SHORT[r.band]}. Healthy is ${green} or more.">`
-        + arc(DIAL_MIN, amberFloor - gap, 'd-red') + arc(amberFloor + gap, green - gap, 'd-amber') + arc(green + gap, DIAL_MAX, 'd-green')
+      // PR above what panels can make: one grey arc, grey needle and digits, so the gauge reads as "check this", not a result.
+      const check = r.band === 'check';
+      return `<svg viewBox="-6 -4 212 150" role="img" class="${check ? 'is-check' : ''}" aria-label="Performance ratio ${pr}, ${BAND_SHORT[r.band]}. Healthy is ${green} or more.">`
+        + (check ? arc(DIAL_MIN, DIAL_MAX, 'd-grey')
+          : arc(DIAL_MIN, amberFloor - gap, 'd-red') + arc(amberFloor + gap, green - gap, 'd-amber') + arc(green + gap, DIAL_MAX, 'd-green'))
         + `<text class="scale" x="${ax.toFixed(1)}" y="${ay.toFixed(1)}" text-anchor="middle">${amberFloor}</text><text class="scale" x="${gx.toFixed(1)}" y="${gy.toFixed(1)}" text-anchor="middle">${green}</text>`
         + `<g class="needle" style="--a:${deg.toFixed(1)}deg"><line x1="100" y1="100" x2="100" y2="34"/><circle cx="100" cy="100" r="6"/></g>`
         + `<rect x="40" y="108" width="120" height="36" rx="7" fill="#0E1B2C"/><text class="lcd-lbl" x="48" y="130">PR</text>`
