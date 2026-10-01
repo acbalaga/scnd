@@ -11,7 +11,7 @@ test('findings golden: two low months raise a question with the latest period an
 });
 test('findings golden: weather split, clipping, no export and payback each produce their own question', () => {
   const w = { wi: 0.9, uncertain: false, inferred: false, split: { weather: 58, system: 40, total: 98 } };
-  const r = findings({ bills: [bill({ band: 'amber', pr: 0.7, weather: w, flags: ['clipping', 'no_export_after_activation'] })], payback: { saved: 8000, promised: 10000, days: 30 } });
+  const r = findings({ bills: [bill({ band: 'amber', pr: 0.7, weather: w, flags: ['clipping', 'no_export_after_activation'] })], payback: { saved: 8000, promised: 10000, days: PAYBACK_MIN_DAYS } });
   assert.deepEqual(r.items.map((i) => i.id), ['one_low', 'weather_split', 'clipping', 'no_export', 'payback']);
   assert.match(r.items[4].text, /20% behind/);
 });
@@ -65,4 +65,10 @@ test('findings edge: a small payback gap early on is a note, not a question; aft
   const year = findings({ bills: [bill()], payback: { saved: 9000, promised: 10000, days: PAYBACK_MIN_DAYS } });
   assert.deepEqual(year.items.map((i) => i.id), ['payback']);
   assert.equal(findings({ bills: [bill()], payback: { saved: 12000, promised: 10000, days: 60 } }).uncertainty.length, 1);
+});
+test('findings edge: even a large payback gap waits for a year of bills (a wet-season start reads far behind)', () => {
+  const wet = findings({ bills: [bill()], payback: { saved: 7900, promised: 10000, days: 92 } });
+  assert.equal(wet.items.length, 0); assert.match(wet.uncertainty.at(-1), /21% behind the promised payback pace, over 92 days/);
+  const justShort = findings({ bills: [bill()], payback: { saved: 5000, promised: 10000, days: PAYBACK_MIN_DAYS - 1 } });
+  assert.equal(justShort.items.length, 0);
 });

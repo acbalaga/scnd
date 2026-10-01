@@ -53,6 +53,7 @@ const HYBRID_FLAG_TEXT = {
 // asks people not to type bill or account numbers into it. Name and email in the form are optional.
 const FEEDBACK_URL = 'https://forms.gle/uaUyhAR2PLqakpME8';
 
+const DIAL_MIN = 0.45, DIAL_MAX = 0.95;   // PR range the dial arc covers (see dial())
 let nextId = 1;
 const newBill = () => ({ id: nextId++, start: '', end: '', inverterKwh: '', importKwh: '', exportKwh: '', genRate: '', varCharges: '', total: '', outageHours: '', chargeKwh: '', dischargeKwh: '', homeLoadKwh: '', open: true });
 
@@ -62,13 +63,13 @@ document.addEventListener('alpine:init', () => {
     cities: CITIES,
     facings: FACINGS,
     place: '',
-    s: { lat: '', lon: '', kWp: '', acKw: '', tilt: 10, azimuth: 0, commissioned: '', hybrid: false, netMetering: true, cost: '', promisedYears: '', warrantyPct: '', batteryCost: '' },
+    s: { lat: '', lon: '', kWp: '', acKw: '', tilt: 10, azimuth: 0, commissioned: '', hybrid: false, netMetering: false, cost: '', promisedYears: '', warrantyPct: '', batteryCost: '' },
     ready: false,
     setupError: '',
     climate: null,
     lowDiffuse: false,
     bills: [newBill()],
-    // Actual-month weather, fetched only when the user clicks. status: idle | loading | done.
+    // Actual-month weather, fetched only when the user clicks. status: idle | loading | done | failed (no source usable).
     fileMessage: '',
     setupOpen: true,
     example: false,
@@ -107,6 +108,9 @@ document.addEventListener('alpine:init', () => {
       if (!Number.isFinite(tilt) || tilt < 0 || tilt > 90) missing.push('roof tilt (0 to 90)');
       if (missing.length) {
         this.setupError = `Please fill in: ${missing.join(', ')}.`;
+        // Take the owner to the first field that needs them (the error line alone can sit below the fold).
+        const first = { location: 'fPlace', 'panel size (kWp)': 'fKwp', 'inverter size (kW)': 'fAc', 'roof tilt (0 to 90)': 'fTilt' }[missing[0]];
+        this.$nextTick(() => this.$refs[first]?.focus());
         return;
       }
       s.lat = round1(lat); s.lon = round1(lon);       // only ever use the rounded point
@@ -138,7 +142,8 @@ document.addEventListener('alpine:init', () => {
         if (calc.isError(base)) { w.errors.push(`${label}: ${base.message}`); continue; }
         w[key] = r.value; w[key + 'Base'] = base;
       }
-      w.status = 'done';
+      // Neither source usable: say so, rather than letting each bill read "no data for these dates".
+      w.status = w.sat || w.nasa ? 'done' : 'failed';
     },
 
     // F4 for one bill: two indices, combined, then the shortfall split. null until the user has checked the weather.
@@ -256,6 +261,14 @@ document.addEventListener('alpine:init', () => {
       const sameYear = new Date(a).getUTCFullYear() === new Date(b).getUTCFullYear();
       return `${f(a, !sameYear)} to ${f(b, true)}`;
     },
+    // Live-region text: the latest bill's plain-sentence answer. Changes only when the band does, so it is not chatty.
+    get announce() {
+      for (let i = this.bills.length - 1; i >= 0; i--) {
+        const h = this.headline(this.bills[i]);
+        if (h) return `${this.billTitle(this.bills[i], i)}: ${h}`;
+      }
+      return '';
+    },
     billTitle(b, i) { return b.start && b.end ? this.fmtRange(b.start, b.end) : `Bill ${i + 1}`; },
     get summaryLine() {
       const s = this.s, face = FACINGS.find((x) => x.az === num(s.azimuth))?.label.toLowerCase() ?? '';
@@ -284,23 +297,26 @@ document.addEventListener('alpine:init', () => {
       return `${this.fmt(g, 0)} kWh made, against about ${this.fmt(r.expectedKwh, 0)} kWh for a healthy system in that sun (${this.fmt(Math.abs(gap), 0)}% ${gap < 0 ? 'under' : 'over'}).`;
     },
     // Half-dial: red, amber and green zones from PR_BANDS for this bill's season, and a needle at the PR.
+    // The arc spans PR DIAL_MIN to DIAL_MAX, not 0 to 1: on a 0 to 1 arc red took 65% of the dial and an amber month
+    // looked like a failure. The needle clamps at the ends; the LCD always shows the true PR. Display only, bands unchanged.
     dial(b) {
       const r = this.result(b);
       if (!r || r.pr === null) return '';
       const amberFloor = calc.isDrySeason(r.midMonth) ? calc.PR_BANDS.amberDry : calc.PR_BANDS.amberWet, green = calc.PR_BANDS.green;
-      const pt = (v, rad) => { const a = Math.PI * (1 - v); return [100 + rad * Math.cos(a), 100 - rad * Math.sin(a)]; };
+      const pos = (pr) => Math.max(0, Math.min((pr - DIAL_MIN) / (DIAL_MAX - DIAL_MIN), 1));
+      const pt = (pr, rad) => { const a = Math.PI * (1 - pos(pr)); return [100 + rad * Math.cos(a), 100 - rad * Math.sin(a)]; };
       const arc = (v0, v1, cls) => { const [x0, y0] = pt(v0, 80), [x1, y1] = pt(v1, 80); return `<path class="arc" style="stroke:var(--${cls})" d="M${x0.toFixed(1)} ${y0.toFixed(1)} A80 80 0 0 1 ${x1.toFixed(1)} ${y1.toFixed(1)}"/>`; };
-      const v = Math.max(0, Math.min(r.pr, 1)), deg = -90 + v * 180, gap = 0.006;
+      const deg = -90 + pos(r.pr) * 180, gap = 0.004;
       const [gx, gy] = pt(green, 99), [ax, ay] = pt(amberFloor, 99);
       const pr = this.fmt(r.pr, 2);
       return `<svg viewBox="-6 -4 212 150" role="img" aria-label="Performance ratio ${pr}, ${BAND_SHORT[r.band]}. Healthy is ${green} or more.">`
-        + arc(0, amberFloor - gap, 'd-red') + arc(amberFloor + gap, green - gap, 'd-amber') + arc(green + gap, 1, 'd-green')
+        + arc(DIAL_MIN, amberFloor - gap, 'd-red') + arc(amberFloor + gap, green - gap, 'd-amber') + arc(green + gap, DIAL_MAX, 'd-green')
         + `<text class="scale" x="${ax.toFixed(1)}" y="${ay.toFixed(1)}" text-anchor="middle">${amberFloor}</text><text class="scale" x="${gx.toFixed(1)}" y="${gy.toFixed(1)}" text-anchor="middle">${green}</text>`
         + `<g class="needle" style="--a:${deg.toFixed(1)}deg"><line x1="100" y1="100" x2="100" y2="34"/><circle cx="100" cy="100" r="6"/></g>`
         + `<rect x="40" y="108" width="120" height="36" rx="7" fill="#0E1B2C"/><text class="lcd-lbl" x="48" y="130">PR</text>`
         + `<text class="lcd-ghost" x="152" y="135" text-anchor="end">8.88</text><text class="lcd-num" x="152" y="135" text-anchor="end">${pr}</text></svg>`;
     },
-    weatherTeaser(b) { const w = this.result(b)?.weather; return w && !w.missing ? `Index ${this.fmt(w.wi, 2)}` : (this.weather.status === 'done' ? 'No data' : 'Not checked'); },
+    weatherTeaser(b) { const w = this.result(b)?.weather; return w && !w.missing ? `Index ${this.fmt(w.wi, 2)}` : (this.weather.status === 'done' ? 'No data' : (this.weather.status === 'failed' ? "Couldn't check" : 'Not checked')); },
     get canCheckWeather() { return this.bills.some((b) => this.result(b)?.pr != null); },
 
     // ---- Example: a made-up system with two bills, so an owner sees a full result in one tap ----
@@ -324,7 +340,7 @@ document.addEventListener('alpine:init', () => {
     },
     clearExample() {
       this.example = false; this.ready = false; this.setupOpen = true; this.place = '';
-      this.s = { lat: '', lon: '', kWp: '', acKw: '', tilt: 10, azimuth: 0, commissioned: '', hybrid: false, netMetering: true, cost: '', promisedYears: '', warrantyPct: '', batteryCost: '' };
+      this.s = { lat: '', lon: '', kWp: '', acKw: '', tilt: 10, azimuth: 0, commissioned: '', hybrid: false, netMetering: false, cost: '', promisedYears: '', warrantyPct: '', batteryCost: '' };
       this.bills = [newBill()]; this.climate = null; this.lowDiffuse = false;
       this.resetWeather();
       this.savedSnap = this.snap();   // a fresh start has nothing to lose
@@ -519,7 +535,7 @@ document.addEventListener('alpine:init', () => {
     get tip() {
       const m = this.chartModel; if (!m || this.chartHover === null || !m.pts[this.chartHover]) return null;
       const p = m.pts[this.chartHover], pct = (p.x / m.W) * 100;
-      return { date: this.fmtDate(p.date), saved: '₱' + this.fmt(p.saved, 0), promised: p.promised === null ? null : '₱' + this.fmt(p.promised, 0), style: `left:${pct.toFixed(1)}%; transform:translateX(${pct > 55 ? '-108%' : '8%'})` };
+      return { date: this.fmtDate(p.date), saved: '₱' + this.fmt(p.saved, 0), promised: p.promised === null ? null : '₱' + this.fmt(p.promised, 0), style: { left: `${pct.toFixed(1)}%`, transform: `translateX(${pct > 55 ? '-108%' : '8%'})` } };
     },
     get chart() {
       const m = this.chartModel; if (!m) return '';
