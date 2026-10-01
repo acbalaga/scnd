@@ -53,7 +53,14 @@ const HYBRID_FLAG_TEXT = {
 // asks people not to type bill or account numbers into it. Name and email in the form are optional.
 const FEEDBACK_URL = 'https://forms.gle/uaUyhAR2PLqakpME8';
 
+// One date style across titles, chart and table: "1 Sep 2026". Locale formatters disagree (en-GB "Sept", en-PH month first).
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const dayMonth = (t, withYear) => { const d = new Date(t); return `${d.getUTCDate()} ${MON[d.getUTCMonth()]}${withYear ? ' ' + d.getUTCFullYear() : ''}`; };
 const DIAL_MIN = 0.45, DIAL_MAX = 0.95;   // PR range the dial arc covers (see dial())
+// Bill number fields with the names the owner sees, for plain error messages.
+const NUM_FIELDS = [['inverterKwh', 'solar produced'], ['chargeKwh', 'battery charged'], ['dischargeKwh', 'battery discharged'], ['homeLoadKwh', 'home load'],
+  ['importKwh', 'bought from the grid'], ['exportKwh', 'sent to the grid'], ['genRate', 'generation charge'], ['varCharges', 'variable charges'], ['total', 'total amount due'], ['outageHours', 'outage hours']];
+const BILL_FIELDS = ['start', 'end', ...NUM_FIELDS.map(([k]) => k)];
 let nextId = 1;
 const newBill = () => ({ id: nextId++, start: '', end: '', inverterKwh: '', importKwh: '', exportKwh: '', genRate: '', varCharges: '', total: '', outageHours: '', chargeKwh: '', dischargeKwh: '', homeLoadKwh: '', open: true });
 
@@ -251,15 +258,14 @@ document.addEventListener('alpine:init', () => {
     },
     fmtDate(iso) {
       const t = Date.parse(iso);
-      return Number.isFinite(t) ? new Date(t).toLocaleDateString('en-PH', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }) : '';
+      return Number.isFinite(t) ? dayMonth(t, true) : '';
     },
     // "1 Jul to 1 Aug 2026", or with both years when the bill crosses New Year.
     fmtRange(start, end) {
       const a = Date.parse(start), b = Date.parse(end);
       if (!Number.isFinite(a) || !Number.isFinite(b)) return '';
-      const f = (t, y) => new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', ...(y ? { year: 'numeric' } : {}), timeZone: 'UTC' });
       const sameYear = new Date(a).getUTCFullYear() === new Date(b).getUTCFullYear();
-      return `${f(a, !sameYear)} to ${f(b, true)}`;
+      return `${dayMonth(a, !sameYear)} to ${dayMonth(b, true)}`;
     },
     // Live-region text: the latest bill's plain-sentence answer. Changes only when the band does, so it is not chatty.
     get announce() {
@@ -347,13 +353,25 @@ document.addEventListener('alpine:init', () => {
     },
 
     addBill() { this.bills.forEach((x) => { x.open = false; }); this.bills.push(newBill()); this.$nextTick(() => this.scrollTo('bills-end')); },
-    removeBill(id) { this.bills = this.bills.filter((b) => b.id !== id); },
+    // A bill with numbers in it asks first (there is no undo); an empty one goes at once.
+    removing: null,
+    billHasData(b) { return BILL_FIELDS.some((k) => String(b[k] ?? '').trim() !== ''); },
+    askRemove(b, el) {
+      if (!this.billHasData(b)) return this.removeBill(b.id);
+      this.removing = b.id;
+      this.$nextTick(() => el.closest('article')?.querySelector('.confirm .keep')?.focus());
+    },
+    removeBill(id) { this.bills = this.bills.filter((b) => b.id !== id); this.removing = null; },
+    // Index of the first bill with an answer: the PR definition is shown there only, not under every dial.
+    get firstAnswered() { return this.bills.findIndex((b) => this.result(b)?.pr != null); },
 
     // One result object per bill. Only fields the bill has enough data for are filled.
     result(b) {
       if (!this.ready || !this.climate) return null;
       const s = this.s, errors = [], out = { errors, flags: [], pr: null, split: null, savings: null };
       if (!b.start || !b.end) return null;
+      const negative = NUM_FIELDS.filter(([k]) => num(b[k]) < 0).map(([, label]) => label);
+      if (negative.length) { errors.push(`These cannot be below zero: ${negative.join(', ')}. Check the minus sign.`); return out; }
       const p = calc.poaPeriod({ ghi: this.climate.ghi, dif: this.climate.dif, tilt: num(s.tilt), azimuth: num(s.azimuth), lat: s.lat, start: b.start, end: b.end });
       if (calc.isError(p)) { errors.push(p.message); return out; }
       const g = num(b.inverterKwh), x = num(b.exportKwh), i = num(b.importKwh);
@@ -513,7 +531,7 @@ document.addEventListener('alpine:init', () => {
         d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1));
         const day = (d.getTime() - t0) / 86400000;
         if (day > xMax) break;
-        if (day >= xMax * 0.14 && day <= xMax * 0.92) xTicks.push({ day, label: d.toLocaleDateString('en-GB', { month: 'short', timeZone: 'UTC' }) });
+        if (day >= xMax * 0.14 && day <= xMax * 0.92) xTicks.push({ day, label: MON[d.getUTCMonth()] });
       }
       // Always end the axis on the last reading date, and drop a month tick that would crowd it.
       const endMs = t0 + xMax * 86400000, endLabel = this.fmtShort(new Date(endMs).toISOString().slice(0, 10));
@@ -522,7 +540,7 @@ document.addEventListener('alpine:init', () => {
       while (xTicks.length > 5) xTicks.splice(1, 1);
       return { W, H, L, R, T, B, pw, ph, xMax, yMax, X, Y, pts, yTicks, xTicks: xTicks.map((k) => ({ ...k, x: X(k.day) })), perDay, baseY: Y(0) };
     },
-    fmtShort(iso) { const t = Date.parse(iso); return Number.isFinite(t) ? new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }) : ''; },
+    fmtShort(iso) { const t = Date.parse(iso); return Number.isFinite(t) ? dayMonth(t, false) : ''; },
 
     chartHover: null,
     chartMove(ev) {

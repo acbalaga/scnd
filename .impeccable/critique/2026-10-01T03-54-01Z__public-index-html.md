@@ -10,6 +10,7 @@ target_fingerprint: "sha256:354c3e5c34cf37231b75219648a7b1cd55002f1b8d48267b83f1
 target_path: /home/user/scnd/public/index.html
 timestamp: 2026-10-01T03-54-01Z
 slug: public-index-html
+closed: true
 ---
 # SCND critique, public/index.html (1 Oct 2026)
 Method: dual-agent (A: design review, B: detector + browser)
