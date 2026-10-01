@@ -268,7 +268,8 @@
                 <div class="dial" x-html="dial(b)"></div>
                 <p class="headline" x-text="headline(b)"></p>
                 <p class="sub" x-text="answerSub(b)"></p>
-                <p class="help" style="text-align:center"><span x-show="i === firstAnswered">PR is how much of the sun's energy on your panels became electricity. </span>Healthy is 0.75 or more. <span x-text="result(b).basis === 'weather' ? 'Adjusted for the weather in this period.' : 'Against a typical year\'s sun.'"></span></p>
+                <!-- PR definition matches the findings sheet (app.js "sources") and docs/SPEC.md F1: energy made over what the rated panels would make in that sun. -->
+                <p class="help" style="text-align:center"><span x-show="i === firstAnswered">PR compares what your panels made with what panels their size would make in the sun they got, if nothing were lost. Heat, dust, wiring and the inverter always take some, so real systems sit below 1.00. </span>Healthy is 0.75 or more. <span x-text="result(b).basis === 'weather' ? 'Adjusted for the weather in this period.' : 'Against a typical year\'s sun.'"></span></p>
                 <!-- Two low months: a next step, not an alarm. Weather first while unchecked, because a cloudy stretch can clear the flag. -->
                 <div class="raise" x-show="redRaised(b)" role="group" :aria-label="'Two low months in a row, ' + billTitle(b, i)">
                   <p class="raise-label"><i aria-hidden="true"></i>Two low months in a row</p>
