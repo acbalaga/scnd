@@ -132,10 +132,20 @@ export function prBand(pr, month) {
 // call, or an uncertain one, it stays against a typical year. An inferred call (one source) is used: it is labelled.
 // pr and expectedKwh are the typical-year values; call is weatherCall's result or null.
 // Returns { pr, expectedKwh, basis: 'weather' | 'typical' }. Adjusted PR = pr / WI (same as PR on H_POA x WI).
+// A PR above this is more than panels can make in practice (heat, wiring, inverter and soiling losses always apply),
+// so it points at a wrong input: dates, kWh, panel size, or the weather data. Decided by Fred, 1 Oct 2026.
+export const PR_PLAUSIBLE_MAX = 0.90;
+export const prTooHigh = (pr) => Number.isFinite(pr) && pr > PR_PLAUSIBLE_MAX;
+
+// When the weather adjustment alone lifts PR above PR_PLAUSIBLE_MAX (the typical-year PR is plausible), the weather
+// index is the suspect, not the owner's numbers: judge on the typical year and say why (weatherRejected, prWeather).
+// Seen with real data: Manila, Aug 2026, NASA POWER alone (satellite gap) gave an index of 0.66. Fred, 1 Oct 2026.
 export function judgedPr({ pr, expectedKwh, call }) {
   if (!Number.isFinite(pr) || !Number.isFinite(expectedKwh)) return err('bad_input', 'Need a numeric PR and expected energy.');
   if (!call || call.uncertain || !Number.isFinite(call.wi) || call.wi <= 0) return { pr, expectedKwh, basis: 'typical' };
-  return { pr: pr / call.wi, expectedKwh: expectedKwh * call.wi, basis: 'weather' };
+  const adjusted = pr / call.wi;
+  if (prTooHigh(adjusted) && !prTooHigh(pr)) return { pr, expectedKwh, basis: 'typical', weatherRejected: true, prWeather: adjusted };
+  return { pr: adjusted, expectedKwh: expectedKwh * call.wi, basis: 'weather' };
 }
 
 // Two bills count as back to back when the second starts within this many days of the first one's end

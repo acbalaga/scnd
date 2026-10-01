@@ -142,6 +142,18 @@ test('judgedPr edge: no call or an uncertain one stays on the typical year; bad 
   assert.equal(c.judgedPr({ pr: 0.58, expectedKwh: 600, call: { wi: 0.75, uncertain: true } }).basis, 'typical');
   assert.ok(c.isError(c.judgedPr({ pr: NaN, expectedKwh: 600, call: null })));
 });
+test('judgedPr edge: a weather index that lifts a plausible PR above 0.90 is rejected for the typical year', () => {
+  // The example's August bill: PR 0.79 against a typical year, NASA-only index 0.657 -> 1.20.
+  const r = c.judgedPr({ pr: 0.79, expectedKwh: 556, call: { wi: 0.657, uncertain: false } });
+  assert.equal(r.basis, 'typical'); assert.equal(r.weatherRejected, true); near(r.pr, 0.79); near(r.expectedKwh, 556); near(r.prWeather, 0.79 / 0.657);
+  // Up to 0.90 the adjustment stands; a PR already too high before weather keeps the adjustment (the inputs are the suspect).
+  assert.equal(c.judgedPr({ pr: 0.70, expectedKwh: 556, call: { wi: 0.8, uncertain: false } }).basis, 'weather');
+  assert.equal(c.judgedPr({ pr: 0.95, expectedKwh: 556, call: { wi: 0.9, uncertain: false } }).basis, 'weather');
+});
+test('prTooHigh golden: above 0.90 is implausible, 0.90 itself and non-numbers are not', () => {
+  assert.equal(c.prTooHigh(0.91), true); assert.equal(c.prTooHigh(1.2), true);
+  assert.equal(c.prTooHigh(0.90), false); assert.equal(c.prTooHigh(0.78), false); assert.equal(c.prTooHigh(NaN), false);
+});
 test('isConsecutive golden: next starts on the end date, or up to 7 days either side', () => {
   assert.equal(c.isConsecutive({ end: '2026-07-01' }, { start: '2026-07-01' }), true);
   assert.equal(c.isConsecutive({ end: '2026-07-01' }, { start: '2026-07-08' }), true);
