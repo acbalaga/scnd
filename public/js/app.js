@@ -4,7 +4,7 @@ import * as calc from './calc.js';
 import { loadGrid, lookup, isLowDiffuse } from './grid.js';
 import { fetchSatellite, fetchNasa } from './weather.js';
 import { serialize, parse } from './data.js';
-import { findings, MIN_DEGRADATION_PAIRS } from './findings.js';
+import { findings, MIN_DEGRADATION_PAIRS, PAYBACK_MIN_DAYS } from './findings.js';
 
 const num = (v) => (v === '' || v === null || v === undefined ? NaN : Number(v));
 const round1 = (v) => Math.round(v * 10) / 10;
@@ -523,14 +523,26 @@ document.addEventListener('alpine:init', () => {
       const okNum = (v) => (calc.isError(v) ? null : v);
       const promised = cost > 0 && yrs > 0 ? okNum(calc.promisedSavings({ cost, years: yrs, days: last.day })) : null;
       const years = cost > 0 ? okNum(calc.paybackYearsAtPace({ cost, saved: last.saved, days: last.day })) : null;
-      return { saved: last.saved, days: last.day, promised, gapPct: promised ? (last.saved / promised - 1) * 100 : null, years, promisedYears: yrs > 0 ? yrs : null, cost: cost > 0 ? cost : null };
+      // Before about a year of bills the pace leans on whichever season the bills cover (the sheet waits a year too).
+      const early = last.day < PAYBACK_MIN_DAYS;
+      const months = this.bills.map((b) => this.result(b)).filter((r) => r?.savings != null).map((r) => r.midMonth);
+      const dry = months.filter(calc.isDrySeason).length;
+      const season = dry === 0 ? 'wet' : dry === months.length ? 'dry' : 'mixed';
+      return { saved: last.saved, days: last.day, promised, gapPct: promised ? (last.saved / promised - 1) * 100 : null, years, promisedYears: yrs > 0 ? yrs : null, cost: cost > 0 ? cost : null, early, season };
+    },
+    // Tag on the pace tiles while early, worded for the season the bills actually cover.
+    get earlyTag() {
+      const t = this.paybackStats; if (!t?.early) return '';
+      return { wet: 'Early: rainy months read low', dry: 'Early: sunny months read high', mixed: 'Early: under a year of bills' }[t.season];
     },
     get paybackText() {
       const t = this.paybackStats; if (!t) return '';
+      // Early on, the tiles carry the numbers; this line only says why they will move.
+      if (t.early) return `Based on ${this.fmt(t.days, 0)} days of bills. Savings rise and fall with the seasons, so the pace and the payback year will move until you have about a year of bills.`;
       let out = `Over ${this.fmt(t.days, 0)} days you saved ₱${this.fmt(t.saved, 0)}.`;
       if (t.promised !== null) out += ` At the promised pace you would have saved ₱${this.fmt(t.promised, 0)}, so you are ${this.fmt(Math.abs(t.gapPct), 0)}% ${t.gapPct >= 0 ? 'ahead' : 'behind'}.`;
       if (t.years !== null) out += ` At your pace so far the system pays itself back in about ${this.fmt(t.years, 1)} years${t.promisedYears ? `, against ${this.fmt(t.promisedYears, 1)} promised` : ''}.`;
-      return out + ' Your bills may cover only some months, so treat this as a rough guide until you have a full year.';
+      return out;
     },
 
     // Chart model: pixel positions in a 340 x 200 box, clean axis ticks, one point per bill.

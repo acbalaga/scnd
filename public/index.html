@@ -357,7 +357,7 @@
                    metering" and SolarPro Install "reading the net-metered Meralco bill". No rates are hard-coded:
                    every peso figure below is read from the user's own bill. -->
               <details class="sec" x-show="decode(b) && !decode(b).error">
-                <summary>Decode this bill <span class="teaser" x-text="decode(b).flags.includes('total_below_charges') ? 'Check the total' : 'Why it is not zero'"></span></summary>
+                <summary>Decode this bill <span class="teaser" x-text="decode(b)?.flags?.includes('total_below_charges') ? 'Check the total' : 'Why it is not zero'"></span></summary>
                 <div><template x-if="decode(b) && !decode(b).error"><div>
                   <ol class="steps-list">
                     <li><strong>Binili mo sa grid.</strong> Bumili ka ng <b x-text="fmt(num(b.importKwh), 0) + ' kWh'"></b>. Ang mga singil na tumataas kasabay ng kWh ay <b x-text="'₱' + fmt(num(b.varCharges), 2)"></b>. Average iyon na <b x-text="'₱' + fmt(decode(b).rImport, 2) + ' bawat kWh'"></b>.</li>
@@ -419,8 +419,8 @@
           </div>
           <div class="stats" x-show="paybackStats">
             <div class="stat"><small>Saved so far</small><b x-text="'₱' + fmt(paybackStats.saved, 0)"></b><em x-text="'over ' + fmt(paybackStats.days, 0) + ' days'"></em></div>
-            <div class="stat" x-show="paybackStats.promised !== null"><small>Promised pace</small><b x-text="'₱' + fmt(paybackStats.promised, 0)"></b><em x-text="fmt(Math.abs(paybackStats.gapPct), 0) + '% ' + (paybackStats.gapPct >= 0 ? 'ahead' : 'behind')"></em></div>
-            <div class="stat" x-show="paybackStats.years !== null"><small>Payback at your pace</small><b x-text="fmt(paybackStats.years, 1) + ' yr'"></b><em x-text="paybackStats.promisedYears ? 'promised ' + fmt(paybackStats.promisedYears, 1) + ' yr' : 'rough guide'"></em></div>
+            <div class="stat" x-show="paybackStats.promised !== null"><small>Promised pace</small><span class="early-tag" x-show="earlyTag" x-text="earlyTag"></span><b x-text="'₱' + fmt(paybackStats.promised, 0)"></b><em x-text="fmt(Math.abs(paybackStats.gapPct), 0) + '% ' + (paybackStats.gapPct >= 0 ? 'ahead' : 'behind')"></em></div>
+            <div class="stat" x-show="paybackStats.years !== null"><small>Payback at your pace</small><span class="early-tag" x-show="earlyTag" x-text="earlyTag"></span><b x-text="fmt(paybackStats.years, 1) + ' yr'"></b><em x-text="paybackStats.promisedYears ? 'promised ' + fmt(paybackStats.promisedYears, 1) + ' yr' : 'rough guide'"></em></div>
           </div>
           <div class="legend" x-show="promisedPerDay">
             <span><i class="key" style="border-color:var(--c-save)"></i>Your savings</span>
