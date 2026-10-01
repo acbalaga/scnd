@@ -14,9 +14,10 @@ export const PAYBACK_MIN_DAYS = 360;
 const f0 = (v) => Math.round(v).toLocaleString('en-PH');
 const f2 = (v) => v.toFixed(2);
 const peso = (v) => 'PHP ' + Math.round(v).toLocaleString('en-PH');   // the sheet's font has no peso sign
-const span = (b) => `${b.start} to ${b.end}`;
+// The app passes `period` in the same "1 Sep to 1 Oct 2026" style as the screen; raw dates are the fallback.
+const span = (b) => b.period ?? `${b.start} to ${b.end}`;
 
-// bills: oldest first, each { start, end, pr, band, redRaised, actualKwh, expectedKwh, weather, flags, savings }
+// bills: oldest first, each { start, end, period?, pr, band, redRaised, actualKwh, expectedKwh, weather, flags, savings }
 //   weather: null, or { wi, uncertain, inferred, source, split: { weather, system, total } }
 //   hybridFlags: optional array, e.g. ['grid_charging']
 // payback: null, or { saved, promised, days } (pesos to date, days since the first reading date)

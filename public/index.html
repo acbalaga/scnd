@@ -184,7 +184,7 @@
       <template x-for="(b, i) in bills" :key="b.id">
         <article class="card">
           <div class="bill-head">
-            <div class="bill-title"><h3 x-text="billTitle(b, i)"></h3><span class="chip" :class="chipClass(b)" x-text="chipText(b)"></span></div>
+            <div class="bill-title"><h3 tabindex="-1" x-text="billTitle(b, i)"></h3><span class="chip" :class="chipClass(b)" x-text="chipText(b)"></span></div>
             <button type="button" class="link" @click="askRemove(b, $el)" x-show="bills.length > 1 && removing !== b.id">Remove</button>
           </div>
           <div class="confirm" role="group" aria-label="Confirm remove" x-show="removing === b.id">

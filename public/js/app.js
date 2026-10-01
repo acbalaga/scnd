@@ -209,7 +209,7 @@ document.addEventListener('alpine:init', () => {
       const f = findings({
         payback, degradation: this.degradationResult, efficiency: this.efficiencyTrend,
         bills: rows.map(({ b, r }) => ({
-          start: b.start, end: b.end, pr: r.pr, band: r.band, redRaised: this.redRaised(b), actualKwh: num(b.inverterKwh),
+          start: b.start, end: b.end, period: this.fmtRange(b.start, b.end), pr: r.pr, band: r.band, redRaised: this.redRaised(b), actualKwh: num(b.inverterKwh),
           expectedKwh: r.expectedKwh, weather: r.weather, flags: r.flags, savings: r.savings, hybridFlags: r.hybrid?.flags ?? [],
         })),
       });
@@ -352,7 +352,19 @@ document.addEventListener('alpine:init', () => {
       this.savedSnap = this.snap();   // a fresh start has nothing to lose
     },
 
-    addBill() { this.bills.forEach((x) => { x.open = false; }); this.bills.push(newBill()); this.$nextTick(() => this.scrollTo('bills-end')); },
+    // The new bill lands at the bottom of the list: bring it into view and put the cursor in its first date, so the
+    // owner sees it appear (scrolling to the end of the list left it above the screen on phones).
+    addBill() {
+      this.bills.forEach((x) => { x.open = false; });
+      this.bills.push(newBill());
+      this.$nextTick(() => this.focusBill(this.bills.length - 1, 'input[type=date]'));
+    },
+    focusBill(i, sel) {
+      const a = document.querySelectorAll('#bills article.card')[i]; if (!a) return;
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      a.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+      a.querySelector(sel)?.focus({ preventScroll: true });
+    },
     // A bill with numbers in it asks first (there is no undo); an empty one goes at once.
     removing: null,
     billHasData(b) { return BILL_FIELDS.some((k) => String(b[k] ?? '').trim() !== ''); },
@@ -361,7 +373,12 @@ document.addEventListener('alpine:init', () => {
       this.removing = b.id;
       this.$nextTick(() => el.closest('article')?.querySelector('.confirm .keep')?.focus());
     },
-    removeBill(id) { this.bills = this.bills.filter((b) => b.id !== id); this.removing = null; },
+    // After a remove, focus the bill that took its place (or the new last one), not the top of the page.
+    removeBill(id) {
+      const k = this.bills.findIndex((b) => b.id === id);
+      this.bills = this.bills.filter((b) => b.id !== id); this.removing = null;
+      this.$nextTick(() => this.focusBill(Math.min(k, this.bills.length - 1), '.bill-title h3'));
+    },
     // Index of the first bill with an answer: the PR definition is shown there only, not under every dial.
     get firstAnswered() { return this.bills.findIndex((b) => this.result(b)?.pr != null); },
 
