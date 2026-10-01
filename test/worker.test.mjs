@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import worker from '../src/worker.js';
+import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import worker, { CSP, THEME_SCRIPT_HASH } from '../src/worker.js';
 
 const asset = new Response('static file', { status: 200 });
 const req = (ip) => new Request('https://scnd.example/', { headers: ip ? { 'cf-connecting-ip': ip } : {} });
@@ -28,4 +30,24 @@ test('worker edge: fails open when the limiter throws, is missing, or there is n
   let called = false;
   assert.equal((await worker.fetch(req(null), envWith(async () => { called = true; return { success: false }; }))).status, 200);
   assert.equal(called, false);
+});
+
+test('worker golden: every response carries the CSP and security headers, including 429s', async () => {
+  for (const limit of [async () => ({ success: true }), async () => ({ success: false })]) {
+    const res = await worker.fetch(req('203.0.113.7'), envWith(limit));
+    assert.equal(res.headers.get('content-security-policy'), CSP);
+    assert.equal(res.headers.get('referrer-policy'), 'no-referrer');
+    assert.equal(res.headers.get('x-content-type-options'), 'nosniff');
+    assert.match(res.headers.get('permissions-policy'), /geolocation=\(self\)/);
+  }
+});
+test('worker: CSP allows only this origin plus the two irradiance hosts for connections', () => {
+  assert.match(CSP, /connect-src 'self' https:\/\/satellite-api\.open-meteo\.com https:\/\/power\.larc\.nasa\.gov(;|$)/);
+  assert.match(CSP, /frame-ancestors 'none'/);
+});
+test('worker: THEME_SCRIPT_HASH matches the inline script in index.html', () => {
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
+  const inline = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+  assert.equal(inline.length, 1);
+  assert.equal(`sha256-${createHash('sha256').update(inline[0][1]).digest('base64')}`, THEME_SCRIPT_HASH);
 });
