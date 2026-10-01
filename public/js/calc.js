@@ -147,6 +147,20 @@ export function isConsecutive(prev, next) {
   return Math.abs(t1 - t0) / 86400000 <= CONSECUTIVE_GAP_DAYS;
 }
 
+// Gaps between bills: oldest first, a gap wherever the next bill starts more than CONSECUTIVE_GAP_DAYS after the
+// previous one ends. Bills without both dates are skipped. Returns [{ from, to, days }] (from = previous end,
+// to = next start). Red-flag and payback logic do not change across a gap; the UI only says it is there.
+export function billGaps(bills) {
+  const dated = bills.filter((b) => Number.isFinite(Date.parse(b?.start)) && Number.isFinite(Date.parse(b?.end)))
+    .sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
+  const gaps = [];
+  for (let k = 1; k < dated.length; k++) {
+    const days = (Date.parse(dated[k].start) - Date.parse(dated[k - 1].end)) / 86400000;
+    if (days > CONSECUTIVE_GAP_DAYS) gaps.push({ from: dated[k - 1].end, to: dated[k].start, days });
+  }
+  return gaps;
+}
+
 // Days two bill periods share. Periods run start (included) to end (excluded), so a bill that starts on the
 // previous one's end date shares 0 days.
 export function overlapDays(a, b) {
@@ -254,10 +268,17 @@ export function importRate({ variableCharges, i }) {
   return variableCharges / i;
 }
 
-// Savings = S x r_import + X x r_export.
-export function savings({ s, x, rImport, rExport }) {
+// Savings = S x r_import + export credit, where the credit is X x r_export capped at creditCap (the bill's variable
+// charges). Credit above the variable charges does not lower this bill, and how it carries over is not verified
+// (see billDecode), so it is not counted. Decided by Fred, 1 Oct 2026. Without creditCap the credit is uncapped.
+export function savings({ s, x, rImport, rExport, creditCap }) {
   if (![s, x, rImport, rExport].every(Number.isFinite) || s < 0 || x < 0) return err('bad_input', 'Need S, X >= 0 and numeric rates.');
-  return s * rImport + x * rExport;
+  const credit = x * rExport, cap = Number.isFinite(creditCap) && creditCap >= 0 ? creditCap : Infinity;
+  return s * rImport + Math.min(credit, cap);
+}
+// Export credit left out of savings by the cap (0 when the credit fits inside the variable charges).
+export function uncountedCredit({ x, rExport, creditCap }) {
+  return Number.isFinite(creditCap) && [x, rExport].every(Number.isFinite) ? Math.max(x * rExport - creditCap, 0) : 0;
 }
 
 // ---------- F2: bill decoder ----------

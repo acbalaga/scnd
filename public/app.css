@@ -108,7 +108,7 @@ input[type=checkbox] { -webkit-appearance:auto; appearance:auto; flex:none; widt
 label.check { flex-direction:row; align-items:flex-start; gap:12px; font-weight:400; font-size:15px; line-height:1.4; }
 button { font:600 16px/1.2 var(--body); min-height:46px; padding:12px 16px; border-radius:10px; border:1.5px solid var(--edge); background:var(--card); color:var(--ink); cursor:pointer; box-shadow:0 2px 0 var(--shadow); }
 button:active { transform:translateY(2px); box-shadow:none; }
-button:disabled { opacity:.55; cursor:default; }
+button:disabled, button[aria-disabled="true"] { opacity:.55; cursor:default; }
 button.primary { background:var(--sun); border-color:var(--btn-edge); color:var(--sun-ink); font-weight:700; box-shadow:0 3px 0 var(--btn-edge); }
 button.primary:active { transform:translateY(3px); box-shadow:none; }
 button.link { display:inline-flex; align-items:center; border:0; padding:0 8px; min-height:44px; color:var(--link); background:none; box-shadow:none; font-size:16px; } button.link:active { transform:none; }

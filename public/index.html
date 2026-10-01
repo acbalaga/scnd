@@ -256,7 +256,9 @@
           </details>
 
           <!-- Empty state: say exactly what is missing -->
+          <div class="flag" x-show="gapBefore(b)" x-text="gapBefore(b) ? 'No bill for ' + fmtRange(gapBefore(b).from, gapBefore(b).to) + '. Add it if you have it: low months either side of a gap are not counted as two in a row, and savings to date leave out the missing days.' : ''"></div>
           <p class="nudge" x-show="needsPR(b).length" x-text="'To see your answer, add ' + needsPR(b).join(' and ') + '.'"></p>
+          <p class="nudge" x-show="needsSavings(b).length" x-text="'Your PR is below. To see what solar saved you, also add ' + listAnd(needsSavings(b)) + '.'"></p>
           <template x-if="result(b)"><div>
             <template x-for="e in result(b).errors" :key="e"><p class="err" x-text="e"></p></template>
           </div></template>
@@ -274,9 +276,10 @@
                 <div class="raise" x-show="redRaised(b)" role="group" :aria-label="'Two low months in a row, ' + billTitle(b, i)">
                   <p class="raise-label"><i aria-hidden="true"></i>Two low months in a row</p>
                   <p>Questions, not a verdict: has anything shaded the panels, are they dirty, and what does the inverter's fault log say?<span x-show="!result(b).weather && weather.status !== 'failed'"> A cloudy stretch can do this too, so check the weather first.</span></p>
-                  <p class="help" x-show="!result(b).weather && weather.status === 'failed'">The weather check did not get through. Try again, or go ahead with the findings sheet, which shows PR against a typical year's sun.</p>
+                  <!-- Always rendered so screen readers announce the change; says what is happening and, on failure, why. -->
+                  <p class="help" role="status" x-show="!result(b).weather" x-text="weatherStatusLine"></p>
                   <div class="row">
-                    <button type="button" x-show="!result(b).weather" @click="checkWeather()" :disabled="weather.status === 'loading'" x-text="weather.status === 'loading' ? 'Checking...' : (weather.status === 'failed' ? 'Try the weather again' : 'Check the weather first')"></button>
+                    <button type="button" x-show="!result(b).weather" @click="checkWeather()" :aria-disabled="weather.status === 'loading'" x-text="weather.status === 'loading' ? 'Checking...' : (weather.status === 'failed' ? 'Try the weather again' : 'Check the weather first')"></button>
                     <button type="button" :class="result(b).weather ? '' : 'link'" @click="showSheet = true; $nextTick(() => scrollTo('findings'))">Open findings sheet</button>
                   </div>
                 </div>
@@ -332,7 +335,8 @@
                   <dt>Your buying rate</dt><dd x-text="'₱' + fmt(result(b).rImport, 2) + '/kWh'"></dd>
                   <dt>Saved this bill</dt><dd x-text="'₱' + fmt(result(b).savings, 0)"></dd>
                   <dt>Moving 1 kWh from night to noon is worth</dt><dd x-text="'₱' + fmt(result(b).shift, 2)"></dd>
-                </dl></template></div>
+                </dl></template>
+                <p class="help" x-show="result(b).uncounted > 0" x-text="'Export credit is counted only up to your variable charges, because that is all it can take off this bill. The other ₱' + fmt(result(b).uncounted, 0) + ' is not counted here. Ask your utility whether it carries over.'"></p></div>
               </details>
 
               <!-- Battery (F9) -->
@@ -401,7 +405,7 @@
         <h3>Was it the weather?</h3>
         <p class="help">A low month can be cloudy weather, not a fault. This compares each bill's dates with the sun that fell on your roof, from a satellite (Himawari, through Open-Meteo) and NASA POWER. It sends only your location, rounded to 0.1° (about 11 km), and a date range to those two services. Nothing else leaves your browser.</p>
         <div class="row" style="margin-top:10px">
-          <button type="button" @click="checkWeather()" :disabled="weather.status === 'loading' || !canCheckWeather" x-text="weather.status === 'loading' ? 'Checking...' : (weather.status === 'done' ? 'Check again' : (weather.status === 'failed' ? 'Try again' : 'Check the weather'))"></button>
+          <button type="button" @click="checkWeather()" :disabled="!canCheckWeather" :aria-disabled="weather.status === 'loading'" x-text="weather.status === 'loading' ? 'Checking...' : (weather.status === 'done' ? 'Check again' : (weather.status === 'failed' ? 'Try again' : 'Check the weather'))"></button>
         </div>
         <p class="help" x-show="!canCheckWeather">Add a bill's dates and solar kWh first.</p>
         <div role="alert">

@@ -133,12 +133,15 @@ document.addEventListener('alpine:init', () => {
       // Sun data reads low in very clear dry months (README "Spike 2 result", 29 Sep 2026): show a caveat.
       this.lowDiffuse = isLowDiffuse(this.climate);
       this.setupError = '';
+      // A hybrid needs battery numbers on every bill: open the bills that lack them so the owner sees the fields.
+      if (s.hybrid) this.bills.forEach((b) => { if (!Number.isFinite(num(b.chargeKwh)) || !Number.isFinite(num(b.dischargeKwh))) b.open = true; });
       this.ready = true;
       this.setupOpen = false;
     },
 
     async checkWeather() {
       const w = this.weather;
+      if (w.status === 'loading') return;   // buttons stay focusable while loading (aria-disabled), so guard here
       w.status = 'loading'; w.errors = [];
       this.weatherAt = { lat: this.s.lat, lon: this.s.lon };
       const [sat, nasa] = await Promise.allSettled([fetchSatellite(this.s.lat, this.s.lon), fetchNasa(this.s.lat, this.s.lon)]);
@@ -243,7 +246,8 @@ document.addEventListener('alpine:init', () => {
         shown: Math.min(rows.length, 5), total: rows.length, latest,
         latestWording: latest ? REPORT_WORDING[latest.band] : '',
         savedTotal: cum.length ? 'PHP ' + this.fmt(cum[cum.length - 1].saved, 0) : null,
-        sources: [...sources, ...f.uncertainty],
+        sources: [...sources, ...f.uncertainty,
+          ...(this.gaps.length ? [`Bills are missing for ${this.gaps.map((g) => this.fmtRange(g.from, g.to)).join(', ')}. Two low months either side of a gap are not counted as in a row, and savings to date leave out the missing ${this.gaps.length === 1 ? 'period' : 'periods'}, so the payback pace reads low.`] : [])],
       };
     },
 
@@ -287,6 +291,14 @@ document.addEventListener('alpine:init', () => {
       if (!Number.isFinite(num(b.inverterKwh))) need.push(this.s.hybrid ? 'PV yield' : 'solar produced');
       return need;
     },
+    // Once PR shows: what savings still need. Says the bill numbers are only for savings, and catches the battery
+    // numbers a hybrid needs (ticking "battery" after entering bills used to drop savings with no word why).
+    needsSavings(b) {
+      const r = this.result(b); if (!r || r.pr === null || r.savings !== null) return [];
+      const fields = [['importKwh', 'bought from the grid'], ['exportKwh', 'sent to the grid'], ['genRate', 'generation charge'], ['varCharges', 'variable charges'],
+        ...(this.s.hybrid ? [['chargeKwh', 'battery charged'], ['dischargeKwh', 'battery discharged']] : [])];
+      return fields.filter(([k]) => !Number.isFinite(num(b[k]))).map(([, label]) => label);
+    },
     chipClass(b) { return this.result(b)?.band ?? 'none'; },
     chipText(b) { const r = this.result(b); return r?.band ? `PR ${this.fmt(r.pr, 2)}, ${BAND_SHORT[r.band]}` : 'Not enough yet'; },
     headline(b) {
@@ -323,6 +335,14 @@ document.addEventListener('alpine:init', () => {
         + `<text class="lcd-ghost" x="152" y="135" text-anchor="end">8.88</text><text class="lcd-num" x="152" y="135" text-anchor="end">${pr}</text></svg>`;
     },
     weatherTeaser(b) { const w = this.result(b)?.weather; return w && !w.missing ? `Index ${this.fmt(w.wi, 2)}` : (this.weather.status === 'done' ? 'No data' : (this.weather.status === 'failed' ? "Couldn't check" : 'Not checked')); },
+    // Status line inside the two-low-months block: what the weather check is doing, and why it failed.
+    get weatherStatusLine() {
+      const w = this.weather;
+      if (w.status === 'loading') return 'Checking the weather for these dates.';
+      if (w.status !== 'failed') return '';
+      const unreachable = w.errors.length && w.errors.every((e) => e.endsWith('could not be reached.'));
+      return `The weather check did not get through: ${unreachable ? 'neither weather service could be reached. Check your connection and try again' : 'the weather services gave no usable data for these dates. Try again later'}, or go ahead with the findings sheet, which shows PR against a typical year's sun.`;
+    },
     get canCheckWeather() { return this.bills.some((b) => this.result(b)?.pr != null); },
 
     // ---- Example: a made-up system with two bills, so an owner sees a full result in one tap ----
@@ -412,7 +432,9 @@ document.addEventListener('alpine:init', () => {
         const rExport = num(b.genRate);
         if (!calc.isError(rImport) && Number.isFinite(rExport)) {
           out.rImport = rImport;
-          out.savings = calc.savings({ s: out.split.selfConsumed, x, rImport, rExport });
+          const creditCap = num(b.varCharges);
+          out.savings = calc.savings({ s: out.split.selfConsumed, x, rImport, rExport, creditCap });
+          out.uncounted = calc.uncountedCredit({ x, rExport, creditCap });
           out.shift = calc.loadShiftValue({ rImport, rExport });
         }
       }
@@ -475,6 +497,10 @@ document.addEventListener('alpine:init', () => {
       return { earned, bills: vals.length, cost: cost > 0 ? cost : null };
     },
 
+    // A missing month before this bill (calc.billGaps): shown on the later bill and on the sheet.
+    get gaps() { return calc.billGaps(this.bills); },
+    gapBefore(b) { return this.gaps.find((g) => g.to === b.start) ?? null; },
+
     // Two consecutive red bills, oldest to newest, ending at this bill.
     redRaised(b) {
       const ordered = this.bills.filter((x) => x.start).sort((a, c) => (a.start < c.start ? -1 : 1));
@@ -484,6 +510,7 @@ document.addEventListener('alpine:init', () => {
     },
 
     num,
+    listAnd: (xs) => (xs.length < 2 ? xs.join('') : xs.slice(0, -1).join(', ') + ' and ' + xs[xs.length - 1]),
     decode(b) {
       const v = { importKwh: num(b.importKwh), exportKwh: num(b.exportKwh), genRate: num(b.genRate), varCharges: num(b.varCharges), total: num(b.total) };
       return Object.values(v).every(Number.isFinite) ? calc.billDecode(v) : null;
