@@ -112,10 +112,11 @@
       <p class="err" role="alert" x-show="setupError" x-text="setupError"></p>
       <div class="grid">
         <label class="wide">Where is it?
-          <select x-model="place" @change="pickPlace()" x-ref="fPlace" :class="{ empty: !place }">
+          <select x-model="place" @change="pickPlace(); delete fieldErr.place" x-ref="fPlace" :aria-invalid="!!fieldErr.place" aria-describedby="e_place" :class="{ empty: !place }">
             <option value="">Pick the nearest city</option>
             <template x-for="c in cities" :key="c.name"><option :value="c.name" x-text="c.name"></option></template>
           </select>
+          <span class="err" id="e_place" x-show="fieldErr.place" x-text="fieldErr.place"></span>
         </label>
         <div class="wide"><button type="button" class="link" style="padding-left:0" @click="useMyLocation()">or use my phone's location</button></div>
         <div class="wide">
@@ -129,15 +130,18 @@
         </div>
         <label>Panel size (kWp)
           <span class="hint">On your quotation. Not sure? Panel watts times panel count: six 550 W panels is 3.3 kWp.</span>
-          <input type="number" inputmode="decimal" step="0.01" x-model.number="s.kWp" x-ref="fKwp" placeholder="e.g. 5.5">
+          <input type="number" inputmode="decimal" step="0.01" x-model.number="s.kWp" x-ref="fKwp" :aria-invalid="!!fieldErr.kWp" aria-describedby="e_kWp" @input="delete fieldErr.kWp" placeholder="e.g. 5.5">
+        <span class="err" id="e_kWp" x-show="fieldErr.kWp" x-text="fieldErr.kWp"></span>
         </label>
         <label>Inverter size (kW)
           <span class="hint">On the inverter label.</span>
-          <input type="number" inputmode="decimal" step="0.1" x-model.number="s.acKw" x-ref="fAc" placeholder="e.g. 5">
+          <input type="number" inputmode="decimal" step="0.1" x-model.number="s.acKw" x-ref="fAc" :aria-invalid="!!fieldErr.acKw" aria-describedby="e_acKw" @input="delete fieldErr.acKw" placeholder="e.g. 5">
+        <span class="err" id="e_acKw" x-show="fieldErr.acKw" x-text="fieldErr.acKw"></span>
         </label>
         <label>Roof tilt (degrees)
           <span class="hint">Most PH roofs are 10 to 15°. Not sure? Leave it at 10.</span>
-          <input type="number" inputmode="decimal" step="1" x-model.number="s.tilt" x-ref="fTilt">
+          <input type="number" inputmode="decimal" step="1" x-model.number="s.tilt" x-ref="fTilt" :aria-invalid="!!fieldErr.tilt" aria-describedby="e_tilt" @input="delete fieldErr.tilt">
+        <span class="err" id="e_tilt" x-show="fieldErr.tilt" x-text="fieldErr.tilt"></span>
         </label>
         <label>Panels face
           <span class="hint">Direction they point.</span>
@@ -147,7 +151,7 @@
         </label>
         <label class="check wide"><input type="checkbox" x-model="s.hybrid"> <span>I have a battery (hybrid). Use my app's PV yield, not the inverter's AC output.</span></label>
         <label class="check wide"><input type="checkbox" x-model="s.netMetering"> <span>My utility has already switched me to net metering (my meter can run backward).</span></label>
-        <p class="help wide" x-show="s.hybrid" style="margin-top:-4px">Battery set to zero export (nothing sent to the grid)? Leave this unticked.</p>
+        <p class="help wide" x-show="s.hybrid" style="margin-top:-4px">Battery set to zero export (nothing sent to the grid)? Leave net metering unticked.</p>
         <div class="wide">
           <details class="optional"><summary>More details (optional)</summary>
             <div class="grid" style="margin-top:8px">
@@ -187,8 +191,8 @@
           <div class="bill-head">
             <div class="bill-title"><h3 tabindex="-1" x-text="billTitle(b, i)"></h3><span class="chip" :class="chipClass(b)" x-text="chipText(b)"></span></div>
             <span class="row" style="margin:0">
-              <button type="button" class="link" x-show="foldable(i)" @click="b.expanded = !b.expanded" :aria-expanded="!folded(b, i)" x-text="folded(b, i) ? 'Show details' : 'Hide details'"></button>
-              <button type="button" class="link" @click="askRemove(b, $el)" x-show="bills.length > 1 && removing !== b.id">Remove</button>
+              <button type="button" class="link" x-show="foldable(i)" @click="b.expanded = !b.expanded" :aria-label="(folded(b, i) ? 'Show details for ' : 'Hide details for ') + billTitle(b, i)" :aria-expanded="!folded(b, i)" x-text="folded(b, i) ? 'Show details' : 'Hide details'"></button>
+              <button type="button" class="link" @click="askRemove(b, $el)" :aria-label="'Remove ' + billTitle(b, i)" x-show="bills.length > 1 && removing !== b.id">Remove</button>
             </span>
           </div>
           <p class="sub" style="margin:0 0 4px" x-show="folded(b, i)" x-text="headline(b)"></p>
@@ -206,7 +210,7 @@
               <div class="grid">
                 <label>Reading date, start<input type="date" x-model="b.start"></label>
                 <label>Reading date, end<input type="date" x-model="b.end"></label>
-                <div class="wide help-row"><details class="optional"><summary>Ano ito?</summary>
+                <div class="wide help-row"><details class="optional"><summary>Ano ito? Reading dates</summary>
                   <p class="help">Nasa bill mo ang "Previous reading date" at "Present reading date". Hindi ito buong buwan, kaya ito ang ginagamit natin.</p></details></div>
                 <!-- Optional, so it stays folded and out of the path to the answer (dates, then solar kWh). Opens when it holds a value. -->
                 <div class="wide help-row"><details class="optional" x-init="$el.open = num(b.outageHours) > 0"><summary>Had brownouts? Add outage hours</summary>
@@ -233,7 +237,7 @@
                       <input type="number" min="0" step="any" inputmode="decimal" x-model.number="b.homeLoadKwh"></label>
                   </div>
                 </template>
-                <div class="wide help-row"><details class="optional"><summary>Ano ito?</summary>
+                <div class="wide help-row"><details class="optional"><summary>Ano ito? Solar from the app</summary>
                   <p class="help">Sa inverter app mo, hanapin ang total generation. Idagdag ang daily totals mula sa start hanggang end reading date ng bill.</p>
                   <p class="help" x-show="s.hybrid">Sa hybrid inverter app, hanapin ang "Battery charge" at "Battery discharge" para sa parehong petsa ng bill. Idagdag ang daily totals. Ang "Home load" ay lalabas lang kung may CT meter ang inverter mo.</p></details></div>
               </div>
@@ -244,7 +248,7 @@
               <div class="grid">
                 <label>Bought from the grid (kWh)<input type="number" min="0" step="any" inputmode="decimal" x-model.number="b.importKwh"></label>
                 <label>Sent to the grid (kWh)<input type="number" min="0" step="any" inputmode="decimal" x-model.number="b.exportKwh"></label>
-                <div class="wide help-row"><details class="optional"><summary>Ano ito?</summary>
+                <div class="wide help-row"><details class="optional"><summary>Ano ito? Bought and sent</summary>
                   <p class="help">Sa net metering bill, may dalawang linya: "Delivered" (bili mo sa grid) at "Received" (na-export mo). Kung 0 ang export, ilagay ang 0.</p></details></div>
 
                 <label>Generation charge (₱ per kWh)
@@ -253,10 +257,10 @@
                 <label>Variable charges (₱)
                   <span class="hint">Bill lines that grow with kWh, before the export credit.</span>
                   <input type="number" min="0" inputmode="decimal" step="0.01" x-model.number="b.varCharges"></label>
-                <div class="wide help-row"><details class="optional"><summary>Ano ito?</summary>
+                <div class="wide help-row"><details class="optional"><summary>Ano ito? Rates and charges</summary>
                   <p class="help">Generation charge: presyo bawat kWh sa "Generation" line ng bill. Variable charges: lahat ng singil na tumataas kapag mas marami kang kuryenteng ginamit (generation, transmission, distribution, buwis). Huwag isama ang fixed charges tulad ng metering at supply. Kung hindi sigurado, ilagay ang subtotal bago ang export credit.</p></details></div>
 
-                <label class="wide">Total amount due (₱)<input type="number" min="0" inputmode="decimal" step="0.01" x-model.number="b.total"></label>
+                <label class="wide">Total amount due (₱, optional)<input type="number" min="0" inputmode="decimal" step="0.01" x-model.number="b.total"></label>
               </div>
             </fieldset>
           </details>
@@ -406,7 +410,9 @@
         </div>
         <p class="help" x-show="!canCheckWeather">Add a bill's dates and solar kWh first.</p>
         <div role="alert">
-          <template x-for="e in weather.errors" :key="e"><p class="err" x-text="e"></p></template>
+          <details class="optional" x-show="weather.errors.length"><summary>What went wrong</summary>
+            <template x-for="e in weather.errors" :key="e"><p class="err" x-text="e"></p></template>
+          </details>
           <p class="err" x-show="weather.status === 'failed'">Neither source gave usable data, so nothing changed above. Check your connection and tap Try again. Your PR still stands, measured against a typical year's sun.</p>
         </div>
       </section>
@@ -440,7 +446,7 @@
             <span><i class="key" style="border-color:var(--c-save)"></i>Your savings</span>
             <span><i class="key" style="border-color:var(--c-promise)"></i>Promised pace</span>
           </div>
-          <div class="chartbox" tabindex="0" @pointermove="chartMove($event)" @pointerdown="chartMove($event)" @pointerleave="chartHover = null" @focus="chartKey(0)" @blur="chartHover = null" @keydown.left.prevent="chartKey(-1)" @keydown.right.prevent="chartKey(1)">
+          <div class="chartbox" tabindex="0" role="group" aria-label="Savings over time. Use the left and right arrow keys to read each bill." @pointermove="chartMove($event)" @pointerdown="chartMove($event)" @pointerleave="chartHover = null" @focus="chartKey(0)" @blur="chartHover = null" @keydown.left.prevent="chartKey(-1)" @keydown.right.prevent="chartKey(1)">
             <div x-html="chart"></div>
             <div class="tip" x-show="tip" :style="tip ? tip.style : {}">
               <div class="d" x-text="tip ? tip.date : ''"></div>

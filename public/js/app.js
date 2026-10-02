@@ -80,6 +80,7 @@ document.addEventListener('alpine:init', () => {
     // Actual-month weather, fetched only when the user clicks. status: idle | loading | done | failed (no source usable).
     fileMessage: '',
     setupOpen: true,
+    fieldErr: {},
     example: false,
     savedOnce: false,
     saveNudgeHidden: false,
@@ -110,10 +111,11 @@ document.addEventListener('alpine:init', () => {
       const s = this.s, wasReady = this.ready;
       const lat = num(s.lat), lon = num(s.lon), kWp = num(s.kWp), acKw = num(s.acKw), tilt = num(s.tilt);
       const missing = [];
-      if (!Number.isFinite(lat) || !Number.isFinite(lon)) missing.push('location');
-      if (!Number.isFinite(kWp) || kWp <= 0) missing.push('panel size (kWp)');
-      if (!Number.isFinite(acKw) || acKw <= 0) missing.push('inverter size (kW)');
-      if (!Number.isFinite(tilt) || tilt < 0 || tilt > 90) missing.push('roof tilt (0 to 90)');
+      this.fieldErr = {};
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) { missing.push('location'); this.fieldErr.place = 'Pick the nearest city, or enter coordinates under it.'; }
+      if (!Number.isFinite(kWp) || kWp <= 0) { missing.push('panel size (kWp)'); this.fieldErr.kWp = 'Needed. A number above 0.'; }
+      if (!Number.isFinite(acKw) || acKw <= 0) { missing.push('inverter size (kW)'); this.fieldErr.acKw = 'Needed. A number above 0.'; }
+      if (!Number.isFinite(tilt) || tilt < 0 || tilt > 90) { missing.push('roof tilt (0 to 90)'); this.fieldErr.tilt = 'Between 0 and 90. Not sure? Use 10.'; }
       if (missing.length) {
         this.setupError = `Please fill in: ${missing.join(', ')}.`;
         // Take the owner to the first field that needs them (the error line alone can sit below the fold).
@@ -390,7 +392,12 @@ document.addEventListener('alpine:init', () => {
     // owner sees it appear (scrolling to the end of the list left it above the screen on phones).
     addBill() {
       this.bills.forEach((x) => { x.open = false; });
-      this.bills.push(newBill());
+      // Dates run on from the last bill and the generation charge usually repeats: prefill both, owner can change them.
+      const prev = this.bills[this.bills.length - 1], nb = newBill();
+      if (prev?.end) nb.start = prev.end;
+      if (String(prev?.genRate ?? '').trim() !== '') nb.genRate = prev.genRate;
+      nb.prefill = { start: nb.start, genRate: nb.genRate };
+      this.bills.push(nb);
       this.$nextTick(() => this.focusBill(this.bills.length - 1, 'input[type=date]'));
     },
     focusBill(i, sel) {
@@ -401,7 +408,7 @@ document.addEventListener('alpine:init', () => {
     },
     // A bill with numbers in it asks first (there is no undo); an empty one goes at once.
     removing: null,
-    billHasData(b) { return BILL_FIELDS.some((k) => String(b[k] ?? '').trim() !== ''); },
+    billHasData(b) { return BILL_FIELDS.some((k) => String(b[k] ?? '').trim() !== '' && String(b[k]) !== String(b.prefill?.[k] ?? '')); },
     askRemove(b, el) {
       if (!this.billHasData(b)) return this.removeBill(b.id);
       this.removing = b.id;

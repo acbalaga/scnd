@@ -287,3 +287,6 @@ table.rt { width:100%; border-collapse:collapse; font-size:12.5px; margin:4px 0 
 }
 
 .bill-head > .row { flex-wrap:nowrap; gap:4px; flex:none; } .bill-head > .row .link { white-space:nowrap; }
+
+label > .err { font-size:13px; font-weight:500; margin:2px 0 0; } input[aria-invalid=true], select[aria-invalid=true] { border-color:var(--red); }
+@media (max-width:480px) { .bill-head { flex-wrap:wrap; } }
