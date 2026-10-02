@@ -51,3 +51,12 @@ test('worker: THEME_SCRIPT_HASH matches the inline script in index.html', () => 
   assert.equal(inline.length, 1);
   assert.equal(`sha256-${createHash('sha256').update(inline[0][1]).digest('base64')}`, THEME_SCRIPT_HASH);
 });
+
+test('worker golden: x-limiter header names the path taken', async () => {
+  const h = async (r, env) => (await worker.fetch(r, env)).headers.get('x-limiter');
+  assert.equal(await h(req('203.0.113.7'), envWith(async () => ({ success: true }))), 'ok');
+  assert.equal(await h(req('203.0.113.7'), envWith(async () => ({ success: false }))), 'blocked');
+  assert.equal(await h(req('203.0.113.7'), envWith(async () => { throw new Error('down'); })), 'open-error');
+  assert.equal(await h(req('203.0.113.7'), { ASSETS: { fetch: async () => asset.clone() } }), 'open-no-binding');
+  assert.equal(await h(req(null), envWith(async () => ({ success: true }))), 'open-no-ip');
+});
