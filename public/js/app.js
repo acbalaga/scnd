@@ -106,8 +106,8 @@ document.addEventListener('alpine:init', () => {
       );
     },
 
-    async continueSetup() {
-      const s = this.s;
+    async continueSetup(fromButton = false) {
+      const s = this.s, wasReady = this.ready;
       const lat = num(s.lat), lon = num(s.lon), kWp = num(s.kWp), acKw = num(s.acKw), tilt = num(s.tilt);
       const missing = [];
       if (!Number.isFinite(lat) || !Number.isFinite(lon)) missing.push('location');
@@ -138,7 +138,10 @@ document.addEventListener('alpine:init', () => {
       if (s.hybrid) this.bills.forEach((b) => { if (!Number.isFinite(num(b.chargeKwh)) || !Number.isFinite(num(b.dischargeKwh))) b.open = true; });
       this.ready = true;
       this.setupOpen = false;
+      // The button that was pressed has just been hidden: put focus where the owner goes next, not on the page.
+      if (fromButton) this.$nextTick(() => (wasReady ? document.getElementById('setupEdit')?.focus() : this.focusBill(0, '.bill-title h3')));
     },
+    openSetup() { this.setupOpen = true; this.$nextTick(() => this.$refs.fPlace?.focus()); },
 
     async checkWeather() {
       const w = this.weather;
@@ -369,10 +372,11 @@ document.addEventListener('alpine:init', () => {
       });
       this.bills = bills; this.example = true; this.savedOnce = false; this.saveNudgeHidden = false;
       this.resetWeather();
-      this.$nextTick(() => this.scrollTo('bills'));
+      this.$nextTick(() => this.focusBill(0, '.bill-title h3'));
     },
     clearExample() {
       this.example = false; this.ready = false; this.setupOpen = true; this.place = '';
+      setTimeout(() => { this.scrollTo('setup'); document.querySelector('[x-ref=fPlace]')?.focus({ preventScroll: true }); }, 50);
       this.s = { lat: '', lon: '', kWp: '', acKw: '', tilt: 10, azimuth: 0, commissioned: '', hybrid: false, netMetering: false, cost: '', promisedYears: '', warrantyPct: '', batteryCost: '' };
       this.bills = [newBill()]; this.climate = null; this.lowDiffuse = false;
       this.resetWeather();
@@ -400,6 +404,7 @@ document.addEventListener('alpine:init', () => {
       this.removing = b.id;
       this.$nextTick(() => el.closest('article')?.querySelector('.confirm .keep')?.focus());
     },
+    keepBill(el) { this.removing = null; this.$nextTick(() => el.closest('article')?.querySelector('.bill-head .link')?.focus()); },
     // After a remove, focus the bill that took its place (or the new last one), not the top of the page.
     removeBill(id) {
       const k = this.bills.findIndex((b) => b.id === id);

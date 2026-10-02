@@ -103,7 +103,7 @@
   <section class="card" id="setup">
     <div class="summary-line" x-show="ready && !setupOpen">
       <div><h2>Your system</h2><p class="sub" style="margin:2px 0 0" x-text="summaryLine"></p></div>
-      <button type="button" class="link" @click="setupOpen = true">Edit</button>
+      <button type="button" class="link" id="setupEdit" @click="openSetup()">Edit</button>
     </div>
 
     <div x-show="!ready || setupOpen">
@@ -164,7 +164,7 @@
       </div>
       <p class="err" role="alert" x-show="setupError" x-text="setupError"></p>
       <div class="row">
-        <button type="button" class="primary" @click="continueSetup()" x-text="ready ? 'Save changes' : 'Continue to my bill'"></button>
+        <button type="button" class="primary" @click="continueSetup(true)" x-text="ready ? 'Save changes' : 'Continue to my bill'"></button>
         <button type="button" class="link" x-show="!ready" @click="loadExample()">or try an example</button>
       </div>
     </div>
@@ -189,7 +189,7 @@
           </div>
           <div class="confirm" role="group" aria-label="Confirm remove" x-show="removing === b.id">
             <span>Remove this bill and its numbers? This cannot be undone.</span>
-            <span class="row" style="margin:0"><button type="button" class="danger" @click="removeBill(b.id)">Remove</button><button type="button" class="link keep" @click="removing = null">Keep it</button></span>
+            <span class="row" style="margin:0"><button type="button" class="danger" @click="removeBill(b.id)">Remove</button><button type="button" class="link keep" @click="keepBill($el)">Keep it</button></span>
           </div>
 
           <details class="inputs" :open="b.open" @toggle="b.open = $event.target.open">
@@ -514,7 +514,7 @@
         </table>
 
         <h3>3. Questions for the installer</h3>
-        <p x-show="sheet.allClear" x-text="sheet.latest && sheet.latest.band === 'check' ? 'No questions are raised, but the latest bill\'s PR is above what panels can make, so check its figures before relying on this sheet.' : sheet.allGreen ? 'No questions are raised: PR was within the usual range in every bill reviewed.' : 'No questions are raised: the latest bill is within the usual range and no earlier low months ran two in a row.'"></p>
+        <p x-show="sheet.allClear" x-text="!sheet.total ? 'Nothing to review yet. Add a bill with its dates and solar kWh, and the questions appear here.' : sheet.latest && sheet.latest.band === 'check' ? 'No questions are raised, but the latest bill\'s PR is above what panels can make, so check its figures before relying on this sheet.' : sheet.allGreen ? 'No questions are raised: PR was within the usual range in every bill reviewed.' : 'No questions are raised: the latest bill is within the usual range and no earlier low months ran two in a row.'"></p>
         <ol class="q" x-show="!sheet.allClear"><template x-for="i in sheet.items" :key="i.id"><li x-text="i.text"></li></template></ol>
 
         <h3>4. Information requested</h3>
