@@ -108,6 +108,7 @@
 
     <div x-show="!ready || setupOpen">
       <h2 style="margin-bottom:12px">Your system</h2>
+      <p class="err" role="alert" x-show="setupError" x-text="setupError"></p>
       <div class="grid">
         <label class="wide">Where is it?
           <select x-model="place" @change="pickPlace()" x-ref="fPlace" :class="{ empty: !place }">
@@ -162,7 +163,6 @@
           </details>
         </div>
       </div>
-      <p class="err" role="alert" x-show="setupError" x-text="setupError"></p>
       <div class="row">
         <button type="button" class="primary" @click="continueSetup(true)" x-text="ready ? 'Save changes' : 'Continue to my bill'"></button>
         <button type="button" class="link" x-show="!ready" @click="loadExample()">or try an example</button>
