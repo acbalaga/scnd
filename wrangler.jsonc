@@ -20,9 +20,11 @@
     }
   ],
   // Per-version preview URLs off now that the site is live on myscnd.app (Fred, 2 Oct 2026). Preview URLs bypass
-  // the custom domain and are an extra public surface. workers_dev is left at its default (on) because beta
-  // testers still use scnd.<account>.workers.dev. Set "workers_dev": false when beta ends.
+  // the custom domain and are an extra public surface.
   "preview_urls": false,
+  // The scnd.<account>.workers.dev address is off: beta ends and the site lives on myscnd.app (Fred, 2 Oct 2026).
+  // Beta testers must use myscnd.app. To bring workers.dev back, remove this line (the default is on).
+  "workers_dev": false,
   // Production custom domain, bought in Cloudflare 2 Oct 2026. Cloudflare creates the DNS record and certificate.
   // See docs/CUSTOM-DOMAIN.md.
   "routes": [{ "pattern": "myscnd.app", "custom_domain": true }]
