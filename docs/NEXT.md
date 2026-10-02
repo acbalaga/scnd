@@ -220,4 +220,5 @@ Requested by Fred. Plain links only: no Ko-fi widget, script, cookie or request 
 - [x] **Tip line** under the findings sheet (`index.html`, `aside.tipjar`), only while the sheet is open. One sentence, a Ko-fi link, and a QR Ph `<details>` that appears only if `/assets/qr-ph.png` exists (probed once by `probeQr()` in `app.js`). Payee line reads `PAYEE_NAME` and stays hidden while it is still the `[PAYEE_NAME]` placeholder. Not printed.
 - [x] **Footer:** "Give feedback" (`FEEDBACK_URL`, already set to the Google Form on 30 Sep) is the first item, Ko-fi second, then one privacy line. Each link hides when its constant is empty. 44 px tap targets.
 - [x] `"!/assets/*"` added to `run_worker_first` so the QR file does not spend Worker requests. 2 tests. `node --test`: 126 pass.
-- [ ] **Fred:** add `public/assets/qr-ph.png`, set `PAYEE_NAME` in `public/js/app.js`.
+- [x] `PAYEE_NAME` set to "AL***D B." (the masked name GCash shows after a scan, from Fred).
+- [ ] **Fred:** add `public/assets/qr-ph.png`. Use a cropped QR Ph image: a full GCash screenshot also carries a partial mobile number and user ID.

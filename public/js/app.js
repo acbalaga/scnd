@@ -60,7 +60,7 @@ const FEEDBACK_URL = 'https://forms.gle/uaUyhAR2PLqakpME8';
 // a scan, so a tipper can check they are paying the right person. The payee line stays hidden while it holds the placeholder.
 const KOFI_URL = 'https://ko-fi.com/alfredbalaga';
 const QR_PH_SRC = '/assets/qr-ph.png';
-const PAYEE_NAME = '[PAYEE_NAME]';
+const PAYEE_NAME = 'AL***D B.';   // as GCash shows it after a scan (masked by GCash), given by Fred 2 Oct 2026
 
 // One date style across titles, chart and table: "1 Sep 2026". Locale formatters disagree (en-GB "Sept", en-PH month first).
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
