@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import worker from '../src/worker.js';
 import { CSP, THEME_SCRIPT_HASH } from '../src/headers.js';
@@ -67,4 +69,19 @@ test('worker golden: x-limiter header names the path taken', async () => {
 test('worker: the main module exports only the default handler', async () => {
   const mod = await import('../src/worker.js');
   assert.deepEqual(Object.keys(mod), ['default']);
+});
+
+// Every Worker request counts against the Free plan's daily cap, and over the cap the Free plan answers 429 to every
+// Worker-first path. Static files must bypass the Worker, so a new folder under public/ cannot quietly cost requests.
+test('wrangler: every static file except the page bypasses the Worker', () => {
+  const cfg = JSON.parse(readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8').replace(/^\s*\/\/.*$/gm, ''));
+  const patterns = cfg.assets.run_worker_first;
+  assert.ok(Array.isArray(patterns), 'run_worker_first must list patterns, not true');
+  const skipped = patterns.filter((p) => p.startsWith('!')).map((p) => p.slice(1));
+  const covered = (path) => skipped.some((p) => (p.endsWith('/*') ? path.startsWith(p.slice(0, -1)) : path === p));
+  const files = readdirSync(new URL('../public/', import.meta.url), { recursive: true, withFileTypes: true })
+    .filter((d) => d.isFile()).map((d) => '/' + path.relative(fileURLToPath(new URL('../public/', import.meta.url)), path.join(d.parentPath, d.name)).replaceAll(path.sep, '/'));
+  const onWorker = files.filter((f) => !['/index.html', '/_headers'].includes(f) && !covered(f));
+  assert.deepEqual(onWorker, []);
+  assert.ok(patterns.includes('/*') && !covered('/index.html'), 'the page itself must still run the Worker');
 });

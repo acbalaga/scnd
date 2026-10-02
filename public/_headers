@@ -1,0 +1,6 @@
+# Headers for static files served without the Worker (run_worker_first excludes them, see wrangler.jsonc).
+# The page itself gets its CSP and the rest from src/worker.js. CSP only matters on documents, so it is not
+# repeated here; the icons are plain SVG with no script.
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer

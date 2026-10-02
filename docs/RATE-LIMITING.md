@@ -4,9 +4,9 @@ Decided 29 Sep 2026 (Fred): a Cloudflare WAF rate limiting rule was not availabl
 
 ## What it does
 
-`src/worker.js` runs first on every request (`assets.run_worker_first` in `wrangler.jsonc`) and asks Cloudflare's Workers Rate Limiting binding (`LIMITER`) whether this visitor is over the limit.
+`src/worker.js` runs first on the page itself (`/`, unknown paths and 404s; `assets.run_worker_first` in `wrangler.jsonc`) and asks Cloudflare's Workers Rate Limiting binding (`LIMITER`) whether this visitor is over the limit. Static files (`/js/`, `/vendor/`, `/fonts/`, `/icons/`, `/data/`, `app.css`, the manifest) go straight to the asset server and are not counted (changed 2 Oct 2026, pre-launch audit H-2).
 
-- **Limit:** 100 requests per 10 seconds per visitor. One page load is about 12 requests to our own host (the page, its stylesheet, 6 scripts, the sun-data file, the icon, and the manifest and home-screen icon that browsers fetch on their own). Save, load, print and the two weather calls do not touch our host. A person clicking around never gets near the limit.
+- **Limit:** 100 requests per 10 seconds per visitor, counted on page requests only. One page load is 1 Worker request (it was 14 when static files ran the Worker too: the page, stylesheet, 7 scripts, 3 fonts, 2 icons, measured in headless Chromium). Save, load, print and the two weather calls do not touch the Worker. A person clicking around never gets near the limit.
 - **Why loose:** many Philippine mobile users share one public IP behind carrier-grade NAT. A tight limit would block real owners along with bots. Lower it only if the daily request count shows a real flood.
 - **Over the limit:** `429` with `Retry-After: 10` and `Cache-Control: no-store`, and a one-line plain message.
 - **Key:** the first 16 bytes of SHA-256 over `IP|UTC date`, in hex. The raw IP is never our key, and counters reset by themselves at midnight UTC. Cloudflare holds the counters. We do not log or store anything, and we never read user inputs.
@@ -16,7 +16,8 @@ To change the numbers, edit `ratelimits` in `wrangler.jsonc` (`limit`, and `peri
 
 ## Trade-offs
 
-- **Every request is a Worker request.** Static asset requests are normally free and unlimited, but with `run_worker_first` they run the Worker. Free plan: 100,000 Worker requests a day. About 14,000 page loads a day would reach it. A flood that the limiter blocks still counts against the cap, so a big enough flood can take the site down for the rest of the day. Watch the daily request count in the Cloudflare dashboard during beta. If traffic or bots grow, move to the Workers Paid plan.
+- **Only the page is a Worker request.** Static asset requests are free and unlimited, so they skip the Worker. Free plan: 100,000 Worker requests a day, so about 100,000 page loads a day (it was about 7,000 when every file ran the Worker). Over the cap, Cloudflare answers `429` on Worker-first paths, which includes the page, until the count resets at 00:00 UTC (8 am in the Philippines). A flood that the limiter blocks still counts against the cap. Watch the daily request count in the Cloudflare dashboard after the public share. If traffic or bots grow, move to the Workers Paid plan.
+- **Static files carry `nosniff` and `no-referrer` from `public/_headers`,** not from the Worker. The CSP stays on the page, where it applies.
 - **Counts are approximate.** The binding is per Cloudflare location and eventually consistent, so the limit is permissive, not exact. That is fine for stopping floods.
 - **Preview URLs are covered too.** The limiter is in the Worker, so `workers.dev` preview URLs are limited as well.
 - **Not a defence against a large distributed attack.** Cloudflare's built-in DDoS protection is the layer for that, and it is on by default.
