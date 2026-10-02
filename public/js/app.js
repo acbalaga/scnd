@@ -80,6 +80,8 @@ document.addEventListener('alpine:init', () => {
     // Actual-month weather, fetched only when the user clicks. status: idle | loading | done | failed (no source usable).
     fileMessage: '',
     setupOpen: true,
+    fieldErr: {},
+    started: false,   // landing shows the hero first; the setup form opens on "Check my system"
     example: false,
     savedOnce: false,
     saveNudgeHidden: false,
@@ -110,10 +112,11 @@ document.addEventListener('alpine:init', () => {
       const s = this.s, wasReady = this.ready;
       const lat = num(s.lat), lon = num(s.lon), kWp = num(s.kWp), acKw = num(s.acKw), tilt = num(s.tilt);
       const missing = [];
-      if (!Number.isFinite(lat) || !Number.isFinite(lon)) missing.push('location');
-      if (!Number.isFinite(kWp) || kWp <= 0) missing.push('panel size (kWp)');
-      if (!Number.isFinite(acKw) || acKw <= 0) missing.push('inverter size (kW)');
-      if (!Number.isFinite(tilt) || tilt < 0 || tilt > 90) missing.push('roof tilt (0 to 90)');
+      this.fieldErr = {};
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) { missing.push('location'); this.fieldErr.place = 'Pick the nearest city, or enter coordinates under it.'; }
+      if (!Number.isFinite(kWp) || kWp <= 0) { missing.push('panel size (kWp)'); this.fieldErr.kWp = 'Needed. A number above 0.'; }
+      if (!Number.isFinite(acKw) || acKw <= 0) { missing.push('inverter size (kW)'); this.fieldErr.acKw = 'Needed. A number above 0.'; }
+      if (!Number.isFinite(tilt) || tilt < 0 || tilt > 90) { missing.push('roof tilt (0 to 90)'); this.fieldErr.tilt = 'Between 0 and 90. Not sure? Use 10.'; }
       if (missing.length) {
         this.setupError = `Please fill in: ${missing.join(', ')}.`;
         // Take the owner to the first field that needs them (the error line alone can sit below the fold).
@@ -285,6 +288,17 @@ document.addEventListener('alpine:init', () => {
       }
       return '';
     },
+    // Earlier bills that already have an answer fold to one line once a newer bill has one too (long scroll on phones).
+    foldable(i) { return i < this.bills.reduce((n, b, k) => (this.result(b)?.pr != null ? k : n), -1); },
+    folded(b, i) { return this.foldable(i) && !b.expanded && this.removing !== b.id; },
+    // Placeholders only (never a value): last month's numbers as a reference while typing. Nothing is saved from them.
+    prevHint(i, key) { const v = i > 0 ? num(this.bills[i - 1]?.[key]) : NaN; return Number.isFinite(v) ? `last bill: ${this.fmt(v, 0)}` : ''; },
+    varHint(b, i) {
+      const p = i > 0 ? this.bills[i - 1] : null, rate = p ? num(p.varCharges) / num(p.importKwh) : NaN;
+      if (!Number.isFinite(rate)) return '';
+      const kwh = num(b.importKwh);
+      return Number.isFinite(kwh) && kwh > 0 ? `about ${this.fmt(rate * kwh, 0)}` : `last bill: ${this.fmt(num(p.varCharges), 0)}`;
+    },
     billTitle(b, i) { return b.start && b.end ? this.fmtRange(b.start, b.end) : `Bill ${i + 1}`; },
     get summaryLine() {
       const s = this.s, face = FACINGS.find((x) => x.az === num(s.azimuth))?.label.toLowerCase() ?? '';
@@ -375,7 +389,7 @@ document.addEventListener('alpine:init', () => {
       this.$nextTick(() => this.focusBill(0, '.bill-title h3'));
     },
     clearExample() {
-      this.example = false; this.ready = false; this.setupOpen = true; this.place = '';
+      this.example = false; this.ready = false; this.setupOpen = true; this.started = true; this.place = '';
       setTimeout(() => { this.scrollTo('setup'); document.querySelector('[x-ref=fPlace]')?.focus({ preventScroll: true }); }, 50);
       this.s = { lat: '', lon: '', kWp: '', acKw: '', tilt: 10, azimuth: 0, commissioned: '', hybrid: false, netMetering: false, cost: '', promisedYears: '', warrantyPct: '', batteryCost: '' };
       this.bills = [newBill()]; this.climate = null; this.lowDiffuse = false;
@@ -387,7 +401,12 @@ document.addEventListener('alpine:init', () => {
     // owner sees it appear (scrolling to the end of the list left it above the screen on phones).
     addBill() {
       this.bills.forEach((x) => { x.open = false; });
-      this.bills.push(newBill());
+      // Dates run on from the last bill and the generation charge usually repeats: prefill both, owner can change them.
+      const prev = this.bills[this.bills.length - 1], nb = newBill();
+      if (prev?.end) nb.start = prev.end;
+      if (String(prev?.genRate ?? '').trim() !== '') nb.genRate = prev.genRate;
+      nb.prefill = { start: nb.start, genRate: nb.genRate };
+      this.bills.push(nb);
       this.$nextTick(() => this.focusBill(this.bills.length - 1, 'input[type=date]'));
     },
     focusBill(i, sel) {
@@ -398,7 +417,7 @@ document.addEventListener('alpine:init', () => {
     },
     // A bill with numbers in it asks first (there is no undo); an empty one goes at once.
     removing: null,
-    billHasData(b) { return BILL_FIELDS.some((k) => String(b[k] ?? '').trim() !== ''); },
+    billHasData(b) { return BILL_FIELDS.some((k) => String(b[k] ?? '').trim() !== '' && String(b[k]) !== String(b.prefill?.[k] ?? '')); },
     askRemove(b, el) {
       if (!this.billHasData(b)) return this.removeBill(b.id);
       this.removing = b.id;
