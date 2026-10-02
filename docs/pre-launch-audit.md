@@ -177,8 +177,8 @@ The `dependency-evaluator` plugin did not load into this session either. Same ch
 
 ## Could not verify
 
-- **workers.dev address** (`scnd.alfred-capilla-balaga.workers.dev`): the sandbox proxy still refuses it (`CONNECT` 403), so either it was not added to the allow-list or the change has not reached this session. Check it yourself (post-deploy step 6).
-- **WHOIS privacy:** `rdap.org` redirects `.app` lookups to `pubapi.registry.google`, which is not on the allow-list. Check in Cloudflare: Domain Registration > myscnd.app > Contacts (Cloudflare Registrar redacts by default).
+- **workers.dev address** (`scnd.alfred-capilla-balaga.workers.dev`): the sandbox proxy refuses it. **Fred checked it by hand on 2 Oct 2026: it no longer shows the app**, so `workers_dev: false` is live.
+- **WHOIS privacy:** `rdap.org` redirects `.app` lookups to `pubapi.registry.google`, which is not on the allow-list. Fred's registry search shows the domain as registered (taken), which confirms registration but not whether contact details are redacted. Check in Cloudflare: Domain Registration > myscnd.app > Contacts (Cloudflare Registrar redacts by default).
 - **Real TLS certificate:** the sandbox proxy re-signs TLS. Check in a browser (padlock > certificate: issued for myscnd.app by Google Trust Services or Let's Encrypt via Cloudflare).
 - **Link previews** on Facebook and LinkedIn: need H-4 deployed and their debuggers, which need your login.
 - **Certificate transparency** (`crt.sh`): not on the allow-list. Low value; the certificate is Cloudflare-managed.
