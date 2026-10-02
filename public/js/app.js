@@ -36,6 +36,7 @@ const FLAG_TEXT = {
   no_export_after_activation: 'You said net metering is on, but this bill shows 0 kWh sent to the grid. Ask the utility whether your meter was actually changed to a bi-directional one.',
   outage: 'Outage hours were entered. On-grid inverters shut off during brownouts by design, so some of the gap is expected.',
   clipping: 'Panels are more than 1.3 times the inverter size, so the inverter caps output on sunny days.',
+  before_commissioning: 'This period ends before the month you said the system was switched on. Check the reading dates, or the switch-on month in setup. The result below is not meaningful until they agree.',
   overlap: 'These dates overlap another bill, so savings and payback count the shared days twice. Check the reading dates.',
 };
 
@@ -120,14 +121,33 @@ document.addEventListener('alpine:init', () => {
 
     pickPlace() {
       const c = CITIES.find((x) => x.name === this.place);
-      if (c) { this.s.lat = c.lat; this.s.lon = c.lon; }
+      if (c) { this.s.lat = c.lat; this.s.lon = c.lon; this.geo = { state: 'idle', text: '' }; }
     },
 
+    // Feedback line under the location picker. state: idle | asking | ok | warn | fail.
+    geo: { state: 'idle', text: '' },
+    nearestCity(lat, lon) {
+      const km = (c) => { const r = Math.PI / 180, dx = (c.lon - lon) * r * Math.cos(lat * r), dy = (c.lat - lat) * r; return 6371 * Math.hypot(dx, dy); };
+      return CITIES.reduce((a, c) => (km(c) < km(a) ? c : a));
+    },
     useMyLocation() {
-      if (!navigator.geolocation) { this.setupError = 'This browser cannot share a location. Pick a city instead.'; return; }
+      if (!navigator.geolocation) { this.geo = { state: 'fail', text: 'This browser cannot share a location. Pick a city instead.' }; return; }
+      this.geo = { state: 'asking', text: 'Asking your device for its location. Allow it if your browser prompts.' };
       navigator.geolocation.getCurrentPosition(
-        (p) => { this.s.lat = round1(p.coords.latitude); this.s.lon = round1(p.coords.longitude); this.place = ''; this.setupError = ''; },
-        () => { this.setupError = 'Location was blocked. Pick a city instead.'; },
+        (p) => {
+          const lat = round1(p.coords.latitude), lon = round1(p.coords.longitude);
+          this.s.lat = lat; this.s.lon = lon; this.place = ''; this.setupError = ''; delete this.fieldErr.place;
+          // Same box as the sun data file (task 1). Outside it, Continue would reject the point, so say so now.
+          if (lat < 4.5 || lat > 21 || lon < 116.5 || lon > 127) { this.geo = { state: 'warn', text: `Your device reports ${lat}, ${lon}, which is outside the Philippines. Pick the city nearest your system instead.` }; return; }
+          this.geo = { state: 'ok', text: `Using your location, rounded to ${lat}, ${lon} (about 11 km). Nearest city: ${this.nearestCity(lat, lon).name}. It stays in your browser.` };
+        },
+        (e) => {
+          const why = e.code === 1 ? 'Location was blocked for this site. Allow it in your browser settings, or pick a city.'
+            : e.code === 3 ? 'Your device took too long to answer. Try again, or pick a city.'
+            : 'Your device could not work out where it is. Pick a city instead.';
+          this.geo = { state: 'fail', text: why };
+        },
+        { timeout: 15000, maximumAge: 600000 },
       );
     },
 
@@ -523,6 +543,8 @@ document.addEventListener('alpine:init', () => {
       const k = this.bills.indexOf(b);
       const earlier = this.bills.filter((o, n) => o !== b && o.start && o.end && (o.start < b.start || (o.start === b.start && n < k)));
       if (earlier.some((o) => calc.overlapDays(o, b) > 1)) out.flags.push('overlap');
+      // Switch-on is a month, so only a period that ends before that month starts is certainly wrong (a bill spanning it is normal).
+      if (/^\d{4}-\d{2}$/.test(s.commissioned || '') && b.end.slice(0, 7) < s.commissioned) out.flags.push('before_commissioning');
       return out;
     },
 
