@@ -139,25 +139,25 @@
         <div class="wide">
           <details class="optional"><summary>Not on the list? Enter coordinates</summary>
             <div class="grid" style="margin-top:8px">
-              <label>Latitude<input type="number" inputmode="decimal" step="0.1" x-model.number="s.lat" placeholder="14.6"></label>
-              <label>Longitude<input type="number" inputmode="decimal" step="0.1" x-model.number="s.lon" placeholder="121.0"></label>
+              <label>Latitude<input type="number" inputmode="decimal" min="-90" max="90" step="0.1" x-model.number="s.lat" placeholder="14.6"></label>
+              <label>Longitude<input type="number" inputmode="decimal" min="-180" max="180" step="0.1" x-model.number="s.lon" placeholder="121.0"></label>
               <div class="wide"><p class="help">We round it to 0.1° (about 11 km) and it stays in your browser. Sun data comes from a file we ship, so nothing is looked up online.</p></div>
             </div>
           </details>
         </div>
         <label>Panel size (kWp)
           <span class="hint">On your quotation. Not sure? Panel watts times panel count: six 550 W panels is 3.3 kWp.</span>
-          <input type="number" inputmode="decimal" step="0.01" x-model.number="s.kWp" x-ref="fKwp" :aria-invalid="!!fieldErr.kWp" aria-describedby="e_kWp" @input="delete fieldErr.kWp" placeholder="e.g. 5.5">
+          <input type="number" inputmode="decimal" min="0" step="0.01" x-model.number="s.kWp" x-ref="fKwp" :aria-invalid="!!fieldErr.kWp" aria-describedby="e_kWp" @input="delete fieldErr.kWp" placeholder="e.g. 5.5">
         <span class="err" id="e_kWp" x-show="fieldErr.kWp" x-text="fieldErr.kWp"></span>
         </label>
         <label>Inverter size (kW)
           <span class="hint">On the inverter label.</span>
-          <input type="number" inputmode="decimal" step="0.1" x-model.number="s.acKw" x-ref="fAc" :aria-invalid="!!fieldErr.acKw" aria-describedby="e_acKw" @input="delete fieldErr.acKw" placeholder="e.g. 5">
+          <input type="number" inputmode="decimal" min="0" step="0.1" x-model.number="s.acKw" x-ref="fAc" :aria-invalid="!!fieldErr.acKw" aria-describedby="e_acKw" @input="delete fieldErr.acKw" placeholder="e.g. 5">
         <span class="err" id="e_acKw" x-show="fieldErr.acKw" x-text="fieldErr.acKw"></span>
         </label>
         <label>Roof tilt (degrees)
           <span class="hint">Most PH roofs are 10 to 15°. Not sure? Leave it at 10.</span>
-          <input type="number" inputmode="decimal" step="1" x-model.number="s.tilt" x-ref="fTilt" :aria-invalid="!!fieldErr.tilt" aria-describedby="e_tilt" @input="delete fieldErr.tilt">
+          <input type="number" inputmode="decimal" min="0" max="90" step="1" x-model.number="s.tilt" x-ref="fTilt" :aria-invalid="!!fieldErr.tilt" aria-describedby="e_tilt" @input="delete fieldErr.tilt">
         <span class="err" id="e_tilt" x-show="fieldErr.tilt" x-text="fieldErr.tilt"></span>
         </label>
         <label>Panels face
@@ -175,11 +175,11 @@
               <label>Month it was switched on<input type="month" x-model="s.commissioned"></label>
               <label>Module warranty (% loss per year)
                 <span class="hint">From the datasheet. Used for the year-over-year check.</span>
-                <input type="number" inputmode="decimal" step="0.05" x-model.number="s.warrantyPct">
+                <input type="number" inputmode="decimal" min="0" max="100" step="0.05" x-model.number="s.warrantyPct">
               </label>
               <label class="wide" x-show="s.hybrid">Battery cost (₱)
                 <span class="hint">To see what share the battery has earned back.</span>
-                <input type="number" inputmode="decimal" x-model.number="s.batteryCost">
+                <input type="number" min="0" inputmode="decimal" x-model.number="s.batteryCost">
               </label>
             </div>
           </details>
@@ -454,8 +454,8 @@
           <h3>Payback so far</h3>
           <p class="help">Your savings from the bills above. Optional: add what you paid and the promised payback to compare with the installer's promise.</p>
           <div class="grid" style="margin-top:10px">
-            <label>System cost (₱)<input type="number" inputmode="decimal" x-model.number="s.cost"></label>
-            <label>Promised payback (years)<input type="number" inputmode="decimal" step="0.1" x-model.number="s.promisedYears"></label>
+            <label>System cost (₱)<input type="number" min="0" inputmode="decimal" x-model.number="s.cost"></label>
+            <label>Promised payback (years)<input type="number" inputmode="decimal" min="0" step="0.1" x-model.number="s.promisedYears"></label>
           </div>
           <div class="stats" x-show="paybackStats">
             <div class="stat"><small>Saved so far</small><b x-text="'₱' + fmt(paybackStats.saved, 0)"></b><em x-text="'over ' + fmt(paybackStats.days, 0) + ' days'"></em></div>
