@@ -37,3 +37,21 @@ test('html: the tip block sits after the findings sheet, so it never shows on la
   assert.match(html, /<template x-if="qrOk">\s*<details class="qr">/);   // the image is not requested until the probe finds the file
   assert.match(html, /<img :src="qrSrc"[^>]* alt="QR Ph code/);
 });
+
+// Pre-launch audit M-6, M-7, M-11 (2 Oct 2026).
+test('html: a failed script start leaves a visible message, and app.js removes it on a good start', () => {
+  assert.match(html, /<p id="boot" class="boot boot-js" role="status">[^<]+<\/p>\s*<noscript>/);
+  assert.ok(html.indexOf('id="boot"') < html.indexOf('<main x-data'), 'the message sits outside <main>, which x-cloak hides');
+  assert.match(app, /document\.getElementById\('boot'\)\?\.remove\(\)/);
+});
+
+test('html: there is a 404 page with a way home, and wrangler serves it', () => {
+  const page = readFileSync(new URL('../public/404.html', import.meta.url), 'utf8');
+  assert.match(page, /<a href="\/">/);
+  assert.match(page, /noindex/);
+  assert.match(readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8'), /"not_found_handling": "404-page"/);
+});
+
+test('html: the footer says who runs SCND and where a data question goes', () => {
+  assert.match(html, /personal project by Alfred Balaga/);
+});

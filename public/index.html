@@ -24,10 +24,15 @@
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="stylesheet" href="/app.css">
+<noscript><style>.boot-js{display:none}</style></noscript>
 <script type="module" src="/js/app.js"></script>
 <script defer src="/vendor/alpine.min.js"></script>
 </head>
 <body>
+<!-- Pre-launch audit M-11: if a script fails to load, <main> stays hidden (x-cloak). This line shows after 3 s and is removed
+     by app.js once Alpine starts. Without JavaScript the noscript line shows instead. -->
+<p id="boot" class="boot boot-js" role="status">Loading SCND. If this stays blank, reload the page.</p>
+<noscript><p class="boot boot-now">SCND needs JavaScript to run. Turn it on in your browser settings, then reload the page.</p></noscript>
 <main x-data="scnd" x-cloak :class="{ 'sheet-open': showSheet }">
 
   <header class="top">
@@ -583,6 +588,8 @@
          browser storage is the theme key (see "Your data" below); the only outbound calls are the weather check, location
          rounded to 0.1 degree (weather.js). That is why the line names the weather check. -->
     <p>SCND runs in your browser and stores no data on a server. The optional weather check sends only your location, rounded to 0.1°.</p>
+    <!-- Pre-launch audit M-7 (Fred, 2 Oct 2026): who runs SCND and where a data question goes. The Google Form is the only contact path. -->
+    <p x-show="feedbackHref">SCND is a personal project by Alfred Balaga. For a data question, or to have a feedback answer deleted, use "Give feedback" above and include the name or email you gave.</p>
     <!-- Pre-launch audit H-5 (2 Oct 2026). Facts behind this copy: src/worker.js (hashed IP key, nothing logged or stored),
          public/js/weather.js (the only outbound calls, location rounded to 0.1 degree), app.js theme (localStorage key
          scnd-theme), FEEDBACK_URL (Google Form), Cloudflare Web Analytics beacon (dashboard setting, allowed in src/headers.js; audit M-10). No claim here about regulation, rates or programs. -->
