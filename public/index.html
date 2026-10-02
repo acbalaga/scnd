@@ -134,7 +134,8 @@
           </select>
           <span class="err" id="e_place" x-show="fieldErr.place" x-text="fieldErr.place"></span>
         </label>
-        <div class="wide"><button type="button" class="link" style="padding-left:0" @click="useMyLocation()">or use my phone's location</button></div>
+        <div class="wide"><button type="button" class="link" style="padding-left:0" @click="useMyLocation()">or use my phone's location</button>
+          <p class="help" role="status" aria-live="polite" x-show="geo.text" :class="{ err: geo.state === 'fail' || geo.state === 'warn' }" x-text="geo.text" style="margin-top:4px"></p></div>
         <div class="wide">
           <details class="optional"><summary>Not on the list? Enter coordinates</summary>
             <div class="grid" style="margin-top:8px">
