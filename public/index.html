@@ -42,6 +42,7 @@
   <p class="sr-only" role="status" x-text="announce"></p>
 
   <!-- Before setup: say what it is and offer the shortest path to an answer -->
+  <h1 class="sr-only" x-show="ready">SCND: your solar check</h1>
   <section class="hero" x-show="!ready">
     <div class="lcd-panel" aria-hidden="true"><div class="digits"><span>2nd</span></div><small>Your second meter<br>for rooftop solar</small></div>
     <h1>Is your solar doing its job?</h1>
@@ -392,7 +393,7 @@
 
       <div id="bills-end" class="row">
         <button type="button" @click="addBill()">Add another bill</button>
-        <button type="button" class="primary" @click="showSheet = !showSheet; if (showSheet) $nextTick(() => scrollTo('findings'))" x-text="showSheet ? 'Hide findings sheet' : 'Findings sheet for my installer'"></button>
+        <button type="button" :class="{ primary: weather.status === 'done' }" @click="showSheet = !showSheet; if (showSheet) $nextTick(() => scrollTo('findings'))" x-text="showSheet ? 'Hide findings sheet' : 'Findings sheet for my installer'"></button>
       </div>
 
       <!-- Save nudge: after the first answer, before they leave -->
@@ -406,7 +407,7 @@
         <h3>Was it the weather?</h3>
         <p class="help">A low month can be cloudy weather, not a fault. This compares each bill's dates with the sun that fell on your roof, from a satellite (Himawari, through Open-Meteo) and NASA POWER. It sends only your location, rounded to 0.1° (about 11 km), and a date range to those two services. Nothing else leaves your browser.</p>
         <div class="row" style="margin-top:10px">
-          <button type="button" @click="checkWeather()" :disabled="!canCheckWeather" :aria-disabled="weather.status === 'loading'" x-text="weather.status === 'loading' ? 'Checking...' : (weather.status === 'done' ? 'Check again' : (weather.status === 'failed' ? 'Try again' : 'Check the weather'))"></button>
+          <button type="button" :class="{ primary: weather.status !== 'done' }" @click="checkWeather()" :disabled="!canCheckWeather" :aria-disabled="weather.status === 'loading'" x-text="weather.status === 'loading' ? 'Checking...' : (weather.status === 'done' ? 'Check again' : (weather.status === 'failed' ? 'Try again' : 'Check the weather'))"></button>
         </div>
         <p class="help" x-show="!canCheckWeather">Add a bill's dates and solar kWh first.</p>
         <div role="alert">
