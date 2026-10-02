@@ -42,6 +42,7 @@
   <p class="sr-only" role="status" x-text="announce"></p>
 
   <!-- Before setup: say what it is and offer the shortest path to an answer -->
+  <h1 class="sr-only" x-show="ready">SCND: your solar check</h1>
   <section class="hero" x-show="!ready">
     <div class="lcd-panel" aria-hidden="true"><div class="digits"><span>2nd</span></div><small>Your second meter<br>for rooftop solar</small></div>
     <h1>Is your solar doing its job?</h1>
@@ -103,11 +104,12 @@
   <section class="card" id="setup">
     <div class="summary-line" x-show="ready && !setupOpen">
       <div><h2>Your system</h2><p class="sub" style="margin:2px 0 0" x-text="summaryLine"></p></div>
-      <button type="button" class="link" @click="setupOpen = true">Edit</button>
+      <button type="button" class="link" id="setupEdit" @click="openSetup()">Edit</button>
     </div>
 
     <div x-show="!ready || setupOpen">
       <h2 style="margin-bottom:12px">Your system</h2>
+      <p class="err" role="alert" x-show="setupError" x-text="setupError"></p>
       <div class="grid">
         <label class="wide">Where is it?
           <select x-model="place" @change="pickPlace()" x-ref="fPlace" :class="{ empty: !place }">
@@ -162,9 +164,8 @@
           </details>
         </div>
       </div>
-      <p class="err" role="alert" x-show="setupError" x-text="setupError"></p>
       <div class="row">
-        <button type="button" class="primary" @click="continueSetup()" x-text="ready ? 'Save changes' : 'Continue to my bill'"></button>
+        <button type="button" class="primary" @click="continueSetup(true)" x-text="ready ? 'Save changes' : 'Continue to my bill'"></button>
         <button type="button" class="link" x-show="!ready" @click="loadExample()">or try an example</button>
       </div>
     </div>
@@ -189,7 +190,7 @@
           </div>
           <div class="confirm" role="group" aria-label="Confirm remove" x-show="removing === b.id">
             <span>Remove this bill and its numbers? This cannot be undone.</span>
-            <span class="row" style="margin:0"><button type="button" class="danger" @click="removeBill(b.id)">Remove</button><button type="button" class="link keep" @click="removing = null">Keep it</button></span>
+            <span class="row" style="margin:0"><button type="button" class="danger" @click="removeBill(b.id)">Remove</button><button type="button" class="link keep" @click="keepBill($el)">Keep it</button></span>
           </div>
 
           <details class="inputs" :open="b.open" @toggle="b.open = $event.target.open">
@@ -392,7 +393,7 @@
 
       <div id="bills-end" class="row">
         <button type="button" @click="addBill()">Add another bill</button>
-        <button type="button" class="primary" @click="showSheet = !showSheet; if (showSheet) $nextTick(() => scrollTo('findings'))" x-text="showSheet ? 'Hide findings sheet' : 'Findings sheet for my installer'"></button>
+        <button type="button" :class="{ primary: weather.status === 'done' }" @click="showSheet = !showSheet; if (showSheet) $nextTick(() => scrollTo('findings'))" x-text="showSheet ? 'Hide findings sheet' : 'Findings sheet for my installer'"></button>
       </div>
 
       <!-- Save nudge: after the first answer, before they leave -->
@@ -406,7 +407,7 @@
         <h3>Was it the weather?</h3>
         <p class="help">A low month can be cloudy weather, not a fault. This compares each bill's dates with the sun that fell on your roof, from a satellite (Himawari, through Open-Meteo) and NASA POWER. It sends only your location, rounded to 0.1° (about 11 km), and a date range to those two services. Nothing else leaves your browser.</p>
         <div class="row" style="margin-top:10px">
-          <button type="button" @click="checkWeather()" :disabled="!canCheckWeather" :aria-disabled="weather.status === 'loading'" x-text="weather.status === 'loading' ? 'Checking...' : (weather.status === 'done' ? 'Check again' : (weather.status === 'failed' ? 'Try again' : 'Check the weather'))"></button>
+          <button type="button" :class="{ primary: weather.status !== 'done' }" @click="checkWeather()" :disabled="!canCheckWeather" :aria-disabled="weather.status === 'loading'" x-text="weather.status === 'loading' ? 'Checking...' : (weather.status === 'done' ? 'Check again' : (weather.status === 'failed' ? 'Try again' : 'Check the weather'))"></button>
         </div>
         <p class="help" x-show="!canCheckWeather">Add a bill's dates and solar kWh first.</p>
         <div role="alert">
@@ -514,7 +515,7 @@
         </table>
 
         <h3>3. Questions for the installer</h3>
-        <p x-show="sheet.allClear" x-text="sheet.latest && sheet.latest.band === 'check' ? 'No questions are raised, but the latest bill\'s PR is above what panels can make, so check its figures before relying on this sheet.' : sheet.allGreen ? 'No questions are raised: PR was within the usual range in every bill reviewed.' : 'No questions are raised: the latest bill is within the usual range and no earlier low months ran two in a row.'"></p>
+        <p x-show="sheet.allClear" x-text="!sheet.total ? 'Nothing to review yet. Add a bill with its dates and solar kWh, and the questions appear here.' : sheet.latest && sheet.latest.band === 'check' ? 'No questions are raised, but the latest bill\'s PR is above what panels can make, so check its figures before relying on this sheet.' : sheet.allGreen ? 'No questions are raised: PR was within the usual range in every bill reviewed.' : 'No questions are raised: the latest bill is within the usual range and no earlier low months ran two in a row.'"></p>
         <ol class="q" x-show="!sheet.allClear"><template x-for="i in sheet.items" :key="i.id"><li x-text="i.text"></li></template></ol>
 
         <h3>4. Information requested</h3>

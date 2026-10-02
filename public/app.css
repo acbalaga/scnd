@@ -209,7 +209,8 @@ ol.steps-list { padding-left:20px; margin:8px 0; } ol.steps-list li { margin-bot
 
 /* save nudge, footer */
 .nudge-save { display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
-.foot { margin-top:28px; color:var(--muted); font-size:14px; max-width:62ch; } .foot a { color:var(--link); }
+.foot { margin-top:28px; color:var(--muted); font-size:14px; max-width:62ch; } .foot a { color:var(--link); display:inline-flex; align-items:center; min-height:44px; }
+label.check { min-height:44px; }
 
 /* Findings sheet: a report page. Paper-white in every colour mode, so the screen preview matches the print.
    Fonts: Source Serif 4 (headings) and Source Sans 3 (text and tables), SIL OFL 1.1, self-hosted in /fonts.
