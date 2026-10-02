@@ -13,7 +13,7 @@ Start here: `CLAUDE.md` (project rules), `docs/SPEC.md` (spec), `docs/NEXT.md` (
 | | Feature |
 | --- | --- |
 | F1 | Performance ratio (PR) per bill against a typical year's sun, with a wider dry-season amber band |
-| F2 | Bill decoder: import, export credit at the generation charge, and why fixed charges keep the bill above zero (Taglish walk-through) |
+| F2 | Bill decoder: import, export credit at the generation charge, and why fixed charges keep the bill above zero (plain-English walk-through) |
 | F3 | Findings sheet: a one-page report (summary, system, performance table, numbered questions, information requested, basis and limitations, notes space) for the installer, no installer names |
 | F4 | Weather or system: satellite and NASA POWER cross-checked, labelled "uncertain" or "inferred" when they disagree or one is missing |
 | F5 to F7 | Energy split, savings against the promised payback (chart with hover, table view and payback time at your own pace), load-shift value |

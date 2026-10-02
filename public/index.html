@@ -107,7 +107,6 @@
         <li><b>3</b>Read the result, then print the one-page list of questions for your installer</li>
       </ol>
       <p class="help">Free, no account, and everything you type stays in this browser. The result is a list of questions for your installer, not a verdict.</p>
-      <p class="help" lang="tl">Tinitingnan nito kung tama ang gawa ng solar mo, base sa sarili mong bill.</p>
     </div>
   </section>
 
@@ -227,8 +226,8 @@
               <div class="grid">
                 <label>Reading date, start<input type="date" x-model="b.start"></label>
                 <label>Reading date, end<input type="date" x-model="b.end"></label>
-                <div class="wide help-row"><details class="optional"><summary>? Ano ito? Reading dates</summary>
-                  <p class="help">Nasa bill mo ang "Previous reading date" at "Present reading date". Hindi ito buong buwan, kaya ito ang ginagamit natin.</p></details></div>
+                <div class="wide help-row"><details class="optional"><summary>? What is this? Reading dates</summary>
+                  <p class="help">Your bill shows a "Previous reading date" and a "Present reading date". A billing period rarely matches a calendar month, so SCND uses these two dates.</p></details></div>
                 <!-- Optional, so it stays folded and out of the path to the answer (dates, then solar kWh). Opens when it holds a value. -->
                 <div class="wide help-row"><details class="optional" x-init="$el.open = num(b.outageHours) > 0"><summary>Had brownouts? Add outage hours</summary>
                   <label style="margin-top:4px">Outage hours in this period (optional)
@@ -254,9 +253,9 @@
                       <input type="number" min="0" step="any" inputmode="decimal" x-model.number="b.homeLoadKwh"></label>
                   </div>
                 </template>
-                <div class="wide help-row"><details class="optional"><summary>? Ano ito? Solar from the app</summary>
-                  <p class="help">Sa inverter app mo, hanapin ang total generation. Idagdag ang daily totals mula sa start hanggang end reading date ng bill.</p>
-                  <p class="help" x-show="s.hybrid">Sa hybrid inverter app, hanapin ang "Battery charge" at "Battery discharge" para sa parehong petsa ng bill. Idagdag ang daily totals. Ang "Home load" ay lalabas lang kung may CT meter ang inverter mo.</p></details></div>
+                <div class="wide help-row"><details class="optional"><summary>? What is this? Solar from the app</summary>
+                  <p class="help">In your inverter app, find total generation. Add up the daily totals from the bill's start reading date to its end reading date.</p>
+                  <p class="help" x-show="s.hybrid">In a hybrid inverter app, find "Battery charge" and "Battery discharge" for the same dates and add up the daily totals. "Home load" only appears if your inverter has a CT meter.</p></details></div>
               </div>
             </fieldset>
 
@@ -265,8 +264,8 @@
               <div class="grid">
                 <label>Bought from the grid (kWh)<input type="number" min="0" step="any" inputmode="decimal" x-model.number="b.importKwh" :placeholder="prevHint(i, 'importKwh')"></label>
                 <label>Sent to the grid (kWh)<input type="number" min="0" step="any" inputmode="decimal" x-model.number="b.exportKwh"></label>
-                <div class="wide help-row"><details class="optional"><summary>? Ano ito? Bought and sent</summary>
-                  <p class="help">Sa net metering bill, may dalawang linya: "Delivered" (bili mo sa grid) at "Received" (na-export mo). Kung 0 ang export, ilagay ang 0.</p></details></div>
+                <div class="wide help-row"><details class="optional"><summary>? What is this? Bought and sent</summary>
+                  <p class="help">A net metering bill has two lines: "Delivered" (kWh you bought from the grid) and "Received" (kWh you exported). If nothing was exported, enter 0.</p></details></div>
 
                 <label>Generation charge (₱ per kWh)
                   <span class="hint">Export credit is what the utility pays you per kWh you send to the grid.</span>
@@ -274,8 +273,8 @@
                 <label>Variable charges (₱)
                   <span class="hint">Bill lines that grow with kWh, before the export credit. The grey number uses last bill's rate.</span>
                   <input type="number" min="0" inputmode="decimal" step="0.01" x-model.number="b.varCharges" :placeholder="varHint(b, i)"></label>
-                <div class="wide help-row"><details class="optional"><summary>? Ano ito? Rates and charges</summary>
-                  <p class="help">Generation charge: presyo bawat kWh sa "Generation" line ng bill. Variable charges: lahat ng singil na tumataas kapag mas marami kang kuryenteng ginamit (generation, transmission, distribution, buwis). Huwag isama ang fixed charges tulad ng metering at supply. Kung hindi sigurado, ilagay ang subtotal bago ang export credit.</p></details></div>
+                <div class="wide help-row"><details class="optional"><summary>? What is this? Rates and charges</summary>
+                  <p class="help">Generation charge: the price per kWh on the "Generation" line of the bill. Variable charges: every charge that rises with the kWh you use (generation, transmission, distribution, taxes). Leave out fixed charges such as metering and supply. If you are unsure, enter the subtotal before the export credit.</p></details></div>
 
                 <label class="wide">Total amount due (₱, optional)<input type="number" min="0" inputmode="decimal" step="0.01" x-model.number="b.total"></label>
               </div>
@@ -393,17 +392,17 @@
                 <summary>Decode this bill <span class="teaser" x-text="decode(b)?.flags?.includes('total_below_charges') ? 'Check the total' : 'Why it is not zero'"></span></summary>
                 <div><template x-if="decode(b) && !decode(b).error"><div>
                   <ol class="steps-list">
-                    <li><strong>Binili mo sa grid.</strong> Bumili ka ng <b x-text="fmt(num(b.importKwh), 0) + ' kWh'"></b>. Ang mga singil na tumataas kasabay ng kWh ay <b x-text="'₱' + fmt(num(b.varCharges), 2)"></b>. Average iyon na <b x-text="'₱' + fmt(decode(b).rImport, 2) + ' bawat kWh'"></b>.</li>
-                    <li><strong>Na-export mo.</strong> Nag-export ka ng <b x-text="fmt(num(b.exportKwh), 0) + ' kWh'"></b>. Ang credit ay nasa presyo ng generation charge lang (<b x-text="'₱' + fmt(num(b.genRate), 2)"></b> bawat kWh), hindi sa buong presyo ng binibili mo. Kaya ang export credit mo ay <b x-text="'₱' + fmt(decode(b).exportCredit, 2)"></b>.
-                      <span x-show="decode(b).exportGap > 0"> Mas malaki ang ipon kapag ginamit mo mismo sa bahay ang solar (<b x-text="'₱' + fmt(decode(b).rImport, 2)"></b>) kaysa i-export (<b x-text="'₱' + fmt(num(b.genRate), 2)"></b>).</span></li>
+                    <li><strong>Bought from the grid.</strong> You bought <b x-text="fmt(num(b.importKwh), 0) + ' kWh'"></b>. The charges that rise with kWh came to <b x-text="'₱' + fmt(num(b.varCharges), 2)"></b>, an average of <b x-text="'₱' + fmt(decode(b).rImport, 2) + ' per kWh'"></b>.</li>
+                    <li><strong>Exported.</strong> You exported <b x-text="fmt(num(b.exportKwh), 0) + ' kWh'"></b>. The credit is paid at the generation charge only (<b x-text="'₱' + fmt(num(b.genRate), 2)"></b> per kWh), not at the full price you pay for imports. Your export credit is <b x-text="'₱' + fmt(decode(b).exportCredit, 2)"></b>.
+                      <span x-show="decode(b).exportGap > 0"> Solar you use at home saves more (<b x-text="'₱' + fmt(decode(b).rImport, 2)"></b> per kWh) than solar you export (<b x-text="'₱' + fmt(num(b.genRate), 2)"></b> per kWh).</span></li>
                     <!-- Steps 3 and 4 say what these numbers show: credit above the charges, a total below them, or nothing left for fixed charges. -->
-                    <li x-show="!decode(b).excess"><strong>Pagkatapos ng credit.</strong> <span x-text="'₱' + fmt(num(b.varCharges), 2) + ' minus ₱' + fmt(decode(b).exportCredit, 2) + ' ay ₱' + fmt(decode(b).afterCredit, 2) + '.'"></span>
-                      <span x-show="decode(b).coverage !== null"> Na-offset ng credit ang <b x-text="fmt(Math.min(decode(b).coverage, 1) * 100, 0) + '%'"></b> ng variable charges.</span></li>
-                    <li x-show="decode(b).excess > 0"><strong>Pagkatapos ng credit.</strong> Mas malaki ang credit (<b x-text="'₱' + fmt(decode(b).exportCredit, 2)"></b>) kaysa sa variable charges (<b x-text="'₱' + fmt(num(b.varCharges), 2)"></b>), kaya <b>₱0.00</b> ang natira rito. Ang sobrang <b x-text="'₱' + fmt(decode(b).excess, 2)"></b> ay hindi kinukwenta ng SCND; tingnan ang paalala sa ibaba.</li>
-                    <li x-show="!decode(b).flags.includes('total_below_charges') && !decode(b).noFixed"><strong>Bakit hindi zero ang bill.</strong> Ang natitirang <b x-text="'₱' + fmt(decode(b).other, 2)"></b> ay fixed charges (tulad ng metering at supply) at iba pang singil na hindi sakop ng variable charges. Hindi ito bumababa kahit gaano karami ang i-export mo. Pambawas lang sa variable charges ang credit, kaya hindi kailanman zero ang bill.</li>
-                    <li x-show="decode(b).flags.includes('total_below_charges')"><strong>Hindi tugma ang total.</strong> Ang total mo ay mas mababa ng <b x-text="'₱' + fmt(-decode(b).other, 2)"></b> kaysa sa <b x-text="'₱' + fmt(decode(b).afterCredit, 2)"></b> na natira pagkatapos ng credit. Hindi ito maipapaliwanag ng fixed charges, kaya balikan ang mga numero; tingnan ang paalala sa ibaba.</li>
-                    <li x-show="decode(b).noFixed"><strong>Walang natira para sa fixed charges.</strong> Sa mga numerong inilagay mo, katumbas mismo ng total ang natira pagkatapos ng credit. Kadalasan may fixed charges ang bill (tulad ng metering at supply), kaya baka kasama na sila sa variable charges na inilagay mo. Kung ganoon, mas mataas nang kaunti ang lumalabas na presyo bawat kWh kaysa sa totoo.</li>
-                    <li><strong>Total.</strong> <b x-text="'₱' + fmt(num(b.total), 2)"></b> ang binayaran mo.</li>
+                    <li x-show="!decode(b).excess"><strong>After the credit.</strong> <span x-text="'₱' + fmt(num(b.varCharges), 2) + ' minus ₱' + fmt(decode(b).exportCredit, 2) + ' is ₱' + fmt(decode(b).afterCredit, 2) + '.'"></span>
+                      <span x-show="decode(b).coverage !== null"> The credit covers <b x-text="fmt(Math.min(decode(b).coverage, 1) * 100, 0) + '%'"></b> of the variable charges.</span></li>
+                    <li x-show="decode(b).excess > 0"><strong>After the credit.</strong> The credit (<b x-text="'₱' + fmt(decode(b).exportCredit, 2)"></b>) is larger than the variable charges (<b x-text="'₱' + fmt(num(b.varCharges), 2)"></b>), so nothing is left here: <b>₱0.00</b>. SCND does not model the extra <b x-text="'₱' + fmt(decode(b).excess, 2)"></b>. See the note below.</li>
+                    <li x-show="!decode(b).flags.includes('total_below_charges') && !decode(b).noFixed"><strong>Why the bill is not zero.</strong> The remaining <b x-text="'₱' + fmt(decode(b).other, 2)"></b> is fixed charges (such as metering and supply) and other charges outside the variable charges. Exporting more does not lower them. The credit only offsets variable charges, so the bill never reaches zero.</li>
+                    <li x-show="decode(b).flags.includes('total_below_charges')"><strong>The total does not match.</strong> Your total is <b x-text="'₱' + fmt(-decode(b).other, 2)"></b> below the <b x-text="'₱' + fmt(decode(b).afterCredit, 2)"></b> left after the credit. Fixed charges cannot explain that, so recheck the numbers. See the note below.</li>
+                    <li x-show="decode(b).noFixed"><strong>Nothing left for fixed charges.</strong> With the numbers you entered, the amount left after the credit equals the total. Bills usually carry fixed charges (such as metering and supply), so they may already be inside the variable charges you entered. If so, the price per kWh shown here reads slightly higher than the real one.</li>
+                    <li><strong>Total.</strong> You paid <b x-text="'₱' + fmt(num(b.total), 2)"></b>.</li>
                   </ol>
                   <template x-for="f in decode(b).flags" :key="f"><div class="flag" x-text="decodeFlagText(f)"></div></template>
                 </div></template></div>

@@ -32,7 +32,7 @@ Owner: Fred (Alfred Balaga), renewable energy O&M practitioner. Personal project
 ## Product decisions
 
 - Hybrid systems are first-class (F9): PV yield, battery charge, battery discharge, optional home load. PR uses PV yield, not inverter AC output.
-- Language: English UI. Taglish for bill-decoder explanations, tooltips and nudges. Findings sheet stays in English (it goes to the installer).
+- Language: English UI throughout, including bill-decoder explanations, tooltips and nudges (plain English, no Taglish). The findings sheet is English too (it goes to the installer).
 - Red flag only after two consecutive red months. Findings sheet is framed as "questions to ask your installer", never a verdict; no installer names are stored or shown.
 - Separate product from Fred's PV module obsolescence tracker idea. Deliberately in the same naming family as SCNTL (Fred's private BESS sizing tool), but no code or data is shared with it.
 

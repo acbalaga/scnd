@@ -38,7 +38,7 @@ Build `scripts/build-grid.mjs` (Node, no dependencies) that writes `public/data/
 
 ## 3. Input flow and F1, F5, F6, F7
 
-System setup once (location, kWp, tilt, facing, inverter AC kW, commissioning month, hybrid yes/no), then one card per bill. Results for F1, F5, F6, F7. Mobile first. English UI; Taglish for help text.
+System setup once (location, kWp, tilt, facing, inverter AC kW, commissioning month, hybrid yes/no), then one card per bill. Results for F1, F5, F6, F7. Mobile first. English UI, including help text.
 
 - **Checks**
     - [ ] A first-time owner can finish setup plus one bill in under 5 minutes on a phone. Not verified: needs a real first-time owner. Setup is 6 required fields, a bill is 8.
@@ -46,7 +46,7 @@ System setup once (location, kWp, tilt, facing, inverter AC kW, commissioning mo
 
 ## 4. F2 bill decoder
 
-- [x] Done. `billDecode` in `public/js/calc.js` (3 tests), and a Taglish "Decode this bill" walk-through in each bill card. Copy claims cite the SPEC sources (29 Sep 2026) in a comment next to the copy. A credit larger than the variable charges is flagged, not modelled, because how it carries over is not verified.
+- [x] Done. `billDecode` in `public/js/calc.js` (3 tests), and a plain-English "Decode this bill" walk-through in each bill card. Copy claims cite the SPEC sources (29 Sep 2026) in a comment next to the copy. A credit larger than the variable charges is flagged, not modelled, because how it carries over is not verified.
 
 Annotated walk-through of the user's own bill numbers. Explain export credit at the generation charge, and why fixed charges keep the bill above zero.
 
