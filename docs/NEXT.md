@@ -200,3 +200,15 @@ Decided by Fred, 2 Oct 2026: path B, new domain bought in Cloudflare, attached t
 - [x] **Beta over (Fred, 2 Oct 2026):** `"workers_dev": false` in `wrangler.jsonc`. After the deploy, the workers.dev address stops answering; tell testers to use myscnd.app. In the dashboard, check the workers.dev subdomain toggle for `scnd` matches.
 - [ ] **Separate cleanup:** duplicate `_dmarc` record on alfredbalaga.com.
 - [ ] **Doorway link** on the author site to https://myscnd.app (plain link, no iframe).
+
+## 14. Pre-launch audit (2 Oct 2026)
+
+Requested by Fred before the public LinkedIn and Facebook share. Full report: `docs/pre-launch-audit.md`. Branch `pre-launch-fixes`, not deployed.
+
+- [x] **H-1** Worker entry module exported constants, so `wrangler dev` 4.146.0 would not start. Moved to `src/headers.js`.
+- [x] **H-2** Every static file ran the Worker (14 Worker requests per visit against the Free plan's 100,000 a day). Static files now bypass it; `public/_headers` gives them `nosniff` and `no-referrer`. This replaces the note in task 11 item 7 that `_headers` files do not apply: they do now, for the excluded paths.
+- [x] **H-3** Two-low-months question and headline now say when the months were judged against a typical year without a weather check.
+- [x] **H-4** Open Graph and Twitter tags, `public/icons/og.png` (`scripts/gen-og.mjs`), canonical link.
+- [x] **H-5** "Privacy and limits" footer section and a visible estimates line.
+- `node --test`: 124 pass. Checked under `wrangler dev` and headless Chromium at 390 px.
+- [ ] **Fred:** deploy, then the post-deploy checklist in the report; dashboard items (workers.dev and preview toggles, DNSSEC, HSTS, no-mail DNS records); decide the Medium items and L-5 (employer names in two docs, repo private).
