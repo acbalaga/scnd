@@ -40,9 +40,9 @@ const FLAG_TEXT = {
 };
 
 const DECODE_FLAG_TEXT = {
-  gen_above_buy: "Mas mataas ang generation charge na inilagay mo kaysa sa average na binibili mo. Tingnan kung ang 'Variable charges' ay ang subtotal bago ang export credit.",
-  credit_exceeds_variable: 'Mas malaki ang export credit kaysa sa variable charges. Itanong sa utility kung paano hinahawakan ang sobrang credit sa bill mo (carry-over o hindi). Hindi ito kinukwenta ng SCND.',
-  total_below_charges: 'Mas mababa ang total mo kaysa sa lumalabas sa kwenta. Baka may discount o carry-over na credit, o may maling numero. Balikan ang bill.',
+  gen_above_buy: "The generation charge you entered is higher than your average import price. Check that 'Variable charges' is the subtotal before the export credit.",
+  credit_exceeds_variable: 'The export credit is larger than the variable charges. Ask the utility whether the extra credit carries over on your bill. SCND does not model it.',
+  total_below_charges: 'Your total is lower than the sums here give. There may be a discount or a carried-over credit, or a number may be wrong. Recheck the bill.',
 };
 
 const HYBRID_FLAG_TEXT = {

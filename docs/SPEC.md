@@ -52,7 +52,7 @@ v1 ships eight features. Three are the core you picked; five exist because the i
 
 **Inputs, all typed by the user:** location (nearest city, or coordinates, rounded to 0.1°), kWp, tilt and facing, inverter AC rating, commissioning month; monthly inverter kWh; per bill: import kWh, export kWh, generation charge, total amount; optional: installer's promised monthly savings and payback years, module warranty degradation %/yr, outage hours.
 
-**Deferred to v2:** quote auditor tab, brand CSV import, screenshot OCR, link-out to the obsolescence tracker. (Taglish help text is in v1: bill-decoder explanations and tooltips.)
+**Deferred to v2:** quote auditor tab, brand CSV import, screenshot OCR, link-out to the obsolescence tracker. (Plain-English help text is in v1: bill-decoder explanations and tooltips.)
 
 Design note: rates are always read off the user's own bill, never hard-coded. That sidesteps the retail-vs-generation-rate confusion and survives monthly rate changes and non-Meralco DUs.
 
@@ -157,7 +157,7 @@ Built in the order of `docs/NEXT.md`, calc core before any UI, so the numbers ar
 2. **Typical-year grid.** Done (task 1). `scripts/build-grid.mjs` builds `public/data/ph-grid.json` from NASA POWER.
 3. **Calc core.** Done (task 2). One pure JS module with golden-case tests, POA checked against pvlib.
 4. **Input flow and F1, F5, F6, F7.** Done (task 3). System setup once, then one card per bill.
-5. **F2 bill decoder.** Done (task 4). Taglish walk-through of the owner's own numbers.
+5. **F2 bill decoder.** Done (task 4). Plain-English walk-through of the owner's own numbers.
 6. **F4 weather check.** Done (task 5).
 7. **F3 findings sheet and save/load JSON.** Done (task 6).
 8. **F8 degradation and F9 hybrid.** Done (task 7).
@@ -179,7 +179,7 @@ Built in the order of `docs/NEXT.md`, calc core before any UI, so the numbers ar
 - [ ] **Name.** SCND, read "second": Solar, Consumption, Net-metering, Degradation, one letter per app tab. Tagline: "Your second meter." Deliberately in the SCNTL family. Check domain and FB page availability
 - [x] **Hosting.** Cloudflare Workers Free, static assets. Live at myscnd.app since 2 Oct 2026 (new domain bought in Cloudflare, see `docs/CUSTOM-DOMAIN.md`); the workers.dev address was switched off when beta ended
 - [x] **Hybrid systems.** In v1 scope as F9
-- [x] **Language.** English UI; Taglish for bill-decoder explanations, tooltips and nudges; findings sheet stays English because it goes to the installer
+- [x] **Language.** English UI throughout, including bill-decoder explanations, tooltips and nudges (Taglish dropped 2 Oct 2026); findings sheet is English because it goes to the installer
 - [x] **Obsolescence tracker.** Separate product and brand
 - [x] **Rate limiting.** In code: Worker with the Workers Rate Limiting binding (a WAF rule was not available on Fred's plan). See `docs/RATE-LIMITING.md`
 - [ ] **Beta recruits.** Fred sourcing five owners across three DUs, with at least two hybrids
