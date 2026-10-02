@@ -7,6 +7,18 @@ import { serialize, parse } from './data.js';
 import { findings, MIN_DEGRADATION_PAIRS, PAYBACK_MIN_DAYS } from './findings.js';
 
 const num = (v) => (v === '' || v === null || v === undefined ? NaN : Number(v));
+// Number boxes take digits, one decimal point and (only where min allows) a leading minus. Browsers
+// otherwise let "e", "+" and pasted text through type="number" fields.
+const numberOk = (el, text) => /^-?\d*\.?\d*$/.test(text) && (!text.includes('-') || el.min === '' || Number(el.min) < 0);
+document.addEventListener('keydown', (e) => {
+  const el = e.target;
+  if (!(el instanceof HTMLInputElement) || el.type !== 'number' || e.ctrlKey || e.metaKey || e.altKey || e.key.length !== 1) return;
+  if (!/[\d.]/.test(e.key) && !(e.key === '-' && (el.min === '' || Number(el.min) < 0))) e.preventDefault();
+});
+document.addEventListener('paste', (e) => {
+  const el = e.target;
+  if (el instanceof HTMLInputElement && el.type === 'number' && !numberOk(el, (e.clipboardData?.getData('text') || '').trim())) e.preventDefault();
+});
 const round1 = (v) => Math.round(v * 10) / 10;
 // Today on the owner's own clock, as YYYY-MM-DD. toISOString() is UTC, which is yesterday in PH before 8 am.
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
@@ -156,7 +168,7 @@ document.addEventListener('alpine:init', () => {
       const lat = num(s.lat), lon = num(s.lon), kWp = num(s.kWp), acKw = num(s.acKw), tilt = num(s.tilt);
       const missing = [];
       this.fieldErr = {};
-      if (!Number.isFinite(lat) || !Number.isFinite(lon)) { missing.push('location'); this.fieldErr.place = 'Pick the nearest city, or enter coordinates under it.'; }
+      if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) { missing.push('location'); this.fieldErr.place = 'Pick the nearest city, or enter coordinates under it.'; }
       if (!Number.isFinite(kWp) || kWp <= 0) { missing.push('panel size (kWp)'); this.fieldErr.kWp = 'Needed. A number above 0.'; }
       if (!Number.isFinite(acKw) || acKw <= 0) { missing.push('inverter size (kW)'); this.fieldErr.acKw = 'Needed. A number above 0.'; }
       if (!Number.isFinite(tilt) || tilt < 0 || tilt > 90) { missing.push('roof tilt (0 to 90)'); this.fieldErr.tilt = 'Between 0 and 90. Not sure? Use 10.'; }
