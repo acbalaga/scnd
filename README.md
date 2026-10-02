@@ -2,7 +2,7 @@
 
 **Your second meter.** A free, private checker for Philippine rooftop solar owners: **S**olar performance, **C**onsumption split, **N**et-metering bill, **D**egradation.
 
-An owner types their system details and a few numbers from each bill and inverter app. SCND says whether the system is producing what it should, was it the weather or the system, what the export credit is worth, and what to ask the installer. It never gives a verdict, only questions.
+An owner types their system details and a few numbers from each bill and inverter app. SCND says whether the system is producing what it should, whether a shortfall was the weather or the system, what the export credit is worth, and what to ask the installer. It never gives a verdict, only questions.
 
 Static site served by a Cloudflare Worker. No backend, no accounts, no database, no cookies. Everything the owner types stays in the browser.
 
@@ -16,7 +16,7 @@ Start here: `CLAUDE.md` (project rules), `docs/SPEC.md` (spec), `docs/NEXT.md` (
 | F2 | Bill decoder: import, export credit at the generation charge, and why fixed charges keep the bill above zero (Taglish walk-through) |
 | F3 | Findings sheet: a one-page report (summary, system, performance table, numbered questions, information requested, basis and limitations, notes space) for the installer, no installer names |
 | F4 | Weather or system: satellite and NASA POWER cross-checked, labelled "uncertain" or "inferred" when they disagree or one is missing |
-| F5 to F7 | Energy split, true savings against the promised payback (chart with hover, table view and payback time at your own pace), load-shift value |
+| F5 to F7 | Energy split, savings against the promised payback (chart with hover, table view and payback time at your own pace), load-shift value |
 | F8 | Year-over-year degradation against the module warranty, after 13 months of bills |
 | F9 | Hybrid systems: battery round-trip efficiency, implied house load, battery value, grid-charging flag |
 
@@ -32,7 +32,7 @@ Save and load use a JSON file on the owner's own device. "Try an example" fills 
 ## Layout
 
 - `public/`: `index.html`, `app.css`, `manifest.webmanifest`, `icons/`, `js/` (`calc.js` all the maths, `grid.js`, `weather.js`, `findings.js`, `data.js`, `app.js`), `data/ph-grid.json`, `vendor/alpine.min.js` (Alpine 3.17.4, MIT), `fonts/` (Pixelify Sans and DSEG7 Classic for the app, Source Serif 4 and Source Sans 3 for the printed report, all SIL Open Font Licence 1.1, licences alongside), `icons/` (logo and app icons). Everything is self-hosted so the page makes no third-party request
-- `src/worker.js`: serves `public/` and rate-limits
+- `src/worker.js`: serves `public/`, rate-limits page requests and sets the security headers (values in `src/headers.js`; static files take theirs from `public/_headers`)
 - `scripts/`: `build-grid.mjs` (builds the sun grid), `gen-poa-reference.py` (pvlib reference cases), `gen-logo.mjs` and `gen-icons.mjs` (the seven-segment SCND logo and app icons)
 - `test/`: golden-case tests
 - `docs/`: spec, task queue, rate limiting, custom domain guide, feedback form setup

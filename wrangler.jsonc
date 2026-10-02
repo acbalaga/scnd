@@ -1,16 +1,20 @@
 {
-  // SCND: static assets, with the Worker in src/worker.js running first on every request so it can
-  // rate-limit. run_worker_first means every request is a Worker request (Free plan: 100,000 a day),
-  // see docs/RATE-LIMITING.md.
+  // SCND: static assets, with the Worker in src/worker.js running first on the page itself so it can rate-limit
+  // and set the security headers. Static files (scripts, styles, fonts, icons, data) skip the Worker: they are
+  // free and unlimited, while every Worker request counts against the Free plan's 100,000 a day. With the Worker
+  // first on every file, one visit cost about 14 Worker requests, so about 7,000 visits a day would hit the cap
+  // and the Free plan then answers 429 to everything. See docs/RATE-LIMITING.md and public/_headers.
   "name": "scnd",
   "main": "src/worker.js",
   "compatibility_date": "2026-09-01",
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
-    "run_worker_first": true
+    // "!/..." patterns go straight to the asset server. test/worker.test.mjs fails if a file under public/ other
+    // than the page is left on the Worker path.
+    "run_worker_first": ["/*", "!/js/*", "!/vendor/*", "!/fonts/*", "!/icons/*", "!/data/*", "!/app.css", "!/manifest.webmanifest"]
   },
-  // 100 requests per 10 seconds per visitor. One page load is about 12 requests. The limit is loose on purpose:
+  // 100 requests per 10 seconds per visitor, counted on page requests only (static files skip the Worker). The limit is loose on purpose:
   // many Philippine mobile users share one public IP behind carrier-grade NAT.
   "ratelimits": [
     {

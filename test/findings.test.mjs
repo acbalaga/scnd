@@ -77,3 +77,13 @@ test('findings: questions use the app\'s formatted period when given, raw dates 
   assert.match(t, /PR for 15 Mar to 14 Apr 2026 was 0\.70/);
   assert.match(findings({ bills: [bill({ band: 'amber', pr: 0.7 })], payback: null }).items[0].text, /2026-03-15 to 2026-04-14/);
 });
+// Pre-launch audit H-3: two red months against a typical year with no usable weather check must not reach the
+// installer as a bare fault question; a cloudy stretch alone can pull PR that low (Manila, Aug 2026: index 0.66).
+test('findings edge: two low months judged without a weather check say so in the question', () => {
+  const t = (basis) => findings({ bills: [bill({ band: 'red', pr: 0.5, basis }), bill({ band: 'red', pr: 0.48, redRaised: true, basis })], payback: null }).items[0].text;
+  assert.match(t('typical'), /typical year/); assert.match(t('typical'), /weather .*not checked/);
+  assert.match(t(undefined), /weather .*not checked/);
+  assert.ok(!/not checked/.test(t('weather')));
+  const mixed = findings({ bills: [bill({ band: 'red', pr: 0.5, basis: 'typical' }), bill({ band: 'red', pr: 0.48, redRaised: true, basis: 'weather' })], payback: null }).items[0].text;
+  assert.match(mixed, /not checked/);
+});

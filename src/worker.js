@@ -9,23 +9,7 @@
 // It also adds security headers to every response, so the browser enforces the privacy claim: user inputs
 // can only go to this origin, and the only other hosts the page may call are the two irradiance sources.
 
-// sha256 of the inline theme script in public/index.html. test/worker.test.mjs fails if the two drift apart.
-export const THEME_SCRIPT_HASH = 'sha256-B8U7Anw7zuz9OFoSuoKagKsf+/k9rF62FJxi1G4tCEw=';
-
-// Alpine's standard build compiles x-data expressions with new Function, so script-src needs 'unsafe-eval'.
-// style-src needs 'unsafe-inline' for the style="" attributes in index.html. Everything else is locked to self.
-export const CSP = [
-  "default-src 'self'",
-  `script-src 'self' '${THEME_SCRIPT_HASH}' 'unsafe-eval'`,
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data:",
-  "font-src 'self'",
-  "connect-src 'self' https://satellite-api.open-meteo.com https://power.larc.nasa.gov",
-  "object-src 'none'",
-  "base-uri 'none'",
-  "form-action 'none'",
-  "frame-ancestors 'none'",
-].join('; ');
+import { CSP } from './headers.js';
 
 const SECURITY_HEADERS = {
   'content-security-policy': CSP,

@@ -5,6 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>SCND: your second meter</title>
 <meta name="description" content="A free, private checker for Philippine rooftop solar. Your numbers stay in your browser.">
+<link rel="canonical" href="https://myscnd.app/">
+<!-- Share preview for Facebook, LinkedIn and others. Image made by scripts/gen-og.mjs. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="SCND">
+<meta property="og:url" content="https://myscnd.app/">
+<meta property="og:title" content="SCND: is your rooftop solar doing its job?">
+<meta property="og:description" content="A free check for Philippine rooftop solar, from your own bill and inverter app. What you type stays in your browser.">
+<meta property="og:image" content="https://myscnd.app/icons/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="SCND logo and the line: Is your solar doing its job?">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#F3F6FA" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0A1424" media="(prefers-color-scheme: dark)">
 <script>try{var t=localStorage.getItem("scnd-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
@@ -546,7 +558,24 @@
     </template>
   </section>
 
-  <footer class="foot">Nothing here is a verdict. It is a set of questions to ask your installer. <a :href="feedbackHref" x-show="feedbackHref" target="_blank" rel="noopener noreferrer">Give feedback</a> <span x-show="feedbackHref">(opens a Google Form: please leave out bill and account numbers. Name and email are optional.)</span></footer>
+  <footer class="foot">Nothing here is a verdict. It is a set of questions to ask your installer. The numbers are estimates, not an engineering or financial opinion. <a :href="feedbackHref" x-show="feedbackHref" target="_blank" rel="noopener noreferrer">Give feedback</a> <span x-show="feedbackHref">(opens a Google Form: please leave out bill and account numbers. Name and email are optional.)</span>
+    <!-- Pre-launch audit H-5 (2 Oct 2026). Facts behind this copy: src/worker.js (hashed IP key, nothing logged or stored),
+         public/js/weather.js (the only outbound calls, location rounded to 0.1 degree), app.js theme (localStorage key
+         scnd-theme), FEEDBACK_URL (Google Form). No claim here about regulation, rates or programs. -->
+    <details class="fine" id="privacy">
+      <summary>Privacy and limits</summary>
+      <h2>Your data</h2>
+      <ul>
+        <li>What you type (system details, bills, inverter kWh) stays in this browser. SCND has no accounts, no database and no cookies, and its server never receives your numbers.</li>
+        <li>"Check the weather" sends only your location, rounded to 0.1° (about 11 km), and a date range to Open-Meteo and NASA POWER, and only when you tap it.</li>
+        <li>Your Auto, Light or Dark choice is kept in this browser's local storage. "Save" writes a file to your own device; nothing is uploaded.</li>
+        <li>The site is served by Cloudflare, which sees your IP address to deliver the page, like any web host. SCND's own code turns it into a code that changes daily, for rate limiting, and does not log or store it.</li>
+        <li>Feedback goes through a Google Form. Answers are stored in Google Forms and read only by the person who runs SCND. Name and email are optional.</li>
+      </ul>
+      <h2>Limits</h2>
+      <p>SCND gives estimates from your own figures and public sun data. Sun data can be off by 5 to 10% for one place and month. The results are not an engineering inspection, a financial or legal opinion, or a verdict on any installer or product. Talk to a qualified engineer or your installer before acting on warranty or money matters.</p>
+    </details>
+  </footer>
 </main>
 </body>
 </html>
