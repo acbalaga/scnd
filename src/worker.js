@@ -34,9 +34,12 @@ const SECURITY_HEADERS = {
   'permissions-policy': 'geolocation=(self), camera=(), microphone=(), payment=()',
 };
 
-function secure(response) {
+// x-limiter says which path the limiter took: ok, blocked, open-no-ip, open-no-binding or open-error.
+// A diagnostic only (added 2 Oct 2026 to find out why production was not blocking); it carries no visitor data.
+function secure(response, limiter) {
   const res = new Response(response.body, response);   // headers on a fetched Response are immutable
   for (const [k, v] of Object.entries(SECURITY_HEADERS)) res.headers.set(k, v);
+  res.headers.set('x-limiter', limiter);
   return res;
 }
 
@@ -51,6 +54,7 @@ async function visitorKey(ip, now = new Date()) {
 export default {
   async fetch(request, env) {
     const ip = request.headers.get('cf-connecting-ip');   // set by Cloudflare at the edge
+    let state = !ip ? 'open-no-ip' : !env.LIMITER ? 'open-no-binding' : 'ok';
     if (ip && env.LIMITER) {
       try {
         const { success } = await env.LIMITER.limit({ key: await visitorKey(ip) });
@@ -58,12 +62,12 @@ export default {
           return secure(new Response(BLOCKED, {
             status: 429,
             headers: { 'content-type': 'text/plain; charset=utf-8', 'retry-after': '10', 'cache-control': 'no-store' },
-          }));
+          }), 'blocked');
         }
       } catch {
-        // fail open
+        state = 'open-error';   // fail open
       }
     }
-    return secure(await env.ASSETS.fetch(request));
+    return secure(await env.ASSETS.fetch(request), state);
   },
 };
