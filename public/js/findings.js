@@ -17,7 +17,8 @@ const peso = (v) => 'PHP ' + Math.round(v).toLocaleString('en-PH');   // the she
 // The app passes `period` in the same "1 Sep to 1 Oct 2026" style as the screen; raw dates are the fallback.
 const span = (b) => b.period ?? `${b.start} to ${b.end}`;
 
-// bills: oldest first, each { start, end, period?, pr, band, redRaised, actualKwh, expectedKwh, weather, flags, savings }
+// bills: oldest first, each { start, end, period?, pr, band, basis, redRaised, actualKwh, expectedKwh, weather, flags, savings }
+//   basis: 'weather' when PR is weather-adjusted (calc.judgedPr), anything else means against a typical year
 //   weather: null, or { wi, uncertain, inferred, source, split: { weather, system, total } }
 //   hybridFlags: optional array, e.g. ['grid_charging']
 // payback: null, or { saved, promised, days } (pesos to date, days since the first reading date)
@@ -30,7 +31,12 @@ export function findings({ bills, payback, degradation = null, efficiency = null
   const raised = [...bills].reverse().find((b) => b.redRaised);
 
   if (raised) {
-    items.push({ id: 'two_low', text: `PR was in the low range in two months in a row (latest: ${span(raised)}, PR ${f2(raised.pr)}). Has a shading check or panel cleaning been done? What does the inverter fault log show for these dates? Was string-level output compared?` });
+    // Pre-launch audit H-3 (2 Oct 2026): when either month was judged against a typical year (weather not checked,
+    // uncertain or rejected), the installer reads that first, because a cloudy stretch alone can pull PR this low.
+    const k = bills.indexOf(raised), pair = [bills[k - 1], raised];
+    const typical = pair.some((b) => b && b.basis !== 'weather');
+    const caveat = typical ? ' These months are compared with a typical year\'s sun; the actual weather for these dates was not checked or could not be used, so a cloudy stretch may explain part of the gap.' : '';
+    items.push({ id: 'two_low', text: `PR was in the low range in two months in a row (latest: ${span(raised)}, PR ${f2(raised.pr)}).${caveat} Has a shading check or panel cleaning been done? What does the inverter fault log show for these dates? Was string-level output compared?` });
   } else if (last && (last.band === 'amber' || last.band === 'red')) {
     items.push({ id: 'one_low', text: `PR for ${span(last)} was ${f2(last.pr)}, below the ${f2(PR_BANDS.green)} usual for a healthy system. One low month is not a fault. Does the design yield estimate for this month match what the system produced (${f0(last.actualKwh)} kWh)?` });
   }

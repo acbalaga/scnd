@@ -219,7 +219,7 @@ document.addEventListener('alpine:init', () => {
       const f = findings({
         payback, degradation: this.degradationResult, efficiency: this.efficiencyTrend,
         bills: rows.map(({ b, r }) => ({
-          start: b.start, end: b.end, period: this.fmtRange(b.start, b.end), pr: r.pr, band: r.band, redRaised: this.redRaised(b), actualKwh: num(b.inverterKwh),
+          start: b.start, end: b.end, period: this.fmtRange(b.start, b.end), pr: r.pr, band: r.band, basis: r.basis, redRaised: this.redRaised(b), actualKwh: num(b.inverterKwh),
           expectedKwh: r.expectedKwh, weather: r.weather, flags: r.flags, savings: r.savings, hybridFlags: r.hybrid?.flags ?? [],
         })),
       });
@@ -327,7 +327,9 @@ document.addEventListener('alpine:init', () => {
       if (r.band === 'check') return 'Higher than panels this size can make. Check the dates and kWh.';
       if (r.band === 'green') return 'Looks healthy.';
       if (r.band === 'amber') return 'A bit low. Worth watching, not worrying.';
-      return this.redRaised(b) ? 'Low two months in a row. Worth asking your installer.' : 'Low this month. One month is not enough to call a fault.';
+      if (!this.redRaised(b)) return 'Low this month. One month is not enough to call a fault.';
+      // Pre-launch audit H-3: against a typical year, a cloudy stretch can cause this, so weather comes before the installer.
+      return r.basis === 'weather' ? 'Low two months in a row. Worth asking your installer.' : 'Low two months in a row. Check the weather before asking your installer.';
     },
     answerSub(b) {
       const r = this.result(b);
