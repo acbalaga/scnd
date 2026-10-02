@@ -585,7 +585,7 @@
     <p>SCND runs in your browser and stores no data on a server. The optional weather check sends only your location, rounded to 0.1°.</p>
     <!-- Pre-launch audit H-5 (2 Oct 2026). Facts behind this copy: src/worker.js (hashed IP key, nothing logged or stored),
          public/js/weather.js (the only outbound calls, location rounded to 0.1 degree), app.js theme (localStorage key
-         scnd-theme), FEEDBACK_URL (Google Form). No claim here about regulation, rates or programs. -->
+         scnd-theme), FEEDBACK_URL (Google Form), Cloudflare Web Analytics beacon (dashboard setting, allowed in src/headers.js; audit M-10). No claim here about regulation, rates or programs. -->
     <details class="fine" id="privacy">
       <summary>Privacy and limits</summary>
       <h2>Your data</h2>
@@ -594,6 +594,7 @@
         <li>"Check the weather" sends only your location, rounded to 0.1° (about 11 km), and a date range to Open-Meteo and NASA POWER, and only when you tap it.</li>
         <li>Your Auto, Light or Dark choice is kept in this browser's local storage. "Save" writes a file to your own device; nothing is uploaded.</li>
         <li>The site is served by Cloudflare, which sees your IP address to deliver the page, like any web host. SCND's own code turns it into a code that changes daily, for rate limiting, and does not log or store it.</li>
+        <li>Cloudflare Web Analytics counts page views and basic technical details such as country, browser type and page load time. It uses no cookies and does not follow you across sites. SCND sends it nothing you type. Cloudflare's own privacy policy applies to those counts.</li>
         <li>Feedback goes through a Google Form. Answers are stored in Google Forms and read only by the person who runs SCND. Name and email are optional.</li>
         <li>The Ko-fi link and the tip QR are plain links and a picture from this site. Nothing is sent to Ko-fi unless you open its page, and then Ko-fi's own privacy policy applies.</li>
       </ul>

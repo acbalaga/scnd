@@ -196,7 +196,7 @@ Decided by Fred, 2 Oct 2026: path B, new domain bought in Cloudflare, attached t
 - [x] **Docs:** `docs/CUSTOM-DOMAIN.md` rewritten for what was done, path C shrunk to a rejection note; README deploy section and SPEC hosting line updated.
 - [ ] **Smoke test the live site.** Not run from the build sandbox: its proxy answers 403 to CONNECT for myscnd.app:443, so nothing could be fetched or checked. Run by hand, on a phone over mobile data: the page loads over https with a padlock; enter a sample bill; the result and dial show; print the findings sheet; fonts show (pixel headings, LCD digits); no broken images or console errors. On a laptop, in the browser dev tools Network tab, check no 404s and that `.js` is `text/javascript`, `.json` is `application/json` and `.woff2` is `font/woff2`.
 - [x] **Rate-limit check: the production counter did not trip (Fred, 2 Oct 2026).** Three runs against myscnd.app, 150 requests each, no `429`: sequential; parallel (`xargs -P 20`) in 2.0 s; parallel in 1.8 s with the `x-limiter` header, all 150 `ok`. So the Worker runs (CSP header present), `LIMITER` is bound (dashboard, namespace 1001), `limit()` does not throw (`ok`, not `open-error`), and it still approved about 75 requests a second from one IP against a configured 100 per 10 seconds. Local `wrangler dev` blocked correctly. Cause not confirmed: the likely one is that the binding is per location and eventually consistent, so it is looser than configured. **Decided (Fred, 2 Oct 2026): keep as is,** a loose backstop. Watch the daily request count against the Free plan cap of 100,000; revisit (Workers Paid or a stricter limit) only if it shows real bot traffic. Not changing the 100 per 10 s threshold without Fred's say-so. `docs/RATE-LIMITING.md` now says production enforcement is approximate and was not observed at the configured number.
-- [ ] **Cloudflare dashboard, by hand:** toggle **Preview URLs** off for the `scnd` Worker (the file now says so, the dashboard setting should match); confirm the Custom Domain is production only; confirm the Git-connected deploy after this merge keeps the domain.
+- [x] **Cloudflare dashboard, by hand (confirmed by Fred, 2 Oct 2026):** toggle **Preview URLs** off for the `scnd` Worker (the file now says so, the dashboard setting should match); confirm the Custom Domain is production only; confirm the Git-connected deploy after this merge keeps the domain.
 - [x] **Beta over (Fred, 2 Oct 2026):** `"workers_dev": false` in `wrangler.jsonc`. After the deploy, the workers.dev address stops answering; tell testers to use myscnd.app. In the dashboard, check the workers.dev subdomain toggle for `scnd` matches.
 - [ ] **Separate cleanup:** duplicate `_dmarc` record on alfredbalaga.com.
 - [ ] **Doorway link** on the author site to https://myscnd.app (plain link, no iframe).
@@ -222,3 +222,12 @@ Requested by Fred. Plain links only: no Ko-fi widget, script, cookie or request 
 - [x] `"!/assets/*"` added to `run_worker_first` so the QR file does not spend Worker requests. 2 tests. `node --test`: 126 pass.
 - [x] `PAYEE_NAME` set to "AL***D B." (the masked name GCash shows after a scan, from Fred).
 - [x] `public/assets/qr-ph.png` added (Fred's GCash QR Ph crop, resized to 720 px wide, 30 KB; no mobile number or user ID in it). **Fred:** scan it once from the live page with another phone before sharing; no QR decoder was available here to test it.
+
+## 16. Cloudflare Web Analytics disclosed (2 Oct 2026)
+
+Decided by Fred, 2 Oct 2026: keep the Cloudflare beacon and disclose it (audit M-10), instead of turning it off.
+
+- [x] `src/headers.js`: `script-src` allows `https://static.cloudflareinsights.com`, `connect-src` allows `https://cloudflareinsights.com`. Test updated.
+- [x] "Privacy and limits" has a bullet: cookieless page-view counts by Cloudflare, nothing typed is sent to it, Cloudflare's policy applies. CLAUDE.md allows an optional cookieless counter.
+- [x] Fred confirmed in the dashboard: workers.dev and Preview URLs off, custom domain production only (task 13).
+- [ ] **Fred:** after deploy, load https://myscnd.app/ with the browser console open: no CSP error for `cloudflareinsights`. Then turn on Always Use HTTPS and HSTS (audit L-1). Add the privacy notice to the Google Form (audit compliance item 1).
