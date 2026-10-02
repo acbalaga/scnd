@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import worker, { CSP, THEME_SCRIPT_HASH } from '../src/worker.js';
+import worker from '../src/worker.js';
+import { CSP, THEME_SCRIPT_HASH } from '../src/headers.js';
 
 const asset = new Response('static file', { status: 200 });
 const req = (ip) => new Request('https://scnd.example/', { headers: ip ? { 'cf-connecting-ip': ip } : {} });
@@ -59,4 +60,11 @@ test('worker golden: x-limiter header names the path taken', async () => {
   assert.equal(await h(req('203.0.113.7'), envWith(async () => { throw new Error('down'); })), 'open-error');
   assert.equal(await h(req('203.0.113.7'), { ASSETS: { fetch: async () => asset.clone() } }), 'open-no-binding');
   assert.equal(await h(req(null), envWith(async () => ({ success: true }))), 'open-no-ip');
+});
+
+// workerd treats every named export of the main module as an entrypoint and refuses to start when one is not a
+// handler ("Incorrect type for map entry 'CSP'"), so `wrangler dev` crashed. Constants live in src/headers.js.
+test('worker: the main module exports only the default handler', async () => {
+  const mod = await import('../src/worker.js');
+  assert.deepEqual(Object.keys(mod), ['default']);
 });
