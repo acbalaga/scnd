@@ -290,3 +290,5 @@ table.rt { width:100%; border-collapse:collapse; font-size:12.5px; margin:4px 0 
 
 label > .err { font-size:13px; font-weight:500; margin:2px 0 0; } input[aria-invalid=true], select[aria-invalid=true] { border-color:var(--red); }
 @media (max-width:480px) { .bill-head { flex-wrap:wrap; } }
+
+p.err[role=alert] { margin:0 0 12px; } label > .err { margin-top:4px; }

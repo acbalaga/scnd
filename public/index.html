@@ -170,7 +170,7 @@
       </div>
       <div class="row">
         <button type="button" class="primary" @click="continueSetup(true)" x-text="ready ? 'Save changes' : 'Continue to my bill'"></button>
-        <button type="button" class="link" x-show="!ready" @click="loadExample()">or try an example</button>
+        
       </div>
     </div>
 
@@ -210,7 +210,7 @@
               <div class="grid">
                 <label>Reading date, start<input type="date" x-model="b.start"></label>
                 <label>Reading date, end<input type="date" x-model="b.end"></label>
-                <div class="wide help-row"><details class="optional"><summary>Ano ito? Reading dates</summary>
+                <div class="wide help-row"><details class="optional"><summary>? Ano ito? Reading dates</summary>
                   <p class="help">Nasa bill mo ang "Previous reading date" at "Present reading date". Hindi ito buong buwan, kaya ito ang ginagamit natin.</p></details></div>
                 <!-- Optional, so it stays folded and out of the path to the answer (dates, then solar kWh). Opens when it holds a value. -->
                 <div class="wide help-row"><details class="optional" x-init="$el.open = num(b.outageHours) > 0"><summary>Had brownouts? Add outage hours</summary>
@@ -237,7 +237,7 @@
                       <input type="number" min="0" step="any" inputmode="decimal" x-model.number="b.homeLoadKwh"></label>
                   </div>
                 </template>
-                <div class="wide help-row"><details class="optional"><summary>Ano ito? Solar from the app</summary>
+                <div class="wide help-row"><details class="optional"><summary>? Ano ito? Solar from the app</summary>
                   <p class="help">Sa inverter app mo, hanapin ang total generation. Idagdag ang daily totals mula sa start hanggang end reading date ng bill.</p>
                   <p class="help" x-show="s.hybrid">Sa hybrid inverter app, hanapin ang "Battery charge" at "Battery discharge" para sa parehong petsa ng bill. Idagdag ang daily totals. Ang "Home load" ay lalabas lang kung may CT meter ang inverter mo.</p></details></div>
               </div>
@@ -248,7 +248,7 @@
               <div class="grid">
                 <label>Bought from the grid (kWh)<input type="number" min="0" step="any" inputmode="decimal" x-model.number="b.importKwh"></label>
                 <label>Sent to the grid (kWh)<input type="number" min="0" step="any" inputmode="decimal" x-model.number="b.exportKwh"></label>
-                <div class="wide help-row"><details class="optional"><summary>Ano ito? Bought and sent</summary>
+                <div class="wide help-row"><details class="optional"><summary>? Ano ito? Bought and sent</summary>
                   <p class="help">Sa net metering bill, may dalawang linya: "Delivered" (bili mo sa grid) at "Received" (na-export mo). Kung 0 ang export, ilagay ang 0.</p></details></div>
 
                 <label>Generation charge (₱ per kWh)
@@ -257,7 +257,7 @@
                 <label>Variable charges (₱)
                   <span class="hint">Bill lines that grow with kWh, before the export credit.</span>
                   <input type="number" min="0" inputmode="decimal" step="0.01" x-model.number="b.varCharges"></label>
-                <div class="wide help-row"><details class="optional"><summary>Ano ito? Rates and charges</summary>
+                <div class="wide help-row"><details class="optional"><summary>? Ano ito? Rates and charges</summary>
                   <p class="help">Generation charge: presyo bawat kWh sa "Generation" line ng bill. Variable charges: lahat ng singil na tumataas kapag mas marami kang kuryenteng ginamit (generation, transmission, distribution, buwis). Huwag isama ang fixed charges tulad ng metering at supply. Kung hindi sigurado, ilagay ang subtotal bago ang export credit.</p></details></div>
 
                 <label class="wide">Total amount due (₱, optional)<input type="number" min="0" inputmode="decimal" step="0.01" x-model.number="b.total"></label>
@@ -402,9 +402,12 @@
       </template>
 
       <!-- Weather check (F4): only on click, only location and dates leave the browser -->
-      <section class="card">
+      <section class="card" x-show="canCheckWeather || weather.status !== 'idle'">
         <h3>Was it the weather?</h3>
-        <p class="help">A low month can be cloudy weather, not a fault. This compares each bill's dates with the sun that fell on your roof, from a satellite (Himawari, through Open-Meteo) and NASA POWER. It sends only your location, rounded to 0.1° (about 11 km), and a date range to those two services. Nothing else leaves your browser.</p>
+        <p class="help">A low month can be cloudy weather, not a fault. This compares your bill dates with the sun that fell on your roof.</p>
+        <details class="optional"><summary>What is sent?</summary>
+          <p class="help">Sun data comes from a satellite (Himawari, through Open-Meteo) and NASA POWER. Only your location, rounded to 0.1° (about 11 km), and a date range go to those two services, and only when you tap the button. Nothing else leaves your browser.</p>
+        </details>
         <div class="row" style="margin-top:10px">
           <button type="button" :class="{ primary: weather.status !== 'done' }" @click="checkWeather()" :disabled="!canCheckWeather" :aria-disabled="weather.status === 'loading'" x-text="weather.status === 'loading' ? 'Checking...' : (weather.status === 'done' ? 'Check again' : (weather.status === 'failed' ? 'Try again' : 'Check the weather'))"></button>
         </div>
