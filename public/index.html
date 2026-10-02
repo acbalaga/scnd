@@ -48,7 +48,7 @@
     <h1>Is your solar doing its job?</h1>
     <p>Check your rooftop system against your own bill. Free, and everything you type stays in this browser.</p>
     <div class="row" style="margin-top:12px">
-      <button type="button" class="primary" @click="scrollTo('setup')">Check my system</button>
+      <button type="button" class="primary" @click="started = true; $nextTick(() => { scrollTo('setup'); $refs.fPlace?.focus({ preventScroll: true }); })">Check my system</button>
       <button type="button" @click="loadExample()">Try an example</button>
     </div>
     <div><button type="button" class="link" style="padding-left:0" @click="openIntro()">What is SCND?</button></div>
@@ -107,7 +107,7 @@
       <button type="button" class="link" id="setupEdit" @click="openSetup()">Edit</button>
     </div>
 
-    <div x-show="!ready || setupOpen">
+    <div x-show="(!ready && started) || (ready && setupOpen)">
       <h2 style="margin-bottom:12px">Your system</h2>
       <p class="err" role="alert" x-show="setupError" x-text="setupError"></p>
       <div class="grid">
@@ -225,14 +225,14 @@
               <div class="grid">
                 <label class="wide"><span x-text="s.hybrid ? 'PV yield in that period (kWh)' : 'Solar produced in that period (kWh)'"></span>
                   <span class="hint">A kWh is one unit of electricity, what your meter counts.</span>
-                  <input type="number" min="0" step="any" inputmode="decimal" x-model.number="b.inverterKwh">
+                  <input type="number" min="0" step="any" inputmode="decimal" x-model.number="b.inverterKwh" :placeholder="prevHint(i, 'inverterKwh')">
                 </label>
                 <template x-if="s.hybrid">
                   <div class="wide grid">
-                    <label>Battery charged (kWh)<span class="hint">Energy that went into the battery.</span>
-                      <input type="number" min="0" step="any" inputmode="decimal" x-model.number="b.chargeKwh"></label>
+                    <label>Battery charged (kWh)<span class="hint">Energy that went into the battery. Check the Battery page of your app.</span>
+                      <input type="number" min="0" step="any" inputmode="decimal" x-model.number="b.chargeKwh" :placeholder="prevHint(i, 'chargeKwh')"></label>
                     <label>Battery discharged (kWh)<span class="hint">Energy that came out.</span>
-                      <input type="number" min="0" step="any" inputmode="decimal" x-model.number="b.dischargeKwh"></label>
+                      <input type="number" min="0" step="any" inputmode="decimal" x-model.number="b.dischargeKwh" :placeholder="prevHint(i, 'dischargeKwh')"></label>
                     <label class="wide">Home load from your app (kWh, optional)<span class="hint">Only if your inverter has a CT meter.</span>
                       <input type="number" min="0" step="any" inputmode="decimal" x-model.number="b.homeLoadKwh"></label>
                   </div>
@@ -246,7 +246,7 @@
             <fieldset class="src">
               <legend>From your bill</legend>
               <div class="grid">
-                <label>Bought from the grid (kWh)<input type="number" min="0" step="any" inputmode="decimal" x-model.number="b.importKwh"></label>
+                <label>Bought from the grid (kWh)<input type="number" min="0" step="any" inputmode="decimal" x-model.number="b.importKwh" :placeholder="prevHint(i, 'importKwh')"></label>
                 <label>Sent to the grid (kWh)<input type="number" min="0" step="any" inputmode="decimal" x-model.number="b.exportKwh"></label>
                 <div class="wide help-row"><details class="optional"><summary>? Ano ito? Bought and sent</summary>
                   <p class="help">Sa net metering bill, may dalawang linya: "Delivered" (bili mo sa grid) at "Received" (na-export mo). Kung 0 ang export, ilagay ang 0.</p></details></div>
@@ -256,7 +256,7 @@
                   <input type="number" min="0" inputmode="decimal" step="0.0001" x-model.number="b.genRate"></label>
                 <label>Variable charges (₱)
                   <span class="hint">Bill lines that grow with kWh, before the export credit.</span>
-                  <input type="number" min="0" inputmode="decimal" step="0.01" x-model.number="b.varCharges"></label>
+                  <input type="number" min="0" inputmode="decimal" step="0.01" x-model.number="b.varCharges" :placeholder="varHint(b, i)"></label>
                 <div class="wide help-row"><details class="optional"><summary>? Ano ito? Rates and charges</summary>
                   <p class="help">Generation charge: presyo bawat kWh sa "Generation" line ng bill. Variable charges: lahat ng singil na tumataas kapag mas marami kang kuryenteng ginamit (generation, transmission, distribution, buwis). Huwag isama ang fixed charges tulad ng metering at supply. Kung hindi sigurado, ilagay ang subtotal bago ang export credit.</p></details></div>
 
@@ -302,7 +302,7 @@
                 <summary>Weather or system? <span class="teaser" x-text="weatherTeaser(b)"></span></summary>
                 <div>
                   <template x-if="!result(b).weather && weather.status === 'failed'"><p class="help">The weather check did not get through, so the PR above is still against a typical year's sun. Check your connection and use "Try again" below your bills.</p></template>
-                  <template x-if="!result(b).weather && weather.status !== 'failed'"><p class="help">Not checked yet. Use "Check the weather" below your bills. The PR above is against a typical year's sun, so a cloudy month can read low even when the system is fine.</p></template>
+                  <template x-if="!result(b).weather && weather.status !== 'failed'"><p class="help">Not checked yet. Tap "Check the weather" (below your bills) to compare. The PR above is against a typical year's sun, so a cloudy month can read low even when the system is fine.</p></template>
                   <template x-if="result(b).weather && result(b).weather.missing">
                     <div class="flag">No weather data for these dates from either source, so the PR above is against a typical year only. It cannot tell weather from a system fault.</div>
                   </template>
@@ -435,7 +435,7 @@
       <template x-if="chartModel">
         <section class="card">
           <h3>Payback so far</h3>
-          <p class="help">Your savings from the bills above, compared with the installer's promise. Add what you paid and the promised payback to see if you are on track.</p>
+          <p class="help">Your savings from the bills above. Optional: add what you paid and the promised payback to compare with the installer's promise.</p>
           <div class="grid" style="margin-top:10px">
             <label>System cost (₱)<input type="number" inputmode="decimal" x-model.number="s.cost"></label>
             <label>Promised payback (years)<input type="number" inputmode="decimal" step="0.1" x-model.number="s.promisedYears"></label>

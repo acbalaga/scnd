@@ -81,6 +81,7 @@ document.addEventListener('alpine:init', () => {
     fileMessage: '',
     setupOpen: true,
     fieldErr: {},
+    started: false,   // landing shows the hero first; the setup form opens on "Check my system"
     example: false,
     savedOnce: false,
     saveNudgeHidden: false,
@@ -290,6 +291,14 @@ document.addEventListener('alpine:init', () => {
     // Earlier bills that already have an answer fold to one line once a newer bill has one too (long scroll on phones).
     foldable(i) { return i < this.bills.reduce((n, b, k) => (this.result(b)?.pr != null ? k : n), -1); },
     folded(b, i) { return this.foldable(i) && !b.expanded && this.removing !== b.id; },
+    // Placeholders only (never a value): last month's numbers as a reference while typing. Nothing is saved from them.
+    prevHint(i, key) { const v = i > 0 ? num(this.bills[i - 1]?.[key]) : NaN; return Number.isFinite(v) ? `last bill: ${this.fmt(v, 0)}` : ''; },
+    varHint(b, i) {
+      const p = i > 0 ? this.bills[i - 1] : null, rate = p ? num(p.varCharges) / num(p.importKwh) : NaN;
+      if (!Number.isFinite(rate)) return '';
+      const kwh = num(b.importKwh);
+      return Number.isFinite(kwh) && kwh > 0 ? `about ${this.fmt(rate * kwh, 0)} at last bill's rate` : `last bill: ${this.fmt(num(p.varCharges), 0)}`;
+    },
     billTitle(b, i) { return b.start && b.end ? this.fmtRange(b.start, b.end) : `Bill ${i + 1}`; },
     get summaryLine() {
       const s = this.s, face = FACINGS.find((x) => x.az === num(s.azimuth))?.label.toLowerCase() ?? '';
@@ -380,7 +389,7 @@ document.addEventListener('alpine:init', () => {
       this.$nextTick(() => this.focusBill(0, '.bill-title h3'));
     },
     clearExample() {
-      this.example = false; this.ready = false; this.setupOpen = true; this.place = '';
+      this.example = false; this.ready = false; this.setupOpen = true; this.started = true; this.place = '';
       setTimeout(() => { this.scrollTo('setup'); document.querySelector('[x-ref=fPlace]')?.focus({ preventScroll: true }); }, 50);
       this.s = { lat: '', lon: '', kWp: '', acKw: '', tilt: 10, azimuth: 0, commissioned: '', hybrid: false, netMetering: false, cost: '', promisedYears: '', warrantyPct: '', batteryCost: '' };
       this.bills = [newBill()]; this.climate = null; this.lowDiffuse = false;
