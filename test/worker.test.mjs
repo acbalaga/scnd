@@ -82,7 +82,8 @@ test('wrangler: every static file except the page bypasses the Worker', () => {
   const covered = (path) => skipped.some((p) => (p.endsWith('/*') ? path.startsWith(p.slice(0, -1)) : path === p));
   const files = readdirSync(new URL('../public/', import.meta.url), { recursive: true, withFileTypes: true })
     .filter((d) => d.isFile()).map((d) => '/' + path.relative(fileURLToPath(new URL('../public/', import.meta.url)), path.join(d.parentPath, d.name)).replaceAll(path.sep, '/'));
-  const onWorker = files.filter((f) => !['/index.html', '/_headers'].includes(f) && !covered(f));
+  const onWorker = files.filter((f) => !['/index.html', '/404.html', '/_headers'].includes(f) && !covered(f));
   assert.deepEqual(onWorker, []);
-  assert.ok(patterns.includes('/*') && !covered('/index.html'), 'the page itself must still run the Worker');
+  assert.ok(patterns.includes('/*') && !covered('/index.html') && !covered('/404.html'), 'the page and the 404 page must still run the Worker');
+  assert.equal(cfg.assets.not_found_handling, '404-page');
 });

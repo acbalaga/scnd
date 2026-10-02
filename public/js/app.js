@@ -74,6 +74,7 @@ let nextId = 1;
 const newBill = () => ({ id: nextId++, start: '', end: '', inverterKwh: '', importKwh: '', exportKwh: '', genRate: '', varCharges: '', total: '', outageHours: '', chargeKwh: '', dischargeKwh: '', homeLoadKwh: '', open: true });
 
 document.addEventListener('alpine:init', () => {
+  document.getElementById('boot')?.remove();   // the "Loading" fallback in index.html (audit M-11); only a failed start leaves it showing
   Alpine.data('scnd', () => ({
     minPairs: MIN_DEGRADATION_PAIRS,
     cities: CITIES,

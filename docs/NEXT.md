@@ -230,4 +230,14 @@ Decided by Fred, 2 Oct 2026: keep the Cloudflare beacon and disclose it (audit M
 - [x] `src/headers.js`: `script-src` allows `https://static.cloudflareinsights.com`, `connect-src` allows `https://cloudflareinsights.com`. Test updated.
 - [x] "Privacy and limits" has a bullet: cookieless page-view counts by Cloudflare, nothing typed is sent to it, Cloudflare's policy applies. CLAUDE.md allows an optional cookieless counter.
 - [x] Fred confirmed in the dashboard: workers.dev and Preview URLs off, custom domain production only (task 13).
-- [ ] **Fred:** after deploy, load https://myscnd.app/ with the browser console open: no CSP error for `cloudflareinsights`. Then turn on Always Use HTTPS and HSTS (audit L-1). Add the privacy notice to the Google Form (audit compliance item 1).
+- [x] **Fred (done, 2 Oct 2026):** after the deploy, the console shows no CSP error for `cloudflareinsights`; Always Use HTTPS and HSTS are on (audit L-1); the privacy notice is on the Google Form (audit compliance item 1); the link is scraped in Facebook's Sharing Debugger and LinkedIn's Post Inspector; the QR Ph image was scanned from the live page with a second phone.
+
+## 17. Last small fixes before the share (2 Oct 2026)
+
+Requested by Fred: audit M-6, M-7 and M-11. Nothing else changed.
+
+- [x] **M-6, 404 page.** `public/404.html` (logo, "That page is not here", a link home, `noindex`) and `"not_found_handling": "404-page"` in `wrangler.jsonc`. The 404 page runs through the Worker like the main page, so it carries the same security headers. Checked under `wrangler dev`: `/nope` returns 404 with the page and the CSP; no overflow at 390 px.
+- [x] **M-11, blank page on a failed script.** A "Loading SCND. If this stays blank, reload the page." line sits outside `<main>`. It fades in after 3 s (no flash on a normal load) and `app.js` removes it when Alpine starts. Without JavaScript a `<noscript>` line says what to do. Checked at 390 px with `js/app.js` blocked: the line shows and the page chrome still renders; with JavaScript off the noscript line shows and the loading line does not.
+- [x] **M-7, who runs SCND.** Footer line: "SCND is a personal project by Alfred Balaga. For a data question, or to have a feedback answer deleted, use "Give feedback" above and include the name or email you gave." It points at the Google Form because no public email address was chosen; it hides if the form link is empty. **Fred:** if you want a direct address instead, give me one and I will swap it in.
+- 3 tests added; `node --test`: 129 pass.
+- **Still open from the audit, all need your decision:** M-3 (export credit carried over), M-4 (Manila PR reads about 4% low), M-5 ("everything you type" wording), M-8 (typo floor for PR), M-9 (hybrid export check), M-2 (CSP `unsafe-eval`, large), L-5 (employer names in two docs, repo private).
