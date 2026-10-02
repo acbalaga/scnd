@@ -15,3 +15,25 @@ test('html: share preview tags are present and the image is an absolute URL to a
   assert.match(html, /<link rel="canonical" href="https:\/\/myscnd\.app\/">/);
   assert.equal(meta('property', 'og:url'), 'https://myscnd.app/');
 });
+
+// Tip line and footer (2 Oct 2026): plain links only, hidden when their constant is empty, no third-party embed.
+const app = readFileSync(new URL('../public/js/app.js', import.meta.url), 'utf8');
+
+test('html: tip and feedback links are plain, hardened, and driven by constants', () => {
+  assert.match(app, /const KOFI_URL = 'https:\/\/ko-fi\.com\/alfredbalaga';/);
+  assert.match(app, /const QR_PH_SRC = '\/assets\/qr-ph\.png';/);
+  assert.match(app, /const PAYEE_NAME = '/);
+  assert.match(app, /const FEEDBACK_URL = '/);
+  const anchors = [...html.matchAll(/<a [^>]*target="_blank"[^>]*>/g)].map((m) => m[0]);
+  assert.ok(anchors.length >= 3, 'feedback and two Ko-fi links');
+  for (const a of anchors) assert.match(a, /rel="noopener noreferrer"/);
+  for (const a of anchors.filter((x) => /kofiHref|feedbackHref/.test(x))) assert.match(a, /x-show="(kofiHref|feedbackHref)"/);
+  assert.doesNotMatch(html, /ko-fi\.com\/widget|storage\.ko-fi|<iframe/i);
+});
+
+test('html: the tip block sits after the findings sheet, so it never shows on landing or above the results', () => {
+  assert.ok(html.indexOf('class="card tipjar"') > html.indexOf('id="findings"'));
+  assert.match(html, /class="card tipjar" x-show="showSheet && sheet"/);
+  assert.match(html, /<template x-if="qrOk">\s*<details class="qr">/);   // the image is not requested until the probe finds the file
+  assert.match(html, /<img :src="qrSrc"[^>]* alt="QR Ph code/);
+});
