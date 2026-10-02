@@ -36,7 +36,7 @@ const FLAG_TEXT = {
   no_export_after_activation: 'You said net metering is on, but this bill shows 0 kWh sent to the grid. Ask the utility whether your meter was actually changed to a bi-directional one.',
   outage: 'Outage hours were entered. On-grid inverters shut off during brownouts by design, so some of the gap is expected.',
   clipping: 'Panels are more than 1.3 times the inverter size, so the inverter caps output on sunny days.',
-  before_commissioning: 'This period ends before the month you said the system was switched on. Check the reading dates, or the switch-on month in setup. The result below is not meaningful until they agree.',
+  before_commissioning: 'This period ends before the month you said the system was switched on. Check the reading dates, or the switch-on month in setup. No result is shown for this bill until they agree.',
   overlap: 'These dates overlap another bill, so savings and payback count the shared days twice. Check the reading dates.',
 };
 
@@ -363,7 +363,7 @@ document.addEventListener('alpine:init', () => {
       return fields.filter(([k]) => !Number.isFinite(num(b[k]))).map(([, label]) => label);
     },
     chipClass(b) { return this.result(b)?.band ?? 'none'; },
-    chipText(b) { const r = this.result(b); return r?.band ? `PR ${this.fmt(r.pr, 2)}, ${BAND_SHORT[r.band]}` : 'Not enough yet'; },
+    chipText(b) { const r = this.result(b); if (r?.flags.includes('before_commissioning')) return 'Check dates'; return r?.band ? `PR ${this.fmt(r.pr, 2)}, ${BAND_SHORT[r.band]}` : 'Not enough yet'; },
     headline(b) {
       const r = this.result(b);
       if (!r || r.pr === null) return '';
@@ -483,6 +483,9 @@ document.addEventListener('alpine:init', () => {
       if (!this.ready || !this.climate) return null;
       const s = this.s, errors = [], out = { errors, flags: [], pr: null, split: null, savings: null };
       if (!b.start || !b.end) return null;
+      // Switch-on is a month, so only a period that ends before that month starts is certainly wrong (a bill spanning it is normal).
+      // No PR, savings or payback for it: numbers from before the system existed would only mislead.
+      if (/^\d{4}-\d{2}$/.test(s.commissioned || '') && b.end.slice(0, 7) < s.commissioned) { out.flags.push('before_commissioning'); return out; }
       const negative = NUM_FIELDS.filter(([k]) => num(b[k]) < 0).map(([, label]) => label);
       if (negative.length) { errors.push(`These cannot be below zero: ${negative.join(', ')}. Check the minus sign.`); return out; }
       const p = calc.poaPeriod({ ghi: this.climate.ghi, dif: this.climate.dif, tilt: num(s.tilt), azimuth: num(s.azimuth), lat: s.lat, start: b.start, end: b.end });
@@ -543,8 +546,6 @@ document.addEventListener('alpine:init', () => {
       const k = this.bills.indexOf(b);
       const earlier = this.bills.filter((o, n) => o !== b && o.start && o.end && (o.start < b.start || (o.start === b.start && n < k)));
       if (earlier.some((o) => calc.overlapDays(o, b) > 1)) out.flags.push('overlap');
-      // Switch-on is a month, so only a period that ends before that month starts is certainly wrong (a bill spanning it is normal).
-      if (/^\d{4}-\d{2}$/.test(s.commissioned || '') && b.end.slice(0, 7) < s.commissioned) out.flags.push('before_commissioning');
       return out;
     },
 
