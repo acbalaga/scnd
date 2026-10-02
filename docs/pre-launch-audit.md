@@ -37,6 +37,7 @@ Ranked by severity. No Blockers were found. Effort: S under an hour, M a few hou
 | L-1 | Transport | Plain `http://myscnd.app/` is served as `200` with the full page, with no redirect to HTTPS, and there is no `Strict-Transport-Security` header. | Live: `curl -sI http://myscnd.app/` gives `HTTP/1.1 200 OK`, same ETag as HTTPS. | Low: `.app` is on the browser HSTS preload list, so browsers never send plain HTTP to it. Non-browser clients and link checkers can. | Open (dashboard) | SSL/TLS > Edge Certificates: turn on **Always Use HTTPS** and **HSTS** (steps below). | S |
 | L-2 | Headers | `x-limiter` diagnostic header on every Worker response. | `src/worker.js:42`. | Tells a visitor how the limiter behaves. No visitor data. | Open | Remove once the limiter question is closed. | S |
 | L-3 | SEO | No `sitemap.xml`. `robots.txt` exists live but is Cloudflare's managed file (content-signal comments only, no `Disallow`, no sitemap line); it is not in the repo. | Live `/robots.txt` 200, 622 bytes; `/sitemap.xml` 404. | Minor. Search engines may crawl; Lighthouse SEO 100 live. | Open | Optional: a one-URL sitemap, and a `Sitemap:` line via Cloudflare's robots settings. | S |
+| L-10 | Domain hygiene | DNSSEC is off: no DS record at the `.app` registry. No SPF, DMARC or MX record, so anyone can send mail claiming to be from myscnd.app. No CAA record. `www.myscnd.app` does not exist (NXDOMAIN). | `dns.google` lookups, 2 Oct 2026: NS `emely`/`ignat.ns.cloudflare.com`; DS empty; MX, TXT, CAA, `_dmarc` TXT empty; `www` status 3. | Spoofed "SCND" mail could reach people who saw the post. Someone typing `www.myscnd.app` gets a browser error. DNS answers are not signed. | Open (dashboard) | Steps in "Blockers before public share" item 5, plus a `www` record with a redirect to the apex (below). | S |
 | L-9 | Third parties | Cloudflare adds `report-to` / `nel` headers (Network Error Logging, `success_fraction 0.0`): browsers report failed loads to `a.nel.cloudflare.com`. | Live response headers. | Failure reports only, sent to the host already named in the privacy notice. | Open (note only) | Nothing needed; it is part of "served by Cloudflare". | S |
 | L-4 | Headers | No `X-Frame-Options`. | Headers above. | Covered by `frame-ancestors 'none'` in every current browser. | Open | Optional `X-Frame-Options: DENY`. | S |
 | L-5 | Leakage | Employer names appear in two docs and in history since the first commit: CLAUDE.md:12 ("NAC Energy / NAC EnerTech / EPI") and docs/SPEC.md:146-148 ("outside NAC's business ... keep it off company devices this time"). No employer data (plant, pyranometer, SCADA, documents) in any revision. | `git grep` over all 88 commits. | Not served (`docs/` and `CLAUDE.md` are outside `public/`), and the repo is private. Becomes visible if the repo is ever made public; "this time" reads badly out of context. | **Open: needs your decision.** Not rewritten, per your rule. | If the repo stays private, nothing to do. Before making it public: reword the two lines (for example "Nothing from Fred's employer") in a normal commit, and decide whether history needs rewriting. | S |
@@ -58,6 +59,7 @@ Ranked by severity. No Blockers were found. Effort: S under an hour, M a few hou
     - DNSSEC: Domain Registration > Manage Domains > myscnd.app > Configuration > DNSSEC: Enable (Cloudflare Registrar sets the DS record itself).
     - WHOIS: Cloudflare Registrar redacts contact details by default. Confirm under the domain's Contacts page.
     - HSTS (L-1): SSL/TLS > Edge Certificates > HTTP Strict Transport Security: Enable, max-age 12 months, include subdomains on, preload optional. Also confirm "Always Use HTTPS" is on.
+    - `www` (L-10): DNS > Records > Add: `CNAME www myscnd.app`, proxied. Then Rules > Redirect Rules > Create: when hostname equals `www.myscnd.app`, redirect 301 to `concat("https://myscnd.app", http.request.uri.path)`.
     - Email: if myscnd.app will not send or receive mail, publish "no mail" records so nobody can spoof it. In DNS > Records add: `TXT @ "v=spf1 -all"`, `TXT _dmarc "v=DMARC1; p=reject; sp=reject; adkim=s; aspf=s"`, and a null MX `MX @ "." priority 0`. If you set up Email Routing later, replace these with what Cloudflare generates.
 6. **Watch the request count** for the first 48 hours after posting: Workers & Pages > `scnd` > Metrics. After H-2 you should see roughly one Worker request per visit.
 
@@ -110,12 +112,76 @@ Run against https://myscnd.app, which still serves `main` (the live `index.html`
 - **Storage:** `localStorage` and cookies empty after the full flow. No horizontal overflow at 390 px.
 - **Lighthouse, live, mobile** (through a US proxy, so timings are not what a PH phone sees): Performance 95, Accessibility 100, Best Practices 92 (M-10), SEO 100. FCP 2.1 s, LCP 2.4 s, TBT 40 ms, CLS 0, 116 KiB.
 
+### DNS (2 Oct 2026, via dns.google)
+
+| Record | Value | Note |
+| --- | --- | --- |
+| NS | `emely.ns.cloudflare.com`, `ignat.ns.cloudflare.com` | Cloudflare, as expected |
+| A / AAAA | `104.21.17.225`, `172.67.178.159` / `2606:4700:3036::ac43:b29f`, `2606:4700:3031::6815:11e1` | Cloudflare proxy addresses; origin not exposed (Workers have none) |
+| DS / DNSKEY | none | DNSSEC off (L-10) |
+| MX, TXT (SPF), `_dmarc` TXT | none | No mail policy (L-10) |
+| CAA | none | Any CA may issue (L-10, minor) |
+| `www` | NXDOMAIN | (L-10) |
+
+## Compliance check (legal:compliance-check)
+
+The installed plugins do not load into a session that is already running, so this follows the `compliance-check` skill as published in `anthropics/knowledge-work-plugins` (`legal/skills/compliance-check/SKILL.md`), applied to Philippine law. It is not legal advice, and a Philippine lawyer should review it before anything here is relied on.
+
+### Compliance Check: public launch of SCND (free web tool, Philippine owners)
+
+**Summary: Proceed with conditions.** The design keeps compliance exposure small: owner inputs never reach a server, and the only personal data SCND as operator receives is optional name and email through the feedback form. The conditions are a contact point for data questions, the M-10 beacon decision, and keeping the not-advice wording.
+
+**Applicable regulations and policies**
+
+| Regulation / policy | Relevance | Key requirements |
+| --- | --- | --- |
+| RA 10173 Data Privacy Act 2012 and its 2016 IRR | Fred is the personal information controller for feedback-form answers (optional name, email, free text). IP addresses seen by Cloudflare as host. Bill and kWh inputs stay on the device and are not processed by SCND. | Transparency, legitimate purpose and proportionality (Sec. 11); data subject rights including the right to be informed (Sec. 16); reasonable security (Sec. 20). |
+| NPC Circular 2022-04 (registration of DPOs and data processing systems, effective 11 Jan 2023) | Registration is required only at 250 or more employees, sensitive personal information of 1,000 or more people, or processing likely to pose risk to data subjects. | None of the three applies to optional name and email in a feedback form, so registration is not required on current facts. |
+| NPC Circular 16-03 (personal data breach management) | Applies if the feedback responses leak. | Keep the form's sharing settings private; know that notification duties exist if a breach could lead to harm. |
+| RA 10175 Cybercrime Prevention Act (cyber libel) | The findings sheet could be read as accusing an installer. | Already mitigated: questions, not verdicts; no installer names stored or shown; H-3 adds the weather caveat. Keep it that way. |
+| Employment terms with Fred's employer | Side project in the same field. | Not a statute. CLAUDE.md rule 4 and the SPEC risk table already address it; check the employment contract's outside-work and IP clauses yourself. |
+
+**Requirements**
+
+| # | Requirement | Status | Action needed |
+| --- | --- | --- | --- |
+| 1 | Privacy notice at or before collection (feedback form) | Met on the site (H-5); **Unknown** in the form itself | Paste a two-line notice at the top of the Google Form (purpose: improve SCND; who reads it; how to ask for deletion). |
+| 2 | Identity of the controller and a contact for data requests | **Not met** | M-7: one line naming who runs SCND and an email for data questions. |
+| 3 | Notice matches practice | **Not met while the beacon is injected** | M-10: turn off Web Analytics, or disclose it and allow it in the CSP. |
+| 4 | Proportionality (collect only what is needed) | Met | Name and email are optional; the footer asks people to leave out bill and account numbers. |
+| 5 | Security of collected data | Met in the app; **Unknown** for the form | Limit form response access to Fred's Google account; turn on 2-step verification. |
+| 6 | Retention | **Unknown** | Decide a period (for example, delete feedback responses after 12 months) and say so in the form notice. |
+| 7 | Not-advice disclaimer | Met (H-5, sheet footer) | Keep the wording; do not soften it in later copy edits. |
+| 8 | NPC registration | Not required on current facts | Re-check if SCND ever stores user data or grows past the thresholds. |
+
+**Risk areas**
+
+| Risk | Severity | Mitigation |
+| --- | --- | --- |
+| An owner relies on a red result to dispute with an installer, and the result was weather or a typo | Medium | H-3 (weather caveat), M-8 (typo floor), sheet framed as questions with limits. |
+| Privacy notice says less than what happens (injected beacon) | Medium | M-10. |
+| A data request arrives with no address to send it to | Low | M-7. |
+| Cyber libel complaint from an installer | Low | No names, question framing, keep "not a verdict" wording. |
+
+**Recommended actions:** 1) M-10 decision. 2) M-7 contact line. 3) Two-line notice and retention period on the Google Form.
+
+**Approvals needed:** none required by law on current facts. Your own call on naming yourself (M-7).
+
+**Further review recommended:** a Philippine data-privacy lawyer for a short read of the "Privacy and limits" text and the form notice, if you want certainty before the network share. Check the employer contract yourself.
+
+Sources for the registration thresholds: [NPC Circular 2022-04](https://privacy.gov.ph/wp-content/uploads/2023/05/Circular-2022-04.pdf), [Baker McKenzie summary](https://insightplus.bakermckenzie.com/bm/data-technology/philippines-new-npc-circular-on-registration-of-data-protection-officers-and-data-processing-systems-takes-effect_1).
+
+## Dependency vetting
+
+The `dependency-evaluator` plugin did not load into this session either. Same checks done by hand: SCND ships one third-party file, Alpine.js. Provenance: byte-identical to `alpinejs@3.17.4/dist/cdn.min.js` from npm (the current `latest`, published Sep 2026). Licence: MIT, named in the vendored header. Maintenance: active (release in the last month). Typosquat risk: none, it is vendored, not installed. Pinning: fixed by being a committed file. Fonts: four OFL families, licence files committed. Dev tooling (wrangler, playwright-core) is unpinned (L-7) and never shipped.
+
 ## Could not verify
 
-- **workers.dev address:** its hostname is `scnd.<account subdomain>.workers.dev`, which is not in the repo, and `*.workers.dev` is not on the sandbox allow-list. Check it yourself (post-deploy step 6).
+- **workers.dev address** (`scnd.alfred-capilla-balaga.workers.dev`): the sandbox proxy still refuses it (`CONNECT` 403), so either it was not added to the allow-list or the change has not reached this session. Check it yourself (post-deploy step 6).
+- **WHOIS privacy:** `rdap.org` redirects `.app` lookups to `pubapi.registry.google`, which is not on the allow-list. Check in Cloudflare: Domain Registration > myscnd.app > Contacts (Cloudflare Registrar redacts by default).
 - **Real TLS certificate:** the sandbox proxy re-signs TLS. Check in a browser (padlock > certificate: issued for myscnd.app by Google Trust Services or Let's Encrypt via Cloudflare).
 - **Link previews** on Facebook and LinkedIn: need H-4 deployed and their debuggers, which need your login.
-- **DNS, DNSSEC, WHOIS, SPF, DKIM, DMARC** for myscnd.app: no `dig`, and DNS-over-HTTPS (`dns.google`), RDAP (`rdap.org`) and `crt.sh` are not on the allow-list. Adding `dns.google` and `rdap.org` to the environment's allowed domains would let a session check them.
+- **Certificate transparency** (`crt.sh`): not on the allow-list. Low value; the certificate is Cloudflare-managed.
 - **Cloudflare dashboard state** (toggles, metrics, rate limiting rule availability): no API access.
 - **iPhone Safari** rendering, number keyboards and printing of the findings sheet: no WebKit here. NEXT.md says Fred tested Safari on a real iPhone; the new footer section and preview tags have not been.
 - **Meralco's September 2026 generation charge** of PHP 9.70/kWh: only the July 2026 figure (PHP 9.2504) was found.
