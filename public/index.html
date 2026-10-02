@@ -117,18 +117,18 @@
             <template x-for="c in cities" :key="c.name"><option :value="c.name" x-text="c.name"></option></template>
           </select>
         </label>
+        <div class="wide"><button type="button" class="link" style="padding-left:0" @click="useMyLocation()">or use my phone's location</button></div>
         <div class="wide">
           <details class="optional"><summary>Not on the list? Enter coordinates</summary>
             <div class="grid" style="margin-top:8px">
               <label>Latitude<input type="number" inputmode="decimal" step="0.1" x-model.number="s.lat" placeholder="14.6"></label>
               <label>Longitude<input type="number" inputmode="decimal" step="0.1" x-model.number="s.lon" placeholder="121.0"></label>
-              <div class="wide"><button type="button" class="link" @click="useMyLocation()">Use my phone's location</button>
-                <p class="help">We round it to 0.1° (about 11 km) and it stays in your browser. Sun data comes from a file we ship, so nothing is looked up online.</p></div>
+              <div class="wide"><p class="help">We round it to 0.1° (about 11 km) and it stays in your browser. Sun data comes from a file we ship, so nothing is looked up online.</p></div>
             </div>
           </details>
         </div>
         <label>Panel size (kWp)
-          <span class="hint">On your quotation. Six 550 W panels is 3.3 kWp.</span>
+          <span class="hint">On your quotation. Not sure? Panel watts times panel count: six 550 W panels is 3.3 kWp.</span>
           <input type="number" inputmode="decimal" step="0.01" x-model.number="s.kWp" x-ref="fKwp" placeholder="e.g. 5.5">
         </label>
         <label>Inverter size (kW)
@@ -136,7 +136,7 @@
           <input type="number" inputmode="decimal" step="0.1" x-model.number="s.acKw" x-ref="fAc" placeholder="e.g. 5">
         </label>
         <label>Roof tilt (degrees)
-          <span class="hint">Most PH roofs are 10 to 15°.</span>
+          <span class="hint">Most PH roofs are 10 to 15°. Not sure? Leave it at 10.</span>
           <input type="number" inputmode="decimal" step="1" x-model.number="s.tilt" x-ref="fTilt">
         </label>
         <label>Panels face
@@ -186,13 +186,18 @@
         <article class="card">
           <div class="bill-head">
             <div class="bill-title"><h3 tabindex="-1" x-text="billTitle(b, i)"></h3><span class="chip" :class="chipClass(b)" x-text="chipText(b)"></span></div>
-            <button type="button" class="link" @click="askRemove(b, $el)" x-show="bills.length > 1 && removing !== b.id">Remove</button>
+            <span class="row" style="margin:0">
+              <button type="button" class="link" x-show="foldable(i)" @click="b.expanded = !b.expanded" :aria-expanded="!folded(b, i)" x-text="folded(b, i) ? 'Show details' : 'Hide details'"></button>
+              <button type="button" class="link" @click="askRemove(b, $el)" x-show="bills.length > 1 && removing !== b.id">Remove</button>
+            </span>
           </div>
+          <p class="sub" style="margin:0 0 4px" x-show="folded(b, i)" x-text="headline(b)"></p>
           <div class="confirm" role="group" aria-label="Confirm remove" x-show="removing === b.id">
             <span>Remove this bill and its numbers? This cannot be undone.</span>
             <span class="row" style="margin:0"><button type="button" class="danger" @click="removeBill(b.id)">Remove</button><button type="button" class="link keep" @click="keepBill($el)">Keep it</button></span>
           </div>
 
+          <div x-show="!folded(b, i)">
           <details class="inputs" :open="b.open" @toggle="b.open = $event.target.open">
             <summary>Numbers for this period</summary>
             <!-- Grouped by where each number comes from, so the owner works one document at a time. -->
@@ -388,19 +393,9 @@
               </div>
             </div>
           </template>
+          </div>
         </article>
       </template>
-
-      <div id="bills-end" class="row">
-        <button type="button" @click="addBill()">Add another bill</button>
-        <button type="button" :class="{ primary: weather.status === 'done' }" @click="showSheet = !showSheet; if (showSheet) $nextTick(() => scrollTo('findings'))" x-text="showSheet ? 'Hide findings sheet' : 'Findings sheet for my installer'"></button>
-      </div>
-
-      <!-- Save nudge: after the first answer, before they leave -->
-      <div class="card nudge-save" x-show="step === 3 && !savedOnce && !saveNudgeHidden && !example">
-        <div><strong>Save this so next month takes one minute.</strong><p class="help" style="margin:2px 0 0">The file stays on your device. Load it next month and add the new bill.</p></div>
-        <div class="row" style="margin:0"><button type="button" class="primary" @click="saveData()">Save my data</button><button type="button" class="link" @click="saveNudgeHidden = true">Not now</button></div>
-      </div>
 
       <!-- Weather check (F4): only on click, only location and dates leave the browser -->
       <section class="card">
@@ -415,6 +410,18 @@
           <p class="err" x-show="weather.status === 'failed'">Neither source gave usable data, so nothing changed above. Check your connection and tap Try again. Your PR still stands, measured against a typical year's sun.</p>
         </div>
       </section>
+
+      <div id="bills-end" class="row">
+        <button type="button" @click="addBill()">Add another bill</button>
+        <button type="button" :class="{ primary: weather.status === 'done' }" @click="showSheet = !showSheet; if (showSheet) $nextTick(() => scrollTo('findings'))" x-text="showSheet ? 'Hide findings sheet' : 'Findings sheet for my installer'"></button>
+      </div>
+
+      <!-- Save nudge: after the first answer, before they leave -->
+      <div class="card nudge-save" x-show="step === 3 && !savedOnce && !saveNudgeHidden && !example">
+        <div><strong>Save this so next month takes one minute.</strong><p class="help" style="margin:2px 0 0">The file stays on your device. Load it next month and add the new bill.</p></div>
+        <div class="row" style="margin:0"><button type="button" class="primary" @click="saveData()">Save my data</button><button type="button" class="link" @click="saveNudgeHidden = true">Not now</button></div>
+      </div>
+
 
       <template x-if="chartModel">
         <section class="card">
@@ -530,7 +537,7 @@
     </template>
   </section>
 
-  <p class="foot">Nothing here is a verdict. It is a set of questions to ask your installer. <a :href="feedbackHref" x-show="feedbackHref" target="_blank" rel="noopener noreferrer">Give feedback</a> <span x-show="feedbackHref">(opens a Google Form: please leave out bill and account numbers. Name and email are optional.)</span></p>
+  <footer class="foot">Nothing here is a verdict. It is a set of questions to ask your installer. <a :href="feedbackHref" x-show="feedbackHref" target="_blank" rel="noopener noreferrer">Give feedback</a> <span x-show="feedbackHref">(opens a Google Form: please leave out bill and account numbers. Name and email are optional.)</span></footer>
 </main>
 </body>
 </html>

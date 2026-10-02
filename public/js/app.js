@@ -285,6 +285,9 @@ document.addEventListener('alpine:init', () => {
       }
       return '';
     },
+    // Earlier bills that already have an answer fold to one line once a newer bill has one too (long scroll on phones).
+    foldable(i) { return i < this.bills.reduce((n, b, k) => (this.result(b)?.pr != null ? k : n), -1); },
+    folded(b, i) { return this.foldable(i) && !b.expanded && this.removing !== b.id; },
     billTitle(b, i) { return b.start && b.end ? this.fmtRange(b.start, b.end) : `Bill ${i + 1}`; },
     get summaryLine() {
       const s = this.s, face = FACINGS.find((x) => x.az === num(s.azimuth))?.label.toLowerCase() ?? '';
