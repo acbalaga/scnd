@@ -177,7 +177,7 @@ Built in the order of `docs/NEXT.md`, calc core before any UI, so the numbers ar
 ## Open decisions
 
 - [ ] **Name.** SCND, read "second": Solar, Consumption, Net-metering, Degradation, one letter per app tab. Tagline: "Your second meter." Deliberately in the SCNTL family. Check domain and FB page availability
-- [x] **Hosting.** Cloudflare Workers Free, static assets. Live at myscnd.app since 2 Oct 2026 (new domain bought in Cloudflare, see `docs/CUSTOM-DOMAIN.md`); beta testers stay on workers.dev until beta ends
+- [x] **Hosting.** Cloudflare Workers Free, static assets. Live at myscnd.app since 2 Oct 2026 (new domain bought in Cloudflare, see `docs/CUSTOM-DOMAIN.md`); the workers.dev address was switched off when beta ended
 - [x] **Hybrid systems.** In v1 scope as F9
 - [x] **Language.** English UI; Taglish for bill-decoder explanations, tooltips and nudges; findings sheet stays English because it goes to the installer
 - [x] **Obsolescence tracker.** Separate product and brand

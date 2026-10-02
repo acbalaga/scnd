@@ -46,7 +46,7 @@ Save and load use a JSON file on the owner's own device. "Try an example" fills 
 
 ## Deploy
 
-Cloudflare Workers, Git-connected. Every push to `main` deploys to https://myscnd.app (custom domain, production only, live 2 Oct 2026). Preview URLs are off. `scnd.<account>.workers.dev` stays on for beta testers until beta ends, then `workers_dev` goes to `false` in `wrangler.jsonc`. Domain notes are in `docs/CUSTOM-DOMAIN.md`.
+Cloudflare Workers, Git-connected. Every push to `main` deploys to https://myscnd.app (custom domain, production only, live 2 Oct 2026). Preview URLs and the `scnd.<account>.workers.dev` address are off (`preview_urls` and `workers_dev` are `false` in `wrangler.jsonc`, 2 Oct 2026). Domain notes are in `docs/CUSTOM-DOMAIN.md`.
 
 The Worker runs first on every request (`run_worker_first`) so it can rate-limit: 100 requests per 10 seconds per visitor, failing open if the limiter is unavailable. Every request is therefore a Worker request (Free plan: 100,000 a day). Watch the daily count during beta. Details and the trade-offs are in `docs/RATE-LIMITING.md`.
 

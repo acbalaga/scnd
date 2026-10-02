@@ -1,6 +1,6 @@
 # Custom domain: myscnd.app
 
-**Decision (Fred, 2 Oct 2026): path B.** SCND goes live at https://myscnd.app, a new domain bought in Cloudflare Registrar and attached to the `scnd` Worker as a Custom Domain, production only. Beta testers keep using `scnd.<account>.workers.dev` for now.
+**Decision (Fred, 2 Oct 2026): path B.** SCND goes live at https://myscnd.app, a new domain bought in Cloudflare Registrar and attached to the `scnd` Worker as a Custom Domain, production only. Beta ended 2 Oct 2026, so the `scnd.<account>.workers.dev` address is switched off.
 
 ## What we did
 
@@ -8,7 +8,7 @@
 2. Attached it to the `scnd` Worker: **Workers & Pages**, **scnd**, **Settings**, **Domains & Routes**, **Add**, **Custom Domain**. Cloudflare creates the DNS record and the HTTPS certificate.
 3. Recorded it in `wrangler.jsonc`: `"routes": [{ "pattern": "myscnd.app", "custom_domain": true }]`. Without it, a deploy from Git could remove a domain that exists only in the dashboard.
 4. Set `"preview_urls": false`. Preview URLs bypass the custom domain and are an extra public surface.
-5. Left `workers_dev` at its default (on) because beta testers still use the workers.dev link. **When beta ends, set `"workers_dev": false`** and tell testers to use myscnd.app.
+5. Set `"workers_dev": false` (Fred, 2 Oct 2026, beta over). The workers.dev address stops answering and testers use myscnd.app. To bring it back, remove the line (default is on).
 
 Nothing existing is touched: no nameservers changed, no records moved.
 
@@ -26,7 +26,7 @@ Add a normal link or button on alfredbalaga.com that goes to https://myscnd.app.
 
 - https://myscnd.app opens with a padlock, on a phone over mobile data and on a laptop.
 - Enter a sample bill and print the findings sheet.
-- The workers.dev address still works while `workers_dev` is on.
+- The workers.dev address no longer answers once this deploys (`workers_dev` is false).
 - Run the rate-limit check from `docs/RATE-LIMITING.md` against myscnd.app.
 - Open a version preview URL: it should no longer exist (Preview URLs off, in both `wrangler.jsonc` and the dashboard).
 - In Cloudflare, **Workers & Pages**, **scnd**, **Metrics**: requests are counted. The Worker runs first on every request, so watch the daily count against the Free plan limit of 100,000.

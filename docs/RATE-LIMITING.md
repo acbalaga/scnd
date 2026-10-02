@@ -25,6 +25,12 @@ To change the numbers, edit `ratelimits` in `wrangler.jsonc` (`limit`, and `peri
 
 Under `wrangler dev` (Workers runtime, local), 150 rapid requests from one visitor gave 100 served and 50 blocked with `429`; a second visitor was unaffected; the first visitor was served again after 10 seconds; static files were served; the removed `/api/pvgis` route returned 404. Unit tests are in `test/worker.test.mjs`. Local counters are exact, production counters are approximate (above).
 
+## Observed in production (2 Oct 2026)
+
+Three runs of 150 requests from one connection against https://myscnd.app/ (one sequential, two with `xargs -P 20`, the fastest about 75 requests a second) all returned `200`, none `429`. The `x-limiter` response header read `ok` on every request, which means the binding was present and `limit()` ran without error. So in production the limiter did not block at the configured 100 per 10 seconds, although it did under `wrangler dev`. The likely cause is that the binding is per location and eventually consistent (see Trade-offs), but this is not confirmed. Treat it as a loose backstop against floods, not a hard cap. The daily request count against the Free plan limit and Cloudflare's built-in DDoS protection are the real protection.
+
+`x-limiter` is on every response: `ok`, `blocked`, `open-no-ip`, `open-no-binding` or `open-error`. Check it with `curl -sI https://myscnd.app/ | grep -i x-limiter`.
+
 ## Check it after deploy
 
 From your own connection (not a shared one), expect some `429` once you pass the limit, then `200` again after about 10 seconds:
