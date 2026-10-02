@@ -44,8 +44,9 @@ test('worker golden: every response carries the CSP and security headers, includ
     assert.match(res.headers.get('permissions-policy'), /geolocation=\(self\)/);
   }
 });
-test('worker: CSP allows only this origin plus the two irradiance hosts for connections', () => {
-  assert.match(CSP, /connect-src 'self' https:\/\/satellite-api\.open-meteo\.com https:\/\/power\.larc\.nasa\.gov(;|$)/);
+test('worker: CSP allows only this origin, the two irradiance hosts and Cloudflare analytics for connections', () => {
+  assert.match(CSP, /connect-src 'self' https:\/\/satellite-api\.open-meteo\.com https:\/\/power\.larc\.nasa\.gov https:\/\/cloudflareinsights\.com(;|$)/);
+  assert.match(CSP, /script-src 'self' 'sha256-[^']+' 'unsafe-eval' https:\/\/static\.cloudflareinsights\.com(;|$)/);
   assert.match(CSP, /frame-ancestors 'none'/);
 });
 test('worker: THEME_SCRIPT_HASH matches the inline script in index.html', () => {
