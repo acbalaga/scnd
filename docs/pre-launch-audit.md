@@ -2,7 +2,7 @@
 
 2 Oct 2026. Scope: the 12 areas in Fred's brief, for a public share of https://myscnd.app on LinkedIn and Facebook. Branch `pre-launch-fixes`, six commits on top of `main` at `4bf21f6`. Nothing deployed, no DNS or dashboard changes.
 
-**Access during this audit.** This sandbox's egress policy blocks `myscnd.app` (HTTP 403, `x-deny-reason: host_not_allowed`), DNS-over-HTTPS and the Cloudflare API. Every live-site check is therefore in "Could not verify" and in the post-deploy checklist. Everything else was checked against the repo, the full git history, `wrangler dev` 4.146.0 running the real Worker locally, and headless Chromium at 390 px.
+**Access during this audit.** At first this sandbox's egress policy blocked `myscnd.app`. Fred allowed it the same day and the live checks were then run (section "Live check" below). DNS-over-HTTPS, RDAP (WHOIS), certificate transparency, workers.dev and the Cloudflare API stay blocked, so those are in "Could not verify". The live site still runs `main`: the fixes on this branch are not deployed. Everything else was checked against the repo, the full git history, `wrangler dev` 4.146.0 running the real Worker locally, and headless Chromium at 390 px.
 
 **Skills.** Loaded and followed: `vibe-security`, `no-ai-slop`, `senior-code-review`, `impeccable` (its launcher was not executable, so I read context directly and ran its detector through `sh`). Not available in this session: `/dependency-vetting`, `/legal:compliance-check`, `/qa`, and Claude in Chrome. Closest equivalents used: dependency vetting by hand (hash check against the npm release), a privacy-notice review against RA 10173's transparency principle from my own knowledge (not legal advice, not a compliance opinion), and QA by driving the local build in headless Chromium.
 
@@ -10,7 +10,7 @@
 
 **Before fixes: GO WITH FIXES.** No secret, no employer data and no blocker turned up, and the calculation core is sound. Five High findings stood between this and a credible public share: a viral post could take the site down on the Free plan, the findings sheet could send an owner to the installer over a cloudy month, the link would preview badly on both launch channels, and the page had no limits or full privacy notice.
 
-**After fixes: GO, once deployed and the post-deploy checklist passes.** All five Highs are fixed on the branch with tests, and the Worker, headers and page were re-checked under `wrangler dev`. What remains is on the live site and the Cloudflare dashboard, which only Fred can check or change.
+**After fixes: GO, once deployed, the Cloudflare beacon (M-10) is turned off or disclosed, and the post-deploy checklist passes.** All five Highs are fixed on the branch with tests, and the Worker, headers and page were re-checked under `wrangler dev`. What remains is on the live site and the Cloudflare dashboard, which only Fred can check or change.
 
 ## Findings
 
@@ -32,9 +32,12 @@ Ranked by severity. No Blockers were found. Effort: S under an hour, M a few hou
 | M-7 | Privacy (RA 10173) | No identity of who runs SCND and no direct contact for data questions; the Google Form is the only path. | `index.html` footer; `app.js:55`. | Transparency gap for the optional name and email collected through the form. | Open (Fred's call: naming yourself is a personal choice) | One line, for example "SCND is a personal project by Alfred Balaga. Data questions: <email>." | S |
 | M-8 | Input handling | No guard for an implausibly low PR from a typo. European decimal style "1.250,5" reads as 1.2505 kWh, giving PR 0.00 "Low this month". | Headless Chromium, `de-DE` and `en-PH` locales. `"1,250"` is read correctly as 1250. | One red month from a typo; a second would raise the flag. | Open (threshold decision) | A "check numbers" state below a floor such as PR 0.30, like the existing 0.90 ceiling. | S |
 | M-9 | Calculation integrity | Hybrids: export above PV yield is rejected as period misalignment before battery discharge is added. | `calc.js:267` runs before the battery terms at `:268`. Edge run: `energySplit({g:300,x:320,i:100,c:50,d:100})` returns an error, though S = 30. | A hybrid that discharges to the grid gets no savings and a misleading "dates do not line up" message. Rare in PH. | Open | For hybrids, test S = G − X − C + D only. Needs a test. | S |
-| L-1 | Headers | No `Strict-Transport-Security` header. | `src/worker.js` `SECURITY_HEADERS`. | Low: `.app` is on the browser HSTS preload list, so browsers already refuse plain HTTP. | Open | Turn on HSTS in the dashboard (steps below), or add the header in `SECURITY_HEADERS` and `public/_headers`. | S |
+| M-10 | Third parties | Cloudflare injects its Web Analytics beacon into the live page: `<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/..." data-cf-beacon='{..."token":"3f24..."}'>`. It is not in the repo. Our CSP blocks it. | Live HTML with a browser user agent; headless Chromium console: "Refused to load the script 'https://static.cloudflareinsights.com/...' because it violates ... script-src". Lighthouse live: Best Practices 92 (`errors-in-console`, `inspector-issues`). | No data is sent today because the CSP blocks it, but every visit logs a CSP error, and the page served is not the page in the repo. If someone "fixes" the CSP to allow it, a third-party script runs that the privacy notice does not mention. | Open (dashboard) | Pick one. **Off (recommended, matches the privacy notice):** Analytics & Logs > Web Analytics > myscnd.app > Manage site > turn off automatic setup (or remove the site). **On:** keep it, add `https://static.cloudflareinsights.com` to `script-src` and `https://cloudflareinsights.com` to `connect-src`, and add one line to "Privacy and limits" (cookieless page-view counts by Cloudflare). CLAUDE.md allows an optional cookieless counter. | S |
+| M-11 | Resilience | If one script fails to load, the page stays blank: `<main x-cloak>` is hidden until Alpine starts, and Alpine starts without the app if `js/app.js` failed. No `<noscript>` or fallback text. | Live run in headless Chromium: `js/app.js` failed (`ERR_TOO_MANY_RETRIES`, the sandbox proxy, not the site), Alpine logged "scnd is not defined", and the screen was empty. | On a weak mobile connection a visitor from Facebook sees a blank white page with no hint to reload. | Open | A `<noscript>` line and a small static message outside `<main>` ("Loading. If this stays blank, reload the page.") hidden by app.js once it starts. | S |
+| L-1 | Transport | Plain `http://myscnd.app/` is served as `200` with the full page, with no redirect to HTTPS, and there is no `Strict-Transport-Security` header. | Live: `curl -sI http://myscnd.app/` gives `HTTP/1.1 200 OK`, same ETag as HTTPS. | Low: `.app` is on the browser HSTS preload list, so browsers never send plain HTTP to it. Non-browser clients and link checkers can. | Open (dashboard) | SSL/TLS > Edge Certificates: turn on **Always Use HTTPS** and **HSTS** (steps below). | S |
 | L-2 | Headers | `x-limiter` diagnostic header on every Worker response. | `src/worker.js:42`. | Tells a visitor how the limiter behaves. No visitor data. | Open | Remove once the limiter question is closed. | S |
-| L-3 | SEO | No `robots.txt` or `sitemap.xml`. | `wrangler dev`: both 404. | Minor. Lighthouse SEO is 100 without them. | Open | Add both (one URL). | S |
+| L-3 | SEO | No `sitemap.xml`. `robots.txt` exists live but is Cloudflare's managed file (content-signal comments only, no `Disallow`, no sitemap line); it is not in the repo. | Live `/robots.txt` 200, 622 bytes; `/sitemap.xml` 404. | Minor. Search engines may crawl; Lighthouse SEO 100 live. | Open | Optional: a one-URL sitemap, and a `Sitemap:` line via Cloudflare's robots settings. | S |
+| L-9 | Third parties | Cloudflare adds `report-to` / `nel` headers (Network Error Logging, `success_fraction 0.0`): browsers report failed loads to `a.nel.cloudflare.com`. | Live response headers. | Failure reports only, sent to the host already named in the privacy notice. | Open (note only) | Nothing needed; it is part of "served by Cloudflare". | S |
 | L-4 | Headers | No `X-Frame-Options`. | Headers above. | Covered by `frame-ancestors 'none'` in every current browser. | Open | Optional `X-Frame-Options: DENY`. | S |
 | L-5 | Leakage | Employer names appear in two docs and in history since the first commit: CLAUDE.md:12 ("NAC Energy / NAC EnerTech / EPI") and docs/SPEC.md:146-148 ("outside NAC's business ... keep it off company devices this time"). No employer data (plant, pyranometer, SCADA, documents) in any revision. | `git grep` over all 88 commits. | Not served (`docs/` and `CLAUDE.md` are outside `public/`), and the repo is private. Becomes visible if the repo is ever made public; "this time" reads badly out of context. | **Open: needs your decision.** Not rewritten, per your rule. | If the repo stays private, nothing to do. Before making it public: reword the two lines (for example "Nothing from Fred's employer") in a normal commit, and decide whether history needs rewriting. | S |
 | L-6 | Leakage | Personal Gmail address in 6 commit author fields. | `git log --format='%ae'`. | Visible only to repo collaborators while private. | Open | Use the GitHub noreply address in `git config user.email` going forward. | S |
@@ -49,13 +52,14 @@ Ranked by severity. No Blockers were found. Effort: S under an hour, M a few hou
 
 1. **Merge and deploy** `pre-launch-fixes`, then run the post-deploy checklist below. H-2 and H-4 only take effect once deployed.
 2. **Confirm workers.dev and preview URLs are off in the dashboard.** Workers & Pages > `scnd` > Settings > Domains & Routes. `workers.dev` should read Disabled and Preview URLs Disabled, matching `wrangler.jsonc`. If workers.dev still answers, toggle it off there. Disabling (rather than redirecting) is right here: there is nothing on that address worth keeping, and the canonical tag now points search engines at myscnd.app either way.
-3. **Re-scrape the link before posting.** Facebook Sharing Debugger (https://developers.facebook.com/tools/debug/): enter https://myscnd.app/, press "Scrape Again". LinkedIn Post Inspector (https://www.linkedin.com/post-inspector/): inspect the same URL. Both cache previews, and any test share before this deploy would show the old, bare preview.
-4. **Domain hygiene (could not check from here):**
+3. **Decide on the Cloudflare Web Analytics beacon (M-10).** Analytics & Logs > Web Analytics > myscnd.app. Turning it off matches the privacy notice as written; keeping it needs a CSP change and one line in the notice (ask me and I will make both).
+4. **Re-scrape the link before posting.** Facebook Sharing Debugger (https://developers.facebook.com/tools/debug/): enter https://myscnd.app/, press "Scrape Again". LinkedIn Post Inspector (https://www.linkedin.com/post-inspector/): inspect the same URL. Both cache previews, and any test share before this deploy would show the old, bare preview.
+5. **Domain hygiene (could not check from here):**
     - DNSSEC: Domain Registration > Manage Domains > myscnd.app > Configuration > DNSSEC: Enable (Cloudflare Registrar sets the DS record itself).
     - WHOIS: Cloudflare Registrar redacts contact details by default. Confirm under the domain's Contacts page.
     - HSTS (L-1): SSL/TLS > Edge Certificates > HTTP Strict Transport Security: Enable, max-age 12 months, include subdomains on, preload optional. Also confirm "Always Use HTTPS" is on.
     - Email: if myscnd.app will not send or receive mail, publish "no mail" records so nobody can spoof it. In DNS > Records add: `TXT @ "v=spf1 -all"`, `TXT _dmarc "v=DMARC1; p=reject; sp=reject; adkim=s; aspf=s"`, and a null MX `MX @ "." priority 0`. If you set up Email Routing later, replace these with what Cloudflare generates.
-5. **Watch the request count** for the first 48 hours after posting: Workers & Pages > `scnd` > Metrics. After H-2 you should see roughly one Worker request per visit.
+6. **Watch the request count** for the first 48 hours after posting: Workers & Pages > `scnd` > Metrics. After H-2 you should see roughly one Worker request per visit.
 
 No credential was found anywhere, so there is nothing to rotate.
 
@@ -91,11 +95,27 @@ The UI copy is already plain: no em dashes in `public/` or the README, none of t
 
 New copy written for H-5 was checked against the same rules: no em dashes, no filler, units on numbers, claims match the code.
 
+## Live check (2 Oct 2026, after myscnd.app was allowed)
+
+Run against https://myscnd.app, which still serves `main` (the live `index.html` sha256 equals `origin/main:public/index.html`). Headless Chromium at 390 px through the sandbox proxy (TLS is re-signed by that proxy, so the real certificate could not be inspected).
+
+- **Headers on `/`:** CSP, `nosniff`, `no-referrer`, `Permissions-Policy`, `x-limiter: ok`, `cache-control: public, max-age=0, must-revalidate`. No HSTS. No `Access-Control-Allow-Origin`.
+- **Transport:** HTTPS over HTTP/2 with `alt-svc: h3`. Plain HTTP serves 200 (L-1).
+- **Static files:** all 200 with the right types (`text/javascript`, `application/json`, `font/woff2`, `image/svg+xml`, `application/manifest+json`), Brotli-compressed except woff2, and all currently carry `x-limiter: ok`, which confirms H-2 on the live config (every file runs the Worker today).
+- **Private paths:** `/.git/config`, `/wrangler.jsonc`, `/src/worker.js`, `/sitemap.xml`, `/nope` all 404 with an empty body (M-6). `/icons/og.png` 404 as expected until H-4 is deployed.
+- **Third parties on load:** one, the injected Cloudflare beacon, blocked by CSP (M-10). Nothing else leaves the origin until "Check the weather".
+- **Real flow, by hand (Manila, 5.5 kWp, 5 kW, Aug 2026, 420 kWh):** "PR 0.57, low. Low this month. One month is not enough to call a fault. 420 kWh made, against about 556 kWh for a healthy system in that sun (24% under)." Matches calc: no errors.
+- **Weather check (live, example system):** two calls, to `satellite-api.open-meteo.com` and `power.larc.nasa.gov`, both with `latitude=14.6` (rounded); finished in about 9 s with status done.
+- **Findings sheet:** example system, after the weather check: Q1 one low month, Q2 weather split. Printed to PDF: **1 page on A4 and 1 page on Letter**, text clean, PHP amounts, footer disclaimer present.
+- **Storage:** `localStorage` and cookies empty after the full flow. No horizontal overflow at 390 px.
+- **Lighthouse, live, mobile** (through a US proxy, so timings are not what a PH phone sees): Performance 95, Accessibility 100, Best Practices 92 (M-10), SEO 100. FCP 2.1 s, LCP 2.4 s, TBT 40 ms, CLS 0, 116 KiB.
+
 ## Could not verify
 
-- **Live site** (https://myscnd.app): blocked by this sandbox's network policy (`host_not_allowed`). Not checked: live headers, HTTP to HTTPS redirect, HSTS, TLS, cache headers at the edge, whether the workers.dev address still answers, preview URLs, the live Lighthouse score, and the real network tab. To let a future session check it, add `myscnd.app` to the environment's allowed domains (environment settings > Network access).
-- **Link previews** on Facebook and LinkedIn: need the live URL and their debuggers.
-- **DNS, DNSSEC, WHOIS, SPF, DKIM, DMARC** for myscnd.app: no `dig`, and DNS-over-HTTPS is blocked.
+- **workers.dev address:** its hostname is `scnd.<account subdomain>.workers.dev`, which is not in the repo, and `*.workers.dev` is not on the sandbox allow-list. Check it yourself (post-deploy step 6).
+- **Real TLS certificate:** the sandbox proxy re-signs TLS. Check in a browser (padlock > certificate: issued for myscnd.app by Google Trust Services or Let's Encrypt via Cloudflare).
+- **Link previews** on Facebook and LinkedIn: need H-4 deployed and their debuggers, which need your login.
+- **DNS, DNSSEC, WHOIS, SPF, DKIM, DMARC** for myscnd.app: no `dig`, and DNS-over-HTTPS (`dns.google`), RDAP (`rdap.org`) and `crt.sh` are not on the allow-list. Adding `dns.google` and `rdap.org` to the environment's allowed domains would let a session check them.
 - **Cloudflare dashboard state** (toggles, metrics, rate limiting rule availability): no API access.
 - **iPhone Safari** rendering, number keyboards and printing of the findings sheet: no WebKit here. NEXT.md says Fred tested Safari on a real iPhone; the new footer section and preview tags have not been.
 - **Meralco's September 2026 generation charge** of PHP 9.70/kWh: only the July 2026 figure (PHP 9.2504) was found.
@@ -107,16 +127,17 @@ New copy written for H-5 was checked against the same rules: no em dashes, no fi
 Run in order after merging and deploying `pre-launch-fixes`.
 
 1. Deploy finished: Workers & Pages > `scnd` > Deployments shows the new version as active on myscnd.app.
-2. Page headers:
+2. Cloudflare beacon (M-10): `curl -s -A 'Mozilla/5.0 Chrome/129' -H 'accept: text/html' https://myscnd.app/ | grep -c cloudflareinsights` returns `0` after you turn Web Analytics off (or `1` if you chose to keep and disclose it, with the CSP updated).
+3. Page headers:
    `curl -sI https://myscnd.app/ | grep -iE 'content-security|x-content-type|referrer-policy|permissions-policy|x-limiter|strict-transport'`
    Expect CSP, `nosniff`, `no-referrer`, `Permissions-Policy`, `x-limiter: ok` (and HSTS if you enabled it).
-3. Static files skip the Worker (H-2):
+4. Static files skip the Worker (H-2):
    `for p in /app.css /js/app.js /vendor/alpine.min.js /icons/og.png /data/ph-grid.json; do curl -sI https://myscnd.app$p | grep -iE '^HTTP|x-limiter|x-content-type'; done`
    Expect `200`, `nosniff`, and **no** `x-limiter` line.
-4. HTTPS: `curl -sI http://myscnd.app/` returns a 301 or 308 to `https://`.
-5. workers.dev is off: `curl -sI https://scnd.<your-subdomain>.workers.dev/` should not return the app (expect an error or 404).
-6. Not-found and private paths: `curl -s -o /dev/null -w '%{http_code}\n' https://myscnd.app/_headers` and `.../wrangler.jsonc` both `404`.
-7. Preview image: open https://myscnd.app/icons/og.png. Then Facebook Sharing Debugger and LinkedIn Post Inspector for https://myscnd.app/ (Scrape Again). Expect the dark card, title "SCND: is your rooftop solar doing its job?".
-8. On your phone over mobile data: load the page, "Try an example", open "Privacy and limits" in the footer, set both bills' solar kWh to 250 and check the second reads "Check the weather before asking your installer", open the findings sheet and confirm Q1 mentions the typical year, then print or save as PDF.
-9. Browser dev tools (laptop), Network tab with cache disabled: only myscnd.app requests on load, no 404s, no console errors.
-10. After the share: Workers & Pages > `scnd` > Metrics, daily requests should track visits one to one, well under 100,000.
+5. HTTPS (after turning on Always Use HTTPS, L-1): `curl -sI http://myscnd.app/` returns a 301 or 308 to `https://`. Today it returns 200.
+6. workers.dev is off: `curl -sI https://scnd.<your-subdomain>.workers.dev/` should not return the app (expect an error or 404).
+7. Not-found and private paths: `curl -s -o /dev/null -w '%{http_code}\n' https://myscnd.app/_headers` and `.../wrangler.jsonc` both `404`.
+8. Preview image: open https://myscnd.app/icons/og.png. Then Facebook Sharing Debugger and LinkedIn Post Inspector for https://myscnd.app/ (Scrape Again). Expect the dark card, title "SCND: is your rooftop solar doing its job?".
+9. On your phone over mobile data: load the page, "Try an example", open "Privacy and limits" in the footer, set both bills' solar kWh to 250 and check the second reads "Check the weather before asking your installer", open the findings sheet and confirm Q1 mentions the typical year, then print or save as PDF.
+10. Browser dev tools (laptop), Network tab with cache disabled: only myscnd.app requests on load, no 404s, no console errors.
+11. After the share: Workers & Pages > `scnd` > Metrics, daily requests should track visits one to one, well under 100,000.
