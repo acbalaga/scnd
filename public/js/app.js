@@ -54,6 +54,14 @@ const HYBRID_FLAG_TEXT = {
 // asks people not to type bill or account numbers into it. Name and email in the form are optional.
 const FEEDBACK_URL = 'https://forms.gle/uaUyhAR2PLqakpME8';
 
+// Tip links (2 Oct 2026). Plain links the owner chooses to open: no Ko-fi widget, no script, no request from this page.
+// The QR is a picture served from this site (public/assets/qr-ph.png, added by hand); it is probed once when the findings
+// sheet opens and the QR entry stays hidden if the file is missing. PAYEE_NAME is what the GCash or Maya app shows after
+// a scan, so a tipper can check they are paying the right person. The payee line stays hidden while it holds the placeholder.
+const KOFI_URL = 'https://ko-fi.com/alfredbalaga';
+const QR_PH_SRC = '/assets/qr-ph.png';
+const PAYEE_NAME = 'AL***D B.';   // as GCash shows it after a scan (masked by GCash), given by Fred 2 Oct 2026
+
 // One date style across titles, chart and table: "1 Sep 2026". Locale formatters disagree (en-GB "Sept", en-PH month first).
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const dayMonth = (t, withYear) => { const d = new Date(t); return `${d.getUTCDate()} ${MON[d.getUTCMonth()]}${withYear ? ' ' + d.getUTCFullYear() : ''}`; };
@@ -86,10 +94,24 @@ document.addEventListener('alpine:init', () => {
     savedOnce: false,
     saveNudgeHidden: false,
     feedbackHref: FEEDBACK_URL,
+    kofiHref: KOFI_URL,
+    qrSrc: QR_PH_SRC,
+    payeeName: PAYEE_NAME && !/^\[.*\]$/.test(PAYEE_NAME) ? PAYEE_NAME : '',
+    qrOk: false,
+    qrProbed: false,
     showSheet: false,
     weather: { status: 'idle', sat: null, nasa: null, satBase: null, nasaBase: null, errors: [] },
     weatherAt: null,
     resetWeather() { this.weather = { status: 'idle', sat: null, nasa: null, satBase: null, nasaBase: null, errors: [] }; this.weatherAt = null; },
+
+    // Called when the findings sheet opens. A missing file never fires onload, so the QR entry stays hidden.
+    probeQr() {
+      if (this.qrProbed || !this.qrSrc) return;
+      this.qrProbed = true;
+      const img = new Image();
+      img.onload = () => { this.qrOk = true; };
+      img.src = this.qrSrc;
+    },
 
     get clipping() {
       return calc.sanityFlags({ kWp: num(this.s.kWp), acKw: num(this.s.acKw) }).includes('clipping');

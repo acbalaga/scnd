@@ -303,7 +303,7 @@
                   <p class="help" role="status" x-show="!result(b).weather" x-text="weatherStatusLine"></p>
                   <div class="row">
                     <button type="button" x-show="!result(b).weather" @click="checkWeather()" :aria-disabled="weather.status === 'loading'" x-text="weather.status === 'loading' ? 'Checking...' : (weather.status === 'failed' ? 'Try the weather again' : 'Check the weather first')"></button>
-                    <button type="button" :class="result(b).weather ? '' : 'link'" @click="showSheet = true; $nextTick(() => scrollTo('findings'))">Open findings sheet</button>
+                    <button type="button" :class="result(b).weather ? '' : 'link'" @click="showSheet = true; probeQr(); $nextTick(() => scrollTo('findings'))">Open findings sheet</button>
                   </div>
                 </div>
                 <p class="help" x-show="result(b).band === 'red' && !redRaised(b)" style="text-align:center">We wait for a second low month before raising a flag, because satellite sun data can be off by 5 to 10% for a single month.</p>
@@ -434,7 +434,7 @@
 
       <div id="bills-end" class="row">
         <button type="button" @click="addBill()">Add another bill</button>
-        <button type="button" :class="{ primary: weather.status === 'done' }" @click="showSheet = !showSheet; if (showSheet) $nextTick(() => scrollTo('findings'))" x-text="showSheet ? 'Hide findings sheet' : 'Findings sheet for my installer'"></button>
+        <button type="button" :class="{ primary: weather.status === 'done' }" @click="showSheet = !showSheet; if (showSheet) { probeQr(); $nextTick(() => scrollTo('findings')); }" x-text="showSheet ? 'Hide findings sheet' : 'Findings sheet for my installer'"></button>
       </div>
 
       <!-- Save nudge: after the first answer, before they leave -->
@@ -558,7 +558,31 @@
     </template>
   </section>
 
-  <footer class="foot">Nothing here is a verdict. It is a set of questions to ask your installer. The numbers are estimates, not an engineering or financial opinion. <a :href="feedbackHref" x-show="feedbackHref" target="_blank" rel="noopener noreferrer">Give feedback</a> <span x-show="feedbackHref">(opens a Google Form: please leave out bill and account numbers. Name and email are optional.)</span>
+  <!-- Tip line: after the findings sheet is open, never on landing or above the results. Plain links, nothing loaded from Ko-fi.
+       Copy is the owner's own draft (2 Oct 2026). Prints with nothing: main.sheet-open hides everything but #findings. -->
+  <aside class="card tipjar" x-show="showSheet && sheet" aria-label="Tips">
+    <p>SCND is free. Tips cover the hosting that keeps it that way.</p>
+    <p class="tip-links"><a :href="kofiHref" x-show="kofiHref" target="_blank" rel="noopener noreferrer">Tip on Ko-fi</a></p>
+    <template x-if="qrOk">
+    <details class="qr">
+      <summary>Or scan with GCash or Maya (QR Ph)</summary>
+      <img :src="qrSrc" width="220" height="220" alt="QR Ph code for tips. Scan it with GCash, Maya or a bank app." decoding="async">
+      <p class="help" x-show="payeeName">Payee name on scan: <b x-text="payeeName"></b></p>
+    </details>
+    </template>
+  </aside>
+
+  <footer class="foot">
+    <p class="foot-links">
+      <a class="foot-main" :href="feedbackHref" x-show="feedbackHref" target="_blank" rel="noopener noreferrer">Give feedback</a>
+      <a :href="kofiHref" x-show="kofiHref" target="_blank" rel="noopener noreferrer">Tip on Ko-fi</a>
+    </p>
+    <p class="help" x-show="feedbackHref">Feedback opens a Google Form. Please leave out bill and account numbers. Name and email are optional.</p>
+    <p>Nothing here is a verdict. It is a set of questions to ask your installer. The numbers are estimates, not an engineering or financial opinion.</p>
+    <!-- Privacy line checked against the code 2 Oct 2026: no server-side storage, no cookies (app.js, worker.js). The only
+         browser storage is the theme key (see "Your data" below); the only outbound calls are the weather check, location
+         rounded to 0.1 degree (weather.js). That is why the line names the weather check. -->
+    <p>SCND runs in your browser and stores no data on a server. The optional weather check sends only your location, rounded to 0.1°.</p>
     <!-- Pre-launch audit H-5 (2 Oct 2026). Facts behind this copy: src/worker.js (hashed IP key, nothing logged or stored),
          public/js/weather.js (the only outbound calls, location rounded to 0.1 degree), app.js theme (localStorage key
          scnd-theme), FEEDBACK_URL (Google Form). No claim here about regulation, rates or programs. -->
@@ -571,6 +595,7 @@
         <li>Your Auto, Light or Dark choice is kept in this browser's local storage. "Save" writes a file to your own device; nothing is uploaded.</li>
         <li>The site is served by Cloudflare, which sees your IP address to deliver the page, like any web host. SCND's own code turns it into a code that changes daily, for rate limiting, and does not log or store it.</li>
         <li>Feedback goes through a Google Form. Answers are stored in Google Forms and read only by the person who runs SCND. Name and email are optional.</li>
+        <li>The Ko-fi link and the tip QR are plain links and a picture from this site. Nothing is sent to Ko-fi unless you open its page, and then Ko-fi's own privacy policy applies.</li>
       </ul>
       <h2>Limits</h2>
       <p>SCND gives estimates from your own figures and public sun data. Sun data can be off by 5 to 10% for one place and month. The results are not an engineering inspection, a financial or legal opinion, or a verdict on any installer or product. Talk to a qualified engineer or your installer before acting on warranty or money matters.</p>
