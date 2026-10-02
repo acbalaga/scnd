@@ -221,4 +221,4 @@ Requested by Fred. Plain links only: no Ko-fi widget, script, cookie or request 
 - [x] **Footer:** "Give feedback" (`FEEDBACK_URL`, already set to the Google Form on 30 Sep) is the first item, Ko-fi second, then one privacy line. Each link hides when its constant is empty. 44 px tap targets.
 - [x] `"!/assets/*"` added to `run_worker_first` so the QR file does not spend Worker requests. 2 tests. `node --test`: 126 pass.
 - [x] `PAYEE_NAME` set to "AL***D B." (the masked name GCash shows after a scan, from Fred).
-- [ ] **Fred:** add `public/assets/qr-ph.png`. Use a cropped QR Ph image: a full GCash screenshot also carries a partial mobile number and user ID.
+- [x] `public/assets/qr-ph.png` added (Fred's GCash QR Ph crop, resized to 720 px wide, 30 KB; no mobile number or user ID in it). **Fred:** scan it once from the live page with another phone before sharing; no QR decoder was available here to test it.
