@@ -101,7 +101,7 @@
   </ol>
 
   <!-- 1. System setup, once -->
-  <section class="card" id="setup">
+  <section class="card" id="setup" x-show="ready || started">
     <div class="summary-line" x-show="ready && !setupOpen">
       <div><h2>Your system</h2><p class="sub" style="margin:2px 0 0" x-text="summaryLine"></p></div>
       <button type="button" class="link" id="setupEdit" @click="openSetup()">Edit</button>
@@ -255,7 +255,7 @@
                   <span class="hint">Export credit is what the utility pays you per kWh you send to the grid.</span>
                   <input type="number" min="0" inputmode="decimal" step="0.0001" x-model.number="b.genRate"></label>
                 <label>Variable charges (₱)
-                  <span class="hint">Bill lines that grow with kWh, before the export credit.</span>
+                  <span class="hint">Bill lines that grow with kWh, before the export credit. The grey number uses last bill's rate.</span>
                   <input type="number" min="0" inputmode="decimal" step="0.01" x-model.number="b.varCharges" :placeholder="varHint(b, i)"></label>
                 <div class="wide help-row"><details class="optional"><summary>? Ano ito? Rates and charges</summary>
                   <p class="help">Generation charge: presyo bawat kWh sa "Generation" line ng bill. Variable charges: lahat ng singil na tumataas kapag mas marami kang kuryenteng ginamit (generation, transmission, distribution, buwis). Huwag isama ang fixed charges tulad ng metering at supply. Kung hindi sigurado, ilagay ang subtotal bago ang export credit.</p></details></div>

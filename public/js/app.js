@@ -297,7 +297,7 @@ document.addEventListener('alpine:init', () => {
       const p = i > 0 ? this.bills[i - 1] : null, rate = p ? num(p.varCharges) / num(p.importKwh) : NaN;
       if (!Number.isFinite(rate)) return '';
       const kwh = num(b.importKwh);
-      return Number.isFinite(kwh) && kwh > 0 ? `about ${this.fmt(rate * kwh, 0)} at last bill's rate` : `last bill: ${this.fmt(num(p.varCharges), 0)}`;
+      return Number.isFinite(kwh) && kwh > 0 ? `about ${this.fmt(rate * kwh, 0)}` : `last bill: ${this.fmt(num(p.varCharges), 0)}`;
     },
     billTitle(b, i) { return b.start && b.end ? this.fmtRange(b.start, b.end) : `Bill ${i + 1}`; },
     get summaryLine() {
