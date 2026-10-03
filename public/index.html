@@ -581,9 +581,13 @@
       <a class="foot-main" :href="feedbackHref" x-show="feedbackHref" target="_blank" rel="noopener noreferrer">Give feedback</a>
       <a :href="kofiHref" x-show="kofiHref" target="_blank" rel="noopener noreferrer">Tip on Ko-fi</a>
     </p>
-    <p class="help" x-show="feedbackHref">Feedback opens a Google Form. Please leave out bill and account numbers; name and email are optional.</p>
-    <!-- Pre-launch audit M-7 (Fred, 2 Oct 2026): who runs SCND and where a data question goes. The Google Form is the only contact path. -->
-    <p x-show="feedbackHref">SCND is a personal project by Alfred Balaga. For a data question, or to have a feedback answer deleted, use "Give feedback" above and include the name or email you gave.</p>
+    <!-- Pre-launch audit M-7 (Fred, 2 Oct 2026): who runs SCND and where a data question goes. The Google Form is the only contact path.
+         Folded like "Privacy and limits" (Fred, 3 Oct 2026) so the footer loads as two links and two summaries. -->
+    <details class="fine" x-show="feedbackHref">
+      <summary>Feedback and contact</summary>
+      <p>Feedback opens a Google Form. Please leave out bill and account numbers. Name and email are optional.</p>
+      <p>SCND is a personal project by Alfred Balaga. For a data question, or to have a feedback answer deleted, use "Give feedback" and include the name or email you gave.</p>
+    </details>
     <!-- Pre-launch audit H-5 (2 Oct 2026). Facts behind this copy: src/worker.js (hashed IP key, nothing logged or stored),
          public/js/weather.js (the only outbound calls, location rounded to 0.1 degree), app.js theme (localStorage key
          scnd-theme), FEEDBACK_URL (Google Form), Cloudflare Web Analytics beacon (dashboard setting, allowed in src/headers.js; audit M-10). No claim here about regulation, rates or programs. -->
