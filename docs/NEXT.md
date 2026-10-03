@@ -9,6 +9,7 @@ Work top to bottom. Each task ends with its checks passing and a commit. Ask Fre
 
 - [x] **Explainer section.** Inline HTML/SVG "What is SCND?" card (purpose, S/C/N/D tiles, 3-step flow). Hidden on load; opened by "About" in the header or "What is SCND?" in the hero, closed with "Close". Nothing stored. No new request or dependency. Video not used: it needs a rendered binary and a re-render per copy change. Can be a later task if wanted.
 - [x] **Landing copy cleanup (SlopDoctor case 820a67d9, 3 Oct 2026).** One h1 in every state, one "Your system" heading, explainer heading renamed "About SCND". Privacy promise kept in the hero and "Your data" only; "not a verdict" and advice caveats folded into one note below the bills and the Limits section. No new facts, no new request.
+- [x] **One three-step path (SlopDoctor case 820a67d9, second pass, 3 Oct 2026).** The explainer's numbered "How it works" list is now one sentence pointing at the step rail, so the page has a single path (system, bill, answer). The four S/C/N/D labels are bold labels, not h3s inside list items.
 
 ## 1. Typical-year irradiance grid
 

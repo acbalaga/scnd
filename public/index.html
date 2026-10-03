@@ -82,34 +82,31 @@
       <ul class="tiles">
         <li>
           <svg viewBox="0 0 64 48" aria-hidden="true"><circle cx="14" cy="12" r="6" fill="var(--sun)" stroke="var(--ink)" stroke-width="1.5"/><path d="M6 40l8-12h36l8 12z" fill="var(--soft)" stroke="var(--ink)" stroke-width="1.5"/><path d="M22 28l-3 12M32 28v12M42 28l3 12" stroke="var(--edge)" stroke-width="1.5"/></svg>
-          <h3><span class="ltr">S</span>olar performance</h3>
+          <b class="tile-label"><span class="ltr">S</span>olar performance</b>
           <p>Compares each month's output with what your roof should make, and tells a cloudy month from a faulty system.</p>
         </li>
         <li>
           <svg viewBox="0 0 64 48" aria-hidden="true"><path d="M32 6a18 18 0 1 0 18 18H32z" fill="var(--sun)" stroke="var(--ink)" stroke-width="1.5"/><path d="M36 2a18 18 0 0 1 18 18H36z" fill="var(--c-save)" stroke="var(--ink)" stroke-width="1.5"/></svg>
-          <h3><span class="ltr">C</span>onsumption split</h3>
+          <b class="tile-label"><span class="ltr">C</span>onsumption split</b>
           <p>Shows how much solar your home used and how much went to the grid.</p>
         </li>
         <li>
           <svg viewBox="0 0 64 48" aria-hidden="true"><path d="M14 4h30l6 6v34H14z" fill="var(--card)" stroke="var(--ink)" stroke-width="1.5"/><path d="M20 16h24M20 24h24M20 32h14" stroke="var(--edge)" stroke-width="2"/><circle cx="46" cy="34" r="9" fill="var(--sun)" stroke="var(--ink)" stroke-width="1.5"/><path d="M42 34h8" stroke="var(--ink)" stroke-width="2"/></svg>
-          <h3><span class="ltr">N</span>et-metering bill</h3>
+          <b class="tile-label"><span class="ltr">N</span>et-metering bill</b>
           <p>Walks through your bill: what each kWh sent to the grid earns you, and why fixed charges keep the total above zero.</p>
         </li>
         <li>
           <svg viewBox="0 0 64 48" aria-hidden="true"><path d="M6 8v34h52" fill="none" stroke="var(--edge)" stroke-width="1.5"/><path d="M10 14l14 4 14 6 20 6" fill="none" stroke="var(--ink)" stroke-width="2" stroke-linecap="round"/><path d="M10 18l48 14" stroke="var(--c-promise)" stroke-width="1.5" stroke-dasharray="3 3"/></svg>
-          <h3><span class="ltr">D</span>egradation</h3>
+          <b class="tile-label"><span class="ltr">D</span>egradation</b>
           <p>Compares the year-over-year drop in output with the loss your panel warranty allows.</p>
         </li>
       </ul>
-      <ol class="flow" aria-label="How it works">
-        <li><b>1</b>Enter your system details</li>
-        <li><b>2</b>Add a bill and your inverter kWh</li>
-        <li><b>3</b>Read the result, then print the one-page list of questions for your installer</li>
-      </ol>
+      <!-- The how-to is one sentence pointing at the step rail, so the page has a single three-step path. -->
+      <p class="help">The three steps below take you through it: your system details once, then a bill with your inverter kWh, then the answer, which prints as a one-page list of questions for your installer.</p>
     </div>
   </section>
 
-  <ol class="steps" aria-label="Steps">
+  <ol class="steps" aria-label="Your progress">
     <li :class="{ on: step === 1, done: step > 1 }"><b>Step 1</b>Your system</li>
     <li :class="{ on: step === 2, done: step > 2 }"><b>Step 2</b>Your bill</li>
     <li :class="{ on: step === 3 }"><b>Step 3</b>Your answer</li>
