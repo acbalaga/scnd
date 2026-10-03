@@ -58,24 +58,24 @@
   <!-- Screen readers hear the latest answer when it appears or changes band; the dial itself sits below the fold on phones. -->
   <p class="sr-only" role="status" x-text="announce"></p>
 
-  <!-- Before setup: say what it is and offer the shortest path to an answer -->
-  <h1 class="sr-only" x-show="ready">SCND: your solar check</h1>
-  <section class="hero" x-show="!ready">
-    <div class="lcd-panel" aria-hidden="true"><div class="digits"><span>2nd</span></div><small>Your second meter<br>for rooftop solar</small></div>
-    <h1>Is your solar doing its job?</h1>
-    <p>Check your rooftop system against your own bill. Free, and everything you type stays in this browser.</p>
-    <div class="row" style="margin-top:12px">
+  <!-- Before setup: say what it is and offer the shortest path to an answer. The section stays in the DOM so the page
+       always has exactly one h1; after setup only the h1 remains, for screen readers. -->
+  <section class="hero" :style="ready ? 'padding:0' : ''">
+    <div class="lcd-panel" aria-hidden="true" x-show="!ready"><div class="digits"><span>2nd</span></div><small>Your second meter<br>for rooftop solar</small></div>
+    <h1 :class="{ 'sr-only': ready }" x-text="ready ? 'SCND: your solar check' : 'Is your solar doing its job?'">Is your solar doing its job?</h1>
+    <p x-show="!ready">Check your rooftop system against your own bill. Free, and everything you type stays in this browser.</p>
+    <div class="row" style="margin-top:12px" x-show="!ready">
       <button type="button" class="primary" @click="started = true; $nextTick(() => { scrollTo('setup'); $refs.fPlace?.focus({ preventScroll: true }); })">Check my system</button>
       <button type="button" @click="loadExample()">Try an example</button>
     </div>
-    <div><button type="button" class="link" style="padding-left:0" @click="openIntro()">What is SCND?</button></div>
+    <div x-show="!ready"><button type="button" class="link" style="padding-left:0" @click="openIntro()">What is SCND?</button></div>
   </section>
 
   <!-- Explainer: hidden until the visitor asks for it ("What is SCND?" in the header or hero). Copy makes no claims about regulation, rates or programs. -->
   <section class="explainer" id="about" x-show="introOpen" aria-labelledby="explainer-h">
     <div class="card explainer-body">
       <div class="explainer-head">
-        <h2 id="explainer-h">What is SCND?</h2>
+        <h2 id="explainer-h">About SCND</h2>
         <button type="button" class="link" @click="closeIntro()">Close</button>
       </div>
       <p class="why">Your inverter app shows how much your panels made. Your bill shows what you paid. SCND lines the two up for your roof and tells you whether the system is performing or whether there is something to ask your installer.</p>
@@ -106,7 +106,6 @@
         <li><b>2</b>Add a bill and your inverter kWh</li>
         <li><b>3</b>Read the result, then print the one-page list of questions for your installer</li>
       </ol>
-      <p class="help">Free, no account, and everything you type stays in this browser. The result is a list of questions for your installer, not a verdict.</p>
     </div>
   </section>
 
@@ -118,13 +117,13 @@
 
   <!-- 1. System setup, once -->
   <section class="card" id="setup" x-show="ready || started">
-    <div class="summary-line" x-show="ready && !setupOpen">
-      <div><h2>Your system</h2><p class="sub" style="margin:2px 0 0" x-text="summaryLine"></p></div>
-      <button type="button" class="link" id="setupEdit" @click="openSetup()">Edit</button>
+    <!-- One heading for both states: the summary line when set up, the form while editing. -->
+    <div class="summary-line" :style="ready && !setupOpen ? '' : 'margin-bottom:12px'">
+      <div><h2>Your system</h2><p class="sub" style="margin:2px 0 0" x-show="ready && !setupOpen" x-text="summaryLine"></p></div>
+      <button type="button" class="link" id="setupEdit" x-show="ready && !setupOpen" @click="openSetup()">Edit</button>
     </div>
 
     <div x-show="(!ready && started) || (ready && setupOpen)">
-      <h2 style="margin-bottom:12px">Your system</h2>
       <p class="err" role="alert" x-show="setupError" x-text="setupError"></p>
       <div class="grid">
         <label class="wide">Where is it?
@@ -141,7 +140,7 @@
             <div class="grid" style="margin-top:8px">
               <label>Latitude<input type="number" inputmode="decimal" min="-90" max="90" step="0.1" x-model.number="s.lat" placeholder="14.6"></label>
               <label>Longitude<input type="number" inputmode="decimal" min="-180" max="180" step="0.1" x-model.number="s.lon" placeholder="121.0"></label>
-              <div class="wide"><p class="help">We round it to 0.1° (about 11 km) and it stays in your browser. Sun data comes from a file we ship, so nothing is looked up online.</p></div>
+              <div class="wide"><p class="help">We round it to 0.1° (about 11 km). Sun data for the expected yield comes from a file shipped with SCND, so nothing is looked up online.</p></div>
             </div>
           </details>
         </div>
@@ -303,7 +302,7 @@
                 <!-- Two low months: a next step, not an alarm. Weather first while unchecked, because a cloudy stretch can clear the flag. -->
                 <div class="raise" x-show="redRaised(b)" role="group" :aria-label="'Two low months in a row, ' + billTitle(b, i)">
                   <p class="raise-label"><i aria-hidden="true"></i>Two low months in a row</p>
-                  <p>Questions, not a verdict: has anything shaded the panels, are they dirty, and what does the inverter's fault log say?<span x-show="!result(b).weather && weather.status !== 'failed'"> A cloudy stretch can do this too, so check the weather first.</span></p>
+                  <p>Questions to ask: has anything shaded the panels, are they dirty, and what does the inverter's fault log say?<span x-show="!result(b).weather && weather.status !== 'failed'"> A cloudy stretch can do this too, so check the weather first.</span></p>
                   <!-- Always rendered so screen readers announce the change; says what is happening and, on failure, why. -->
                   <p class="help" role="status" x-show="!result(b).weather" x-text="weatherStatusLine"></p>
                   <div class="row">
@@ -418,12 +417,15 @@
         </article>
       </template>
 
+      <!-- The one result-side caveat, once below the bills. The full wording is in "Limits" in the footer. -->
+      <p class="help" x-show="step === 3">Each answer is an estimate from your bill, your inverter app and public sun data. Take a low reading to your installer as a question. Limits are under "Privacy and limits" at the bottom of the page.</p>
+
       <!-- Weather check (F4): only on click, only location and dates leave the browser -->
       <section class="card" x-show="canCheckWeather || weather.status !== 'idle'">
         <h3>Was it the weather?</h3>
         <p class="help">A low month can be cloudy weather, not a fault. This compares your bill dates with the sun that fell on your roof.</p>
         <details class="optional"><summary>What is sent?</summary>
-          <p class="help">Sun data comes from a satellite (Himawari, through Open-Meteo) and NASA POWER. Only your location, rounded to 0.1° (about 11 km), and a date range go to those two services, and only when you tap the button. Nothing else leaves your browser.</p>
+          <p class="help">Sun data comes from a satellite (Himawari, through Open-Meteo) and NASA POWER. Only your location, rounded to 0.1° (about 11 km), and a date range go to those two services, and only when you tap the button.</p>
         </details>
         <div class="row" style="margin-top:10px">
           <button type="button" :class="{ primary: weather.status !== 'done' }" @click="checkWeather()" :disabled="!canCheckWeather" :aria-disabled="weather.status === 'loading'" x-text="weather.status === 'loading' ? 'Checking...' : (weather.status === 'done' ? 'Check again' : (weather.status === 'failed' ? 'Try again' : 'Check the weather'))"></button>
@@ -444,7 +446,7 @@
 
       <!-- Save nudge: after the first answer, before they leave -->
       <div class="card nudge-save" x-show="step === 3 && !savedOnce && !saveNudgeHidden && !example">
-        <div><strong>Save this so next month takes one minute.</strong><p class="help" style="margin:2px 0 0">The file stays on your device. Load it next month and add the new bill.</p></div>
+        <div><strong>Save this so next month takes one minute.</strong><p class="help" style="margin:2px 0 0">It writes a file to your device. Load it next month and add the new bill.</p></div>
         <div class="row" style="margin:0"><button type="button" class="primary" @click="saveData()">Save my data</button><button type="button" class="link" @click="saveNudgeHidden = true">Not now</button></div>
       </div>
 
@@ -582,12 +584,7 @@
       <a class="foot-main" :href="feedbackHref" x-show="feedbackHref" target="_blank" rel="noopener noreferrer">Give feedback</a>
       <a :href="kofiHref" x-show="kofiHref" target="_blank" rel="noopener noreferrer">Tip on Ko-fi</a>
     </p>
-    <p class="help" x-show="feedbackHref">Feedback opens a Google Form. Please leave out bill and account numbers. Name and email are optional.</p>
-    <p>Nothing here is a verdict. It is a set of questions to ask your installer. The numbers are estimates, not an engineering or financial opinion.</p>
-    <!-- Privacy line checked against the code 2 Oct 2026: no server-side storage, no cookies (app.js, worker.js). The only
-         browser storage is the theme key (see "Your data" below); the only outbound calls are the weather check, location
-         rounded to 0.1 degree (weather.js). That is why the line names the weather check. -->
-    <p>SCND runs in your browser and stores no data on a server. The optional weather check sends only your location, rounded to 0.1°.</p>
+    <p class="help" x-show="feedbackHref">Feedback opens a Google Form. Please leave out bill and account numbers; name and email are optional.</p>
     <!-- Pre-launch audit M-7 (Fred, 2 Oct 2026): who runs SCND and where a data question goes. The Google Form is the only contact path. -->
     <p x-show="feedbackHref">SCND is a personal project by Alfred Balaga. For a data question, or to have a feedback answer deleted, use "Give feedback" above and include the name or email you gave.</p>
     <!-- Pre-launch audit H-5 (2 Oct 2026). Facts behind this copy: src/worker.js (hashed IP key, nothing logged or stored),
@@ -597,16 +594,17 @@
       <summary>Privacy and limits</summary>
       <h2>Your data</h2>
       <ul>
-        <li>What you type (system details, bills, inverter kWh) stays in this browser. SCND has no accounts, no database and no cookies, and its server never receives your numbers.</li>
+        <li>What you type (system details, bills, inverter kWh) stays in this browser, and SCND's server never receives it. SCND keeps no accounts, database or cookies.</li>
         <li>"Check the weather" sends only your location, rounded to 0.1° (about 11 km), and a date range to Open-Meteo and NASA POWER, and only when you tap it.</li>
-        <li>Your Auto, Light or Dark choice is kept in this browser's local storage. "Save" writes a file to your own device; nothing is uploaded.</li>
+        <li>Your Auto, Light or Dark choice is kept in this browser's local storage. "Save" writes a file to your own device without uploading it.</li>
         <li>The site is served by Cloudflare, which sees your IP address to deliver the page, like any web host. SCND's own code turns it into a code that changes daily, for rate limiting, and does not log or store it.</li>
         <li>Cloudflare Web Analytics counts page views and basic technical details such as country, browser type and page load time. It uses no cookies and does not follow you across sites. SCND sends it nothing you type. Cloudflare's own privacy policy applies to those counts.</li>
         <li>Feedback goes through a Google Form. Answers are stored in Google Forms and read only by the person who runs SCND. Name and email are optional.</li>
         <li>The Ko-fi link and the tip QR are plain links and a picture from this site. Nothing is sent to Ko-fi unless you open its page, and then Ko-fi's own privacy policy applies.</li>
       </ul>
       <h2>Limits</h2>
-      <p>SCND gives estimates from your own figures and public sun data. Sun data can be off by 5 to 10% for one place and month. The results are not an engineering inspection, a financial or legal opinion, or a verdict on any installer or product. Talk to a qualified engineer or your installer before acting on warranty or money matters.</p>
+      <p>SCND estimates from your own figures and public sun data, and sun data can be off by 5 to 10% for one place and month. Each result is a screening check that gives you questions for your installer. It does not replace an engineering inspection or a financial or legal opinion, and it judges no installer or product.</p>
+      <p>Before acting on warranty or money matters, talk to your installer or a qualified engineer.</p>
     </details>
   </footer>
 </main>
