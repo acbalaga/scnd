@@ -42,3 +42,16 @@ test('serialize keeps battery and warranty fields', () => {
   const r = parse(serialize({ ...setup, warrantyPct: 0.5, batteryCost: 150000 }, [{ ...bills[0], chargeKwh: 120, dischargeKwh: 108, homeLoadKwh: 440 }]));
   assert.equal(r.setup.warrantyPct, 0.5); assert.equal(r.setup.batteryCost, 150000); assert.equal(r.bills[0].dischargeKwh, 108);
 });
+
+test('serialize then parse keeps the charge unit and both ways of entering charges', () => {
+  const b = [{ ...bills[0], chargeUnit: 'rate', varRate: 12, genAmount: '' }];
+  const r = parse(serialize(setup, b));
+  assert.equal(r.bills[0].chargeUnit, 'rate'); assert.equal(r.bills[0].varRate, 12); assert.equal(r.bills[0].genRate, 9.7);
+});
+test('parse opens a file saved before the charge unit existed as amounts, generation amount worked out', () => {
+  const old = JSON.parse(serialize(setup, bills));
+  for (const k of ['chargeUnit', 'genAmount', 'varRate']) delete old.bills[0][k];
+  const r = parse(JSON.stringify(old));
+  assert.equal(r.error, undefined);
+  assert.equal(r.bills[0].chargeUnit, 'amount'); assert.equal(r.bills[0].genAmount, 2910); assert.equal(r.bills[0].varCharges, 3600);
+});

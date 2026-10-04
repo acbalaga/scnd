@@ -9,7 +9,7 @@ const MAX_BILLS = 60;
 
 const SETUP_NUM = ['lat', 'lon', 'kWp', 'acKw', 'tilt', 'azimuth', 'cost', 'promisedYears', 'warrantyPct', 'batteryCost'];
 const SETUP_BOOL = ['hybrid', 'netMetering'];
-const BILL_NUM = ['inverterKwh', 'importKwh', 'exportKwh', 'genRate', 'varCharges', 'total', 'outageHours', 'chargeKwh', 'dischargeKwh', 'homeLoadKwh'];
+const BILL_NUM = ['inverterKwh', 'importKwh', 'exportKwh', 'genRate', 'genAmount', 'varRate', 'varCharges', 'total', 'outageHours', 'chargeKwh', 'dischargeKwh', 'homeLoadKwh'];
 const BILL_DATE = ['start', 'end'];
 
 const isBlank = (v) => v === '' || v === null || v === undefined;
@@ -27,6 +27,7 @@ export function serialize(setup, bills, savedOn = new Date()) {
     const o = {};
     for (const k of BILL_DATE) o[k] = x[k] || '';
     for (const k of BILL_NUM) o[k] = isBlank(x[k]) ? '' : Number(x[k]);
+    o.chargeUnit = x.chargeUnit === 'rate' ? 'rate' : 'amount';
     return o;
   });
   return JSON.stringify({ format: FORMAT, version: VERSION, saved: savedOn.toISOString().slice(0, 10), setup: s, bills: b }, null, 2);
@@ -55,6 +56,13 @@ export function parse(text) {
     const o = {};
     for (const k of BILL_DATE) { o[k] = date(x[k]); if (o[k] === null) return { error: `Bill ${i + 1}: "${k}" is not a date.` }; }
     for (const k of BILL_NUM) { o[k] = num(x[k]); if (o[k] === null) return { error: `Bill ${i + 1}: "${k}" is not a number.` }; }
+    if (x.chargeUnit === 'rate' || x.chargeUnit === 'amount') o.chargeUnit = x.chargeUnit;
+    else {
+      // Saved before the amounts/per-kWh choice (4 Oct 2026): generation charge per kWh, variable charges in pesos.
+      // Open it as amounts, with the generation amount worked out to the centavo, so the variable charges stay as typed.
+      o.chargeUnit = 'amount';
+      if (o.genAmount === '' && o.genRate !== '' && o.importKwh !== '') o.genAmount = Math.round(o.genRate * o.importKwh * 100) / 100;
+    }
     bills.push(o);
   }
   return { setup, bills };
