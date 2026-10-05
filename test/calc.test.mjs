@@ -317,3 +317,17 @@ test('billGaps edge: back-to-back bills, a slip within 7 days, and undated bills
   assert.deepEqual(c.billGaps([{ start: '2026-07-01', end: '2026-08-01' }, { start: '2026-08-06', end: '2026-09-05' }]), []);
   assert.deepEqual(c.billGaps([{ start: '2026-07-01', end: '2026-08-01' }, { start: '', end: '' }]), []);
 });
+
+test('billCharges golden: amounts and per-kWh rates give the same generation charge and variable charges', () => {
+  // 300 kWh bought at 9.70 per kWh generation (Meralco, Sep 2026) and 12.00 per kWh variable charges.
+  const a = c.billCharges({ unit: 'amount', i: 300, genAmount: 2910, varCharges: 3600 });
+  const r = c.billCharges({ unit: 'rate', i: 300, genRate: 9.7, varRate: 12 });
+  assert.ok(Math.abs(a.genRate - 9.7) < 1e-9); assert.equal(a.varCharges, 3600);
+  assert.equal(r.genRate, 9.7); assert.equal(r.varCharges, 3600);
+});
+test('billCharges edge: no imported kWh leaves the derived number missing, not zero or infinite', () => {
+  assert.ok(Number.isNaN(c.billCharges({ unit: 'amount', i: 0, genAmount: 0, varCharges: 0 }).genRate));
+  assert.ok(Number.isNaN(c.billCharges({ unit: 'amount', i: NaN, genAmount: 2910, varCharges: 3600 }).genRate));
+  assert.ok(Number.isNaN(c.billCharges({ unit: 'rate', i: NaN, genRate: 9.7, varRate: 12 }).varCharges));
+  assert.ok(Number.isNaN(c.billCharges({ unit: 'rate', i: 300, genRate: 9.7, varRate: NaN }).varCharges));
+});

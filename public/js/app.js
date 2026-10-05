@@ -81,10 +81,11 @@ const dayMonth = (t, withYear) => { const d = new Date(t); return `${d.getUTCDat
 const DIAL_MIN = 0.45, DIAL_MAX = 0.95;   // PR range the dial arc covers (see dial())
 // Bill number fields with the names the owner sees, for plain error messages.
 const NUM_FIELDS = [['inverterKwh', 'solar produced'], ['chargeKwh', 'battery charged'], ['dischargeKwh', 'battery discharged'], ['homeLoadKwh', 'home load'],
-  ['importKwh', 'bought from the grid'], ['exportKwh', 'sent to the grid'], ['genRate', 'generation charge'], ['varCharges', 'variable charges'], ['total', 'total amount due'], ['outageHours', 'outage hours']];
+  ['importKwh', 'bought from the grid'], ['exportKwh', 'sent to the grid'], ['genRate', 'generation charge'], ['genAmount', 'generation charge'], ['varRate', 'variable charges'], ['varCharges', 'variable charges'],
+  ['total', 'total amount due'], ['outageHours', 'outage hours']];
 const BILL_FIELDS = ['start', 'end', ...NUM_FIELDS.map(([k]) => k)];
 let nextId = 1;
-const newBill = () => ({ id: nextId++, start: '', end: '', inverterKwh: '', importKwh: '', exportKwh: '', genRate: '', varCharges: '', total: '', outageHours: '', chargeKwh: '', dischargeKwh: '', homeLoadKwh: '', open: true });
+const newBill = () => ({ id: nextId++, start: '', end: '', inverterKwh: '', importKwh: '', exportKwh: '', chargeUnit: 'amount', genRate: '', genAmount: '', varRate: '', varCharges: '', total: '', outageHours: '', chargeKwh: '', dischargeKwh: '', homeLoadKwh: '', open: true });
 
 document.addEventListener('alpine:init', () => {
   document.getElementById('boot')?.remove();   // the "Loading" fallback in index.html (audit M-11); only a failed start leaves it showing
@@ -348,11 +349,24 @@ document.addEventListener('alpine:init', () => {
     folded(b, i) { return this.foldable(i) && !b.expanded && this.removing !== b.id; },
     // Placeholders only (never a value): last month's numbers as a reference while typing. Nothing is saved from them.
     prevHint(i, key) { const v = i > 0 ? num(this.bills[i - 1]?.[key]) : NaN; return Number.isFinite(v) ? `last bill: ${this.fmt(v, 0)}` : ''; },
+    // Charges fields fall back to an example (styled italic, like every placeholder) when there is no last bill to go on.
+    // 9.70 PHP/kWh is Meralco's September 2026 generation charge (docs/SPEC.md); 12.00 PHP/kWh variable is made up.
     varHint(b, i) {
-      const p = i > 0 ? this.bills[i - 1] : null, rate = p ? num(p.varCharges) / num(p.importKwh) : NaN;
-      if (!Number.isFinite(rate)) return '';
+      const p = i > 0 ? this.bills[i - 1] : null, last = p ? this.charges(p).varCharges : NaN, rate = last / num(p?.importKwh);
+      if (b.chargeUnit === 'rate') return Number.isFinite(rate) ? `last bill: ${this.fmt(rate, 2)}` : 'e.g. 12.00';
+      if (!Number.isFinite(rate)) return 'e.g. 3600.00';
       const kwh = num(b.importKwh);
-      return Number.isFinite(kwh) && kwh > 0 ? `about ${this.fmt(rate * kwh, 0)}` : `last bill: ${this.fmt(num(p.varCharges), 0)}`;
+      return Number.isFinite(kwh) && kwh > 0 ? `about ${this.fmt(rate * kwh, 0)}` : `last bill: ${this.fmt(last, 0)}`;
+    },
+    genHint(b, i) {
+      const p = i > 0 ? this.bills[i - 1] : null, rate = p ? this.charges(p).genRate : NaN, kwh = num(b.importKwh);
+      if (b.chargeUnit === 'rate') return 'e.g. 9.7000';
+      if (!Number.isFinite(rate) || !(kwh > 0)) return 'e.g. 2910.00';
+      return `about ${this.fmt(rate * kwh, 0)}`;
+    },
+    // The bill's charges as the maths needs them, whichever way the owner entered them (calc.billCharges).
+    charges(b) {
+      return calc.billCharges({ unit: b.chargeUnit, i: num(b.importKwh), genRate: num(b.genRate), genAmount: num(b.genAmount), varRate: num(b.varRate), varCharges: num(b.varCharges) });
     },
     billTitle(b, i) { return b.start && b.end ? this.fmtRange(b.start, b.end) : `Bill ${i + 1}`; },
     get summaryLine() {
@@ -370,7 +384,8 @@ document.addEventListener('alpine:init', () => {
     // numbers a hybrid needs (ticking "battery" after entering bills used to drop savings with no word why).
     needsSavings(b) {
       const r = this.result(b); if (!r || r.pr === null || r.savings !== null) return [];
-      const fields = [['importKwh', 'bought from the grid'], ['exportKwh', 'sent to the grid'], ['genRate', 'generation charge'], ['varCharges', 'variable charges'],
+      const fields = [['importKwh', 'bought from the grid'], ['exportKwh', 'sent to the grid'],
+        ...(b.chargeUnit === 'rate' ? [['genRate', 'generation charge'], ['varRate', 'variable charges']] : [['genAmount', 'generation charge'], ['varCharges', 'variable charges']]),
         ...(this.s.hybrid ? [['chargeKwh', 'battery charged'], ['dischargeKwh', 'battery discharged']] : [])];
       return fields.filter(([k]) => !Number.isFinite(num(b[k]))).map(([, label]) => label);
     },
@@ -439,7 +454,7 @@ document.addEventListener('alpine:init', () => {
         const p = calc.poaPeriod({ ghi: this.climate.ghi, dif: this.climate.dif, tilt: 10, azimuth: 0, lat: this.s.lat, start, end });
         const solar = Math.round(pr * 5.5 * p.hPoa), used = Math.round(solar * 0.4), sent = solar - used, bought = 450 - used;
         const variable = Math.round(bought * 12), credit = sent * 9.7;
-        return { ...newBill(), start, end, inverterKwh: solar, importKwh: bought, exportKwh: sent, genRate: 9.7, varCharges: variable, total: Math.round(Math.max(variable - credit, 0) + 620), open: false };
+        return { ...newBill(), start, end, inverterKwh: solar, importKwh: bought, exportKwh: sent, genAmount: Math.round(bought * 970) / 100, varCharges: variable, total: Math.round(Math.max(variable - credit, 0) + 620), open: false };
       });
       this.bills = bills; this.example = true; this.savedOnce = false; this.saveNudgeHidden = false;
       this.resetWeather();
@@ -461,6 +476,7 @@ document.addEventListener('alpine:init', () => {
       // Dates run on from the last bill and the generation charge usually repeats: prefill both, owner can change them.
       const prev = this.bills[this.bills.length - 1], nb = newBill();
       if (prev?.end) nb.start = prev.end;
+      if (prev) nb.chargeUnit = prev.chargeUnit;
       if (String(prev?.genRate ?? '').trim() !== '') nb.genRate = prev.genRate;
       nb.prefill = { start: nb.start, genRate: nb.genRate };
       this.bills.push(nb);
@@ -518,12 +534,13 @@ document.addEventListener('alpine:init', () => {
         if (calc.isError(split)) errors.push(split.message);
         else out.split = split;
       }
+      const ch = this.charges(b);
       if (out.split) {
-        const rImport = calc.importRate({ variableCharges: num(b.varCharges), i });
-        const rExport = num(b.genRate);
+        const rImport = calc.importRate({ variableCharges: ch.varCharges, i });
+        const rExport = ch.genRate;
         if (!calc.isError(rImport) && Number.isFinite(rExport)) {
           out.rImport = rImport;
-          const creditCap = num(b.varCharges);
+          const creditCap = ch.varCharges;
           out.savings = calc.savings({ s: out.split.selfConsumed, x, rImport, rExport, creditCap });
           out.uncounted = calc.uncountedCredit({ x, rExport, creditCap });
           out.shift = calc.loadShiftValue({ rImport, rExport });
@@ -539,7 +556,7 @@ document.addEventListener('alpine:init', () => {
             out.hybrid = hb;
             const app = num(b.homeLoadKwh);
             if (Number.isFinite(app)) { const lc = calc.loadCheck({ implied: hb.load, app }); if (!calc.isError(lc)) hb.loadCheck = lc; }
-            if (out.rImport !== undefined && Number.isFinite(num(b.genRate))) hb.value = calc.batteryValue({ d, rImport: out.rImport, rExport: num(b.genRate) });
+            if (out.rImport !== undefined && Number.isFinite(ch.genRate)) hb.value = calc.batteryValue({ d, rImport: out.rImport, rExport: ch.genRate });
           }
         }
       }
@@ -607,7 +624,7 @@ document.addEventListener('alpine:init', () => {
     num,
     listAnd: (xs) => (xs.length < 2 ? xs.join('') : xs.slice(0, -1).join(', ') + ' and ' + xs[xs.length - 1]),
     decode(b) {
-      const v = { importKwh: num(b.importKwh), exportKwh: num(b.exportKwh), genRate: num(b.genRate), varCharges: num(b.varCharges), total: num(b.total) };
+      const v = { importKwh: num(b.importKwh), exportKwh: num(b.exportKwh), ...this.charges(b), total: num(b.total) };
       return Object.values(v).every(Number.isFinite) ? calc.billDecode(v) : null;
     },
     decodeFlagText: (f) => DECODE_FLAG_TEXT[f],

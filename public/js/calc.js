@@ -272,6 +272,14 @@ export function energySplit({ g, x, i, c, d }) {
 
 // ---------- F6, F7: money ----------
 
+// Bills show charges either as peso amounts or as peso rates per kWh (owner feedback, 4 Oct 2026: some utilities
+// print only the amounts). Both turn into the generation charge per kWh and the variable charges in pesos, using the
+// imported kWh I: the generation and variable lines are billed on the kWh bought. NaN where a number is missing.
+export function billCharges({ unit, i, genRate, genAmount, varRate, varCharges }) {
+  if (unit === 'rate') return { genRate, varCharges: Number.isFinite(i) && i >= 0 ? varRate * i : NaN };
+  return { genRate: Number.isFinite(i) && i > 0 ? genAmount / i : NaN, varCharges };
+}
+
 // r_import = the bill's variable charges / I. r_export = the generation charge on the bill (per kWh).
 export function importRate({ variableCharges, i }) {
   if (![variableCharges, i].every(Number.isFinite) || variableCharges < 0 || i <= 0) return err('bad_input', 'Need variable charges >= 0 and imported kWh > 0.');
