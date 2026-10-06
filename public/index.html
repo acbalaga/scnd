@@ -606,12 +606,9 @@
       <a :href="kofiHref" x-show="kofiHref && !(showSheet && sheet)" target="_blank" rel="noopener noreferrer">Tip on Ko-fi</a>
     </p>
     <!-- Pre-launch audit M-7 (Fred, 2 Oct 2026): who runs SCND and where a data question goes. The Google Form is the only contact path.
-         Folded like "Privacy and limits" (Fred, 3 Oct 2026) so the footer loads as two links and two summaries. -->
-    <details class="fine" x-show="feedbackHref">
-      <summary>Feedback and contact</summary>
-      <p>Feedback opens a Google Form. Please leave out bill and account numbers. Name and email are optional.</p>
-      <p>SCND is a personal project by Alfred Balaga. For a data question, or to have a feedback answer deleted, use "Give feedback" and include the name or email you gave.</p>
-    </details>
+         Was a "Feedback and contact" fold (3 Oct); shown as one line under the links from 6 Oct so the bill-number warning
+         is read before the form opens. Who runs SCND and the deletion route moved to the Feedback bullet in "Privacy and limits". -->
+    <p class="foot-note" x-show="feedbackHref">Please leave bill and account numbers out of feedback.</p>
     <!-- Pre-launch audit H-5 (2 Oct 2026). Facts behind this copy: src/worker.js (hashed IP key, nothing logged or stored),
          public/js/weather.js (the only outbound calls, location rounded to 0.1 degree), app.js theme (localStorage key
          scnd-theme), FEEDBACK_URL (Google Form), Cloudflare Web Analytics beacon (dashboard setting, allowed in src/headers.js; audit M-10). No claim here about regulation, rates or programs. -->
@@ -624,7 +621,7 @@
         <li>Your Auto, Light or Dark choice is kept in this browser's local storage. "Save" writes a file to your own device without uploading it.</li>
         <li>The site is served by Cloudflare, which sees your IP address to deliver the page, like any web host. SCND's own code turns it into a code that changes daily, for rate limiting, and does not log or store it.</li>
         <li>Cloudflare Web Analytics counts page views and basic technical details such as country, browser type and page load time. It uses no cookies and does not follow you across sites. SCND sends it nothing you type. Cloudflare's own privacy policy applies to those counts.</li>
-        <li>Feedback goes through a Google Form. Answers are stored in Google Forms and read only by the person who runs SCND. Name and email are optional.</li>
+        <li>Feedback goes through a Google Form. Answers are stored in Google Forms and read only by Alfred Balaga, who runs SCND as a personal project. Name and email are optional. For a data question, or to have a feedback answer deleted, use "Give feedback" and include the name or email you gave.</li>
         <li>The Ko-fi link and the tip QR are plain links and a picture from this site. Nothing is sent to Ko-fi unless you open its page, and then Ko-fi's own privacy policy applies.</li>
       </ul>
       <h2>Limits</h2>

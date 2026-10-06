@@ -59,5 +59,8 @@ test('html: there is a 404 page with a way home, and wrangler serves it', () => 
 });
 
 test('html: the footer says who runs SCND and where a data question goes', () => {
-  assert.match(html, /personal project by Alfred Balaga/);
+  const foot = html.slice(html.indexOf('<footer class="foot">'));
+  assert.match(foot, /Alfred Balaga, who runs SCND as a personal project/);
+  assert.match(foot, /to have a feedback answer deleted, use "Give feedback"/);
+  assert.match(foot, /<p class="foot-note" x-show="feedbackHref">Please leave bill and account numbers out of feedback\.<\/p>/);
 });
