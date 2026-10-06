@@ -225,15 +225,24 @@ ol.steps-list { padding-left:20px; margin:8px 0; } ol.steps-list li { margin-bot
 
 /* save nudge, footer */
 .nudge-save { display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
-.foot { display:block; margin-top:28px; color:var(--muted); font-size:14px; max-width:62ch; } .foot a { color:var(--link); display:inline-block; padding:12px 0; margin:-12px 0; }
-.foot-links { display:flex; flex-wrap:wrap; align-items:center; gap:0 22px; margin:0 0 4px; }
-.foot .foot-links a { display:inline-flex; align-items:center; min-height:44px; padding:0; margin:0; }
+/* Footer: two links, then the folds as ruled rows with the same +/- marker as the result sections, then a sign-off. */
+.foot { display:block; margin-top:32px; color:var(--muted); font-size:14px; } .foot a { color:var(--link); display:inline-block; padding:12px 0; margin:-12px 0; text-decoration-thickness:1px; text-underline-offset:3px; } .foot a:hover { text-decoration-thickness:2px; }
+.foot-links { display:flex; flex-wrap:wrap; align-items:baseline; gap:0 24px; margin:0 0 12px; }
+.foot .foot-links a { display:inline-flex; align-items:center; min-height:44px; padding:0; margin:0; font-size:15px; font-weight:600; }
 .foot .foot-links a.foot-main { font-weight:700; font-size:16px; }
+.foot-sign { display:flex; align-items:center; gap:10px; margin:20px 0 0; font-size:14px; } .foot-sign img { display:block; height:22px; width:auto; flex:none; border-radius:4px; }
 .tipjar p { margin:0; } .tipjar .tip-links a { display:inline-flex; align-items:center; min-height:44px; color:var(--link); font-weight:600; }
 .tipjar .qr summary { min-height:44px; display:flex; align-items:center; cursor:pointer; color:var(--link); font-weight:600; }
 .tipjar .qr img { display:block; width:320px; max-width:100%; height:auto; background:#fff; padding:8px; border-radius:8px; border:1.5px solid var(--edge); margin:4px 0 8px; }
-.foot .fine { margin-top:16px; } .foot .fine + .fine { margin-top:0; } .foot .fine p + p { margin-top:8px; } .foot .fine summary { min-height:44px; display:flex; align-items:center; cursor:pointer; color:var(--ink); font-weight:600; }
-.foot .fine h2 { font:600 15px/1.3 var(--body); margin:12px 0 4px; color:var(--ink); } .foot .fine ul { margin:0; padding-left:20px; } .foot .fine li, .foot .fine p { margin:4px 0; }
+.foot .fine { border-top:1px solid var(--line); } .foot .fine:last-of-type { border-bottom:1px solid var(--line); }
+.foot .fine summary { list-style:none; min-height:48px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer; color:var(--ink); font:600 15px/1.25 var(--body); }
+.foot .fine summary::-webkit-details-marker { display:none; }
+.foot .fine summary::after { content:"+"; width:1.2em; text-align:center; color:var(--muted); font-weight:700; font-size:18px; }
+.foot .fine[open] summary::after { content:"\2212"; }
+@media (hover:hover) { .foot .fine summary:hover, .foot .fine summary:hover::after { color:var(--link); } }
+.foot .fine > :not(summary) { max-width:62ch; } .foot .fine > :last-child { margin-bottom:16px; }
+.foot .fine h2 { font:600 15px/1.3 var(--body); margin:14px 0 4px; color:var(--ink); } .foot .fine h2:first-of-type { margin-top:2px; }
+.foot .fine ul { margin:0; padding-left:20px; } .foot .fine li::marker { color:var(--edge); } .foot .fine li, .foot .fine p { margin:6px 0; }
 label.check { min-height:44px; }
 
 /* Findings sheet: a report page. Paper-white in every colour mode, so the screen preview matches the print.
