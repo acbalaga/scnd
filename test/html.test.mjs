@@ -27,8 +27,14 @@ test('html: tip and feedback links are plain, hardened, and driven by constants'
   const anchors = [...html.matchAll(/<a [^>]*target="_blank"[^>]*>/g)].map((m) => m[0]);
   assert.ok(anchors.length >= 3, 'feedback and two Ko-fi links');
   for (const a of anchors) assert.match(a, /rel="noopener noreferrer"/);
-  for (const a of anchors.filter((x) => /kofiHref|feedbackHref/.test(x))) assert.match(a, /x-show="(kofiHref|feedbackHref)"/);
+  for (const a of anchors.filter((x) => /kofiHref|feedbackHref/.test(x))) assert.match(a, /x-show="(kofiHref|feedbackHref)( && [^"]+)?"/);
   assert.doesNotMatch(html, /ko-fi\.com\/widget|storage\.ko-fi|<iframe/i);
+});
+
+test('html: the footer Ko-fi link hides while the tip box shows, so only one Ko-fi link is on screen', () => {
+  const foot = html.slice(html.indexOf('<footer class="foot">'));
+  assert.match(html, /class="card tipjar" x-show="showSheet && sheet"/);
+  assert.match(foot, /<a :href="kofiHref" x-show="kofiHref && !\(showSheet && sheet\)"/);
 });
 
 test('html: the tip block sits after the findings sheet, so it never shows on landing or above the results', () => {
@@ -53,5 +59,8 @@ test('html: there is a 404 page with a way home, and wrangler serves it', () => 
 });
 
 test('html: the footer says who runs SCND and where a data question goes', () => {
-  assert.match(html, /personal project by Alfred Balaga/);
+  const foot = html.slice(html.indexOf('<footer class="foot">'));
+  assert.match(foot, /Alfred Balaga, who runs SCND as a personal project/);
+  assert.match(foot, /to have a feedback answer deleted, use "Give feedback"/);
+  assert.match(foot, /<p class="foot-note" x-show="feedbackHref">Please leave bill and account numbers out of feedback\.<\/p>/);
 });
