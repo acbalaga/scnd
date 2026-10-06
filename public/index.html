@@ -562,10 +562,10 @@
 
         <h3>2. Performance by billing period</h3>
         <table class="rt">
-          <thead><tr><th>Period</th><th>Solar (kWh)</th><th>Expected (kWh)</th><th>PR</th><th>Assessment</th><th>Weather index</th><th>Exported (kWh)</th><th>Saved (PHP)</th></tr></thead>
+          <thead><tr><th>Period</th><th>Solar (kWh)</th><th>Expected (kWh)</th><th>PR</th><th>Assessment</th><th>Weather index</th><th>Exported (kWh)</th><th>Saved (₱)</th></tr></thead>
           <tbody><template x-for="(r, k) in sheet.rows" :key="k"><tr>
             <td data-label="Period" x-text="r.period"></td><td data-label="Solar (kWh)" x-text="r.actual"></td><td data-label="Expected (kWh)" x-text="r.expected"></td><td data-label="PR" x-text="r.pr"></td>
-            <td data-label="Assessment" :class="{ low: r.low }" x-text="r.band"></td><td data-label="Weather index" x-text="r.wi"></td><td data-label="Exported (kWh)" x-text="r.exported"></td><td data-label="Saved (PHP)" x-text="r.saved"></td>
+            <td data-label="Assessment" :class="{ low: r.low }" x-text="r.band"></td><td data-label="Weather index" x-text="r.wi"></td><td data-label="Exported (kWh)" x-text="r.exported"></td><td data-label="Saved (₱)" x-text="r.saved"></td>
           </tr></template></tbody>
         </table>
 

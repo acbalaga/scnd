@@ -23,7 +23,7 @@ Owner: Fred (Alfred Balaga), renewable energy O&M practitioner. Personal project
 ## Stack
 
 - Plain HTML + Alpine.js + ES modules. No build step, no framework, no bundler.
-- Fonts: Pixelify Sans (words) and DSEG7 Classic (LCD digits), both SIL OFL 1.1, self-hosted in `public/fonts/` with their licences. Body text stays in the system font. Do not use the pixel face for numbers (its 5 reads as S). The printed findings sheet is a report page in Source Serif 4 (headings) and Source Sans 3 (text), also SIL OFL, self-hosted; it writes PHP, not the peso sign, because those fonts' Latin subset has none.
+- Fonts: Pixelify Sans (display headings), DSEG7 Classic (LCD digits), Chivo (body and UI text) and Chivo Mono (figures: stats, values, tables), all SIL OFL 1.1, self-hosted in `public/fonts/` with their licences. Do not use the pixel face for numbers (its 5 reads as S). The printed findings sheet is a report page in Source Serif 4 (headings) and Source Sans 3 (text), also SIL OFL, self-hosted. The Latin font files have no peso sign, so each family also has a ₱-only file (`*-peso-wght-normal.woff2`, about 1 KB) on a `unicode-range: U+20B1` face; `scripts/fetch-fonts.py` makes them.
 - Inline SVG charts, hand-rolled. Print stylesheet + `window.print()` for the findings sheet.
 - Cloudflare Workers (static assets). `wrangler.jsonc`, deploys on push to `main` via Git integration. Per-version preview URLs are on for beta testers.
 - Local dev: `npx wrangler dev`.

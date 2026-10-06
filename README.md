@@ -31,7 +31,7 @@ Save and load use a JSON file on the owner's own device. "Try an example" fills 
 
 ## Layout
 
-- `public/`: `index.html`, `app.css`, `manifest.webmanifest`, `icons/`, `js/` (`calc.js` all the maths, `grid.js`, `weather.js`, `findings.js`, `data.js`, `app.js`), `data/ph-grid.json`, `vendor/alpine.min.js` (Alpine 3.17.4, MIT), `fonts/` (Pixelify Sans and DSEG7 Classic for the app, Source Serif 4 and Source Sans 3 for the printed report, all SIL Open Font Licence 1.1, licences alongside), `icons/` (logo and app icons). Everything is self-hosted so the page makes no third-party request
+- `public/`: `index.html`, `app.css`, `manifest.webmanifest`, `icons/`, `js/` (`calc.js` all the maths, `grid.js`, `weather.js`, `findings.js`, `data.js`, `app.js`), `data/ph-grid.json`, `vendor/alpine.min.js` (Alpine 3.17.4, MIT), `fonts/` (Pixelify Sans, DSEG7 Classic, Chivo and Chivo Mono for the app, Source Serif 4 and Source Sans 3 for the printed report, plus a ₱-only file per family, all SIL Open Font Licence 1.1, licences alongside), `icons/` (logo and app icons). Everything is self-hosted so the page makes no third-party request
 - `src/worker.js`: serves `public/`, rate-limits page requests and sets the security headers (values in `src/headers.js`; static files take theirs from `public/_headers`)
 - `scripts/`: `build-grid.mjs` (builds the sun grid), `gen-poa-reference.py` (pvlib reference cases), `gen-logo.mjs` and `gen-icons.mjs` (the seven-segment SCND logo and app icons)
 - `test/`: golden-case tests
