@@ -308,7 +308,7 @@ document.addEventListener('alpine:init', () => {
         })),
         shown: Math.min(rows.length, 5), total: rows.length, latest,
         latestWording: latest ? REPORT_WORDING[latest.band] : '',
-        savedTotal: cum.length ? 'PHP ' + this.fmt(cum[cum.length - 1].saved, 0) : null,
+        savedTotal: cum.length ? '₱' + this.fmt(cum[cum.length - 1].saved, 0) : null,
         sources: [...sources, ...f.uncertainty,
           ...rows.filter((x) => x.r.weatherRejected).map(({ b, r }) => `For ${this.fmtRange(b.start, b.end)} the weather-adjusted PR came out at ${this.fmt(r.prWeather, 2)}, above what panels can make, so the weather data for those dates looks off. That period is judged against a typical year.`),
           ...rows.filter((x) => x.r.band === 'check').map(({ b, r }) => `PR for ${this.fmtRange(b.start, b.end)} works out at ${this.fmt(r.pr, 2)}, above the ${calc.PR_PLAUSIBLE_MAX.toFixed(2)} panels reach in practice, so a figure is likely wrong (reading dates, solar kWh or panel size). Check it before relying on this sheet.`),

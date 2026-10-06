@@ -1,11 +1,17 @@
 /* SCND: "second meter". Night-blue ink, sun-yellow accent, a dial for the signature.
    Pixel face for display only (h1, h2, the answer headline, the LCD panel): its capital C closes up and reads as O
-   at small sizes, so buttons, summaries, labels and h3 use the system font. */
+   at small sizes, so buttons, summaries, labels and h3 use Chivo. Figures (stats, values, tables) use Chivo Mono.
+   Chivo and Chivo Mono: Omnibus-Type, SIL OFL 1.1, chosen 6 Oct 2026. Their Latin files have no peso sign, so a
+   second face per family carries only U+20B1 (about 1 KB, cut by scripts/fetch-fonts.py). */
 @font-face { font-family:"Pixelify Sans"; font-weight:400; font-display:swap; src:url("/fonts/pixelify-sans-latin-400-normal.woff2") format("woff2"); }
 @font-face { font-family:"Pixelify Sans"; font-weight:700; font-display:swap; src:url("/fonts/pixelify-sans-latin-700-normal.woff2") format("woff2"); }
 @font-face { font-family:"DSEG7 Classic"; font-weight:400; font-display:swap; src:url("/fonts/dseg7-classic-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family:"Chivo"; font-weight:100 900; font-display:swap; src:url("/fonts/chivo-latin-wght-normal.woff2") format("woff2"); unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family:"Chivo"; font-weight:100 900; font-display:swap; src:url("/fonts/chivo-peso-wght-normal.woff2") format("woff2"); unicode-range:U+20B1; }
+@font-face { font-family:"Chivo Mono"; font-weight:100 900; font-display:swap; src:url("/fonts/chivo-mono-latin-wght-normal.woff2") format("woff2"); unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family:"Chivo Mono"; font-weight:100 900; font-display:swap; src:url("/fonts/chivo-mono-peso-wght-normal.woff2") format("woff2"); unicode-range:U+20B1; }
 @font-face { font-family:"DSEG7 Classic"; font-weight:700; font-display:swap; src:url("/fonts/dseg7-classic-latin-700-normal.woff2") format("woff2"); }
-/* Fonts: Pixelify Sans and DSEG7 Classic, both SIL OFL 1.1, self-hosted (licences in /fonts). Body text stays in the system font. */
+/* Fonts: Pixelify Sans, DSEG7 Classic, Chivo and Chivo Mono, all SIL OFL 1.1, self-hosted (licences in /fonts). */
 :root {
   color-scheme: light;
   --bg:#F3F6FA; --card:#FFFFFF; --soft:#EAF0F7; --ink:#0E1B2C; --muted:#54657B; --line:#D6DFEA; --edge:#9FB1C6; --shadow:#C9D5E3; --grid:rgba(14,27,44,.05); --link:#0B5FB0;
@@ -17,7 +23,8 @@
   --pixel: "Pixelify Sans", ui-rounded, "SF Pro Rounded", system-ui, sans-serif;
   --lcd: "DSEG7 Classic", ui-monospace, "SF Mono", Menlo, monospace;
   --display: var(--pixel);
-  --body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --body: "Chivo", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --num: "Chivo Mono", ui-monospace, "SF Mono", Menlo, monospace;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   color-scheme:dark;
@@ -42,7 +49,7 @@ html { -webkit-text-size-adjust:100%; }
 .boot-js { opacity:0; animation:boot-in 0s 3s forwards; }
 @keyframes boot-in { to { opacity:1; } }
 .gone { text-align:center; padding-top:48px; } .gone h1 { margin:16px 0 8px; } .gone p { margin:8px 0; } .gone a { display:inline-flex; align-items:center; min-height:44px; color:var(--link); font-weight:700; }
-body { margin:0; background-color:var(--bg); background-image:linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size:22px 22px; color:var(--ink); font:16px/1.5 var(--body); -webkit-font-smoothing:antialiased; }
+body { margin:0; background-color:var(--bg); background-image:linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size:22px 22px; color:var(--ink); font:16px/1.55 var(--body); -webkit-font-smoothing:antialiased; }
 main { max-width:640px; margin:0 auto; padding:16px 16px 72px; }
 :focus-visible { outline:3px solid var(--focus); outline-offset:2px; border-radius:6px; }
 ::selection { background:var(--sun); color:var(--sun-ink); }
@@ -50,7 +57,7 @@ main { max-width:640px; margin:0 auto; padding:16px 16px 72px; }
 h1, h2, h3 { font-family:var(--pixel); font-weight:700; letter-spacing:.01em; line-height:1.15; margin:0; }
 h2 { font-size:22px; } h3 { font-family:var(--body); font-size:18px; letter-spacing:0; }
 p { margin:0 0 10px; } .sub, .help { color:var(--muted); font-size:14px; } .help { margin:6px 0 0; }
-.num, dd, .dial-num { font-variant-numeric:tabular-nums; }
+.num, dd, .dial-num { font-family:var(--num); font-variant-numeric:tabular-nums; }
 
 /* header */
 .top { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:2px 0 14px; }
@@ -202,7 +209,7 @@ ol.steps-list { padding-left:20px; margin:8px 0; } ol.steps-list li { margin-bot
 .stat:last-child:nth-child(odd) { grid-column:1 / -1; }
 .stat small { display:block; color:var(--muted); font:600 12px/1.4 var(--body); text-transform:uppercase; letter-spacing:.06em; }
 .stat .early-tag { display:block; width:fit-content; max-width:100%; margin:2px 0 4px; padding:1px 8px; border-radius:6px; background:var(--amber-bg); color:var(--amber); font:600 12px/1.6 var(--body); }   /* pace tiles before a year of bills */
-.stat b { font:700 22px/1.25 var(--body); font-variant-numeric:tabular-nums; } .stat em { display:block; font-style:normal; color:var(--muted); font-size:13px; }
+.stat b { font:700 22px/1.25 var(--num); font-variant-numeric:tabular-nums; } .stat em { display:block; font-style:normal; color:var(--muted); font-size:13px; }
 .legend { display:flex; flex-wrap:wrap; gap:6px 16px; font-size:13px; color:var(--muted); margin:6px 0 2px; }
 .key { display:inline-block; width:16px; border-top:3px solid; margin-right:6px; vertical-align:middle; border-radius:2px; }
 .chartbox { position:relative; touch-action:pan-y; outline-offset:4px; }
@@ -212,9 +219,9 @@ ol.steps-list { padding-left:20px; margin:8px 0; } ol.steps-list li { margin-bot
 .chartbox text.endlbl { fill:var(--ink); font-weight:700; }
 .chartbox .cross { stroke:var(--muted); stroke-width:1; }
 .tip { position:absolute; top:6px; pointer-events:none; white-space:nowrap; background:var(--card); border:1.5px solid var(--edge); border-radius:10px; padding:8px 10px; font-size:13px; box-shadow:3px 3px 0 var(--shadow); min-width:190px; z-index:2; }
-.tip .d { color:var(--muted); font-size:12px; margin-bottom:2px; } .tip .r { display:flex; justify-content:space-between; gap:14px; align-items:center; } .tip .r b { font-variant-numeric:tabular-nums; }
+.tip .d { color:var(--muted); font-size:12px; margin-bottom:2px; } .tip .r { display:flex; justify-content:space-between; gap:14px; align-items:center; } .tip .r b { font-family:var(--num); font-variant-numeric:tabular-nums; }
 .chart-table { margin-top:6px; } .chart-table summary { color:var(--link); font-size:15px; font-weight:600; padding:12px 0; cursor:pointer; }
-.chart-table table { width:100%; border-collapse:collapse; font-size:13px; margin-top:6px; } .chart-table th, .chart-table td { text-align:right; padding:4px 6px; border-bottom:1px solid var(--line); } .chart-table th:first-child, .chart-table td:first-child { text-align:left; } .chart-table th { color:var(--muted); font-weight:600; }
+.chart-table table { width:100%; border-collapse:collapse; font-size:13px; margin-top:6px; } .chart-table td { font-family:var(--num); } .chart-table th, .chart-table td { text-align:right; padding:4px 6px; border-bottom:1px solid var(--line); } .chart-table th:first-child, .chart-table td:first-child { text-align:left; } .chart-table th { color:var(--muted); font-weight:600; }
 
 /* save nudge, footer */
 .nudge-save { display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
@@ -231,18 +238,25 @@ label.check { min-height:44px; }
 
 /* Findings sheet: a report page. Paper-white in every colour mode, so the screen preview matches the print.
    Fonts: Source Serif 4 (headings) and Source Sans 3 (text and tables), SIL OFL 1.1, self-hosted in /fonts.
-   They only download when the sheet is opened. Their Latin subset has no peso sign, so the sheet writes PHP. */
-@font-face { font-family:"Source Serif 4"; font-weight:600; font-display:swap; src:url("/fonts/source-serif-4-latin-600-normal.woff2") format("woff2"); }
-@font-face { font-family:"Source Serif 4"; font-weight:700; font-display:swap; src:url("/fonts/source-serif-4-latin-700-normal.woff2") format("woff2"); }
-@font-face { font-family:"Source Sans 3"; font-weight:400; font-display:swap; src:url("/fonts/source-sans-3-latin-400-normal.woff2") format("woff2"); }
-@font-face { font-family:"Source Sans 3"; font-weight:600; font-display:swap; src:url("/fonts/source-sans-3-latin-600-normal.woff2") format("woff2"); }
-@font-face { font-family:"Source Sans 3"; font-weight:700; font-display:swap; src:url("/fonts/source-sans-3-latin-700-normal.woff2") format("woff2"); }
+   They only download when the sheet is opened. Their Latin files have no peso sign, so a second face carries only
+   U+20B1 (about 1.4 KB each, cut by scripts/fetch-fonts.py, 6 Oct 2026). One rule per weight, because Chrome
+   only combines faces whose weight descriptors match; the browser fetches each file once. */
+@font-face { font-family:"Source Serif 4"; font-weight:600; font-display:swap; src:url("/fonts/source-serif-4-latin-600-normal.woff2") format("woff2"); unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family:"Source Serif 4"; font-weight:700; font-display:swap; src:url("/fonts/source-serif-4-latin-700-normal.woff2") format("woff2"); unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family:"Source Serif 4"; font-weight:600; font-display:swap; src:url("/fonts/source-serif-4-peso-wght-normal.woff2") format("woff2"); unicode-range:U+20B1; }
+@font-face { font-family:"Source Serif 4"; font-weight:700; font-display:swap; src:url("/fonts/source-serif-4-peso-wght-normal.woff2") format("woff2"); unicode-range:U+20B1; }
+@font-face { font-family:"Source Sans 3"; font-weight:400; font-display:swap; src:url("/fonts/source-sans-3-peso-wght-normal.woff2") format("woff2"); unicode-range:U+20B1; }
+@font-face { font-family:"Source Sans 3"; font-weight:600; font-display:swap; src:url("/fonts/source-sans-3-peso-wght-normal.woff2") format("woff2"); unicode-range:U+20B1; }
+@font-face { font-family:"Source Sans 3"; font-weight:700; font-display:swap; src:url("/fonts/source-sans-3-peso-wght-normal.woff2") format("woff2"); unicode-range:U+20B1; }
+@font-face { font-family:"Source Sans 3"; font-weight:400; font-display:swap; src:url("/fonts/source-sans-3-latin-400-normal.woff2") format("woff2"); unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family:"Source Sans 3"; font-weight:600; font-display:swap; src:url("/fonts/source-sans-3-latin-600-normal.woff2") format("woff2"); unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family:"Source Sans 3"; font-weight:700; font-display:swap; src:url("/fonts/source-sans-3-latin-700-normal.woff2") format("woff2"); unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
 #findings.paper { --focus:#0B5FB0; /* paper is white in every mode, so the dark-mode yellow ring would be 1.55:1 */ --p-ink:#1b2430; --p-muted:#566374; --p-rule:#b9c2cd; --p-faint:#e2e7ec; --p-accent:#1F3A5F; --serif:"Source Serif 4", Georgia, "Times New Roman", serif;
   background:#fff; color:var(--p-ink); border:1px solid #cfd6de; border-radius:4px; box-shadow:0 10px 28px rgba(0,0,0,.18); padding:22px 20px 18px;
   font:400 14px/1.45 "Source Sans 3", system-ui, -apple-system, "Segoe UI", sans-serif; font-variant-numeric:tabular-nums lining-nums; }
 #findings .toolbar { display:flex; justify-content:space-between; align-items:center; gap:10px; margin:0 0 14px; padding-bottom:12px; border-bottom:1px dashed var(--p-rule); color:var(--p-muted); font-size:13px; }
 #findings .toolbar strong { color:var(--p-ink); }
-#findings button { font:600 14px/1 "Source Sans 3", system-ui, sans-serif; }
+#findings button { font:600 14px/1 "Source Sans 3", system-ui, sans-serif; } #findings dd { font-family:inherit; }
 .rpt-head { display:flex; justify-content:space-between; align-items:flex-end; gap:12px; padding-bottom:8px; border-bottom:2px solid var(--p-accent); }
 .rpt-brand { display:flex; align-items:center; gap:10px; color:var(--p-muted); font-size:11px; letter-spacing:.1em; text-transform:uppercase; font-weight:600; }
 .rpt-brand img { height:22px; width:auto; border-radius:3px; display:block; }

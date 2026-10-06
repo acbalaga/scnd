@@ -13,7 +13,7 @@ export const PAYBACK_MIN_DAYS = 360;
 
 const f0 = (v) => Math.round(v).toLocaleString('en-PH');
 const f2 = (v) => v.toFixed(2);
-const peso = (v) => 'PHP ' + Math.round(v).toLocaleString('en-PH');   // the sheet's font has no peso sign
+const peso = (v) => '₱' + Math.round(v).toLocaleString('en-PH');
 // The app passes `period` in the same "1 Sep to 1 Oct 2026" style as the screen; raw dates are the fallback.
 const span = (b) => b.period ?? `${b.start} to ${b.end}`;
 
