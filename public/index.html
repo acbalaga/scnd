@@ -602,7 +602,8 @@
   <footer class="foot">
     <p class="foot-links">
       <a class="foot-main" :href="feedbackHref" x-show="feedbackHref" target="_blank" rel="noopener noreferrer">Give feedback</a>
-      <a :href="kofiHref" x-show="kofiHref" target="_blank" rel="noopener noreferrer">Tip on Ko-fi</a>
+      <!-- Hidden while the tip box above is showing, so the page carries one Ko-fi link at a time. -->
+      <a :href="kofiHref" x-show="kofiHref && !(showSheet && sheet)" target="_blank" rel="noopener noreferrer">Tip on Ko-fi</a>
     </p>
     <!-- Pre-launch audit M-7 (Fred, 2 Oct 2026): who runs SCND and where a data question goes. The Google Form is the only contact path.
          Folded like "Privacy and limits" (Fred, 3 Oct 2026) so the footer loads as two links and two summaries. -->
