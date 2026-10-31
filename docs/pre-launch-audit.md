@@ -49,6 +49,8 @@ Ranked by severity. No Blockers were found. Effort: S under an hour, M a few hou
 
 Everything on the branch is merged and live. Fred confirmed: no CSP error for the beacon on the live page, Always Use HTTPS and HSTS on, the privacy notice on the Google Form, the link scraped in Facebook's Sharing Debugger and LinkedIn's Post Inspector, and the QR Ph image scanned from the live page. M-6, M-7 and M-11 are fixed (NEXT.md task 17). Still open and waiting on Fred's decision: M-3, M-4, M-5, M-8, M-9, M-2, L-5.
 
+**Update, 31 Oct 2026:** M-3, M-4 (disclosed, not corrected), M-5, M-8 (floor 0.30) and M-9 are fixed (NEXT.md task 19). Still open: M-2, L-5.
+
 ## Blockers before public share
 
 **Fixed on the branch:** H-1 to H-5 (above). No Blocker-level finding existed.

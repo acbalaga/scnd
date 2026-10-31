@@ -11,7 +11,7 @@
 <meta property="og:site_name" content="SCND">
 <meta property="og:url" content="https://myscnd.app/">
 <meta property="og:title" content="SCND: is your rooftop solar doing its job?">
-<meta property="og:description" content="A free check for Philippine rooftop solar, from your own bill and inverter app. What you type stays in your browser.">
+<meta property="og:description" content="A free check for Philippine rooftop solar, from your own bill and inverter app. Your bills and kWh stay in your browser.">
 <meta property="og:image" content="https://myscnd.app/icons/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -63,7 +63,7 @@
   <section class="hero" :style="ready ? 'padding:0' : ''">
     <div class="lcd-panel" aria-hidden="true" x-show="!ready"><div class="digits"><span>2nd</span></div><small>Your second meter<br>for rooftop solar</small></div>
     <h1 :class="{ 'sr-only': ready }" x-text="ready ? 'SCND: your solar check' : 'Is your solar doing its job?'">Is your solar doing its job?</h1>
-    <p x-show="!ready">Check your rooftop system against your own bill. Free, and everything you type stays in this browser.</p>
+    <p x-show="!ready">Check your rooftop system against your own bill. Free, and your bills and kWh stay in this browser.</p>
     <div class="row" style="margin-top:12px" x-show="!ready">
       <button type="button" class="primary" @click="started = true; $nextTick(() => { scrollTo('setup'); $refs.fPlace?.focus({ preventScroll: true }); })">Check my system</button>
       <button type="button" @click="loadExample()">Try an example</button>
@@ -318,7 +318,7 @@
                 <p class="sub" x-text="answerSub(b)"></p>
                 <!-- PR definition matches the findings sheet (app.js "sources") and docs/SPEC.md F1: energy made over what the rated panels would make in that sun. -->
                 <div class="flag" x-show="result(b).weatherRejected" x-text="'Against this period\'s weather, PR works out at ' + fmt(result(b).prWeather, 2) + ', above what panels can make, so the weather data for these dates looks off. Showing PR against a typical year instead.'"></div>
-                <p class="help" style="text-align:center"><span x-show="i === firstAnswered">PR compares what your panels made with what panels their size would make in the sun they got, if nothing were lost. Heat, dust, wiring and the inverter always take some, so real systems sit below 1.00. </span>Healthy is 0.75 or more. <span x-text="result(b).basis === 'weather' ? 'Adjusted for the weather in this period.' : 'Against a typical year\'s sun.'"></span></p>
+                <p class="help" style="text-align:center"><span x-show="i === firstAnswered">PR compares what your panels made with what panels their size would make in the sun they got, if nothing were lost. Heat, dust, wiring and the inverter always take some, so real systems sit below 1.00. </span>Healthy is 0.75 or more. <span x-text="result(b).basis === 'weather' ? 'Adjusted for the weather in this period.' : 'Against a typical year\'s sun.'"></span><!-- Audit M-4 (Fred, 31 Oct 2026): typical-year sun reads +3.9% vs Global Solar Atlas at Manila, docs/NEXT.md task 1. --><span x-show="manilaBias"> Around Metro Manila the sun data reads a little high, so PR may show about 4% low.</span></p>
                 <!-- Two low months: a next step, not an alarm. Weather first while unchecked, because a cloudy stretch can clear the flag. -->
                 <div class="raise" x-show="redRaised(b)" role="group" :aria-label="'Two low months in a row, ' + billTitle(b, i)">
                   <p class="raise-label"><i aria-hidden="true"></i>Two low months in a row</p>
@@ -504,6 +504,8 @@
             </table>
           </details>
           <p class="help" x-text="paybackText"></p>
+          <!-- Pre-launch audit M-3 (Fred, 31 Oct 2026): credit above the variable charges is not counted, carry-over unverified. -->
+          <p class="help" x-show="creditLeftOut > 0" x-text="'Leaves out ₱' + fmt(creditLeftOut, 0) + ' of export credit that was more than your bills\' variable charges. If your utility carries it over to later bills, your real pace is closer to the promise. Ask them how it is applied.'"></p>
         </section>
       </template>
 
@@ -570,7 +572,7 @@
         </table>
 
         <h3>3. Questions for the installer</h3>
-        <p x-show="sheet.allClear" x-text="!sheet.total ? 'Nothing to review yet. Add a bill with its dates and solar kWh, and the questions appear here.' : sheet.latest && sheet.latest.band === 'check' ? 'No questions are raised, but the latest bill\'s PR is above what panels can make, so check its figures before relying on this sheet.' : sheet.allGreen ? 'No questions are raised: PR was within the usual range in every bill reviewed.' : 'No questions are raised: the latest bill is within the usual range and no earlier low months ran two in a row.'"></p>
+        <p x-show="sheet.allClear" x-text="!sheet.total ? 'Nothing to review yet. Add a bill with its dates and solar kWh, and the questions appear here.' : sheet.latest && sheet.latest.band === 'check' ? (sheet.latest.checkLow ? 'No questions are raised, but the latest bill\'s PR is below what a working system makes, so check its figures (or whether the system was off) before relying on this sheet.' : 'No questions are raised, but the latest bill\'s PR is above what panels can make, so check its figures before relying on this sheet.') : sheet.allGreen ? 'No questions are raised: PR was within the usual range in every bill reviewed.' : 'No questions are raised: the latest bill is within the usual range and no earlier low months ran two in a row.'"></p>
         <ol class="q" x-show="!sheet.allClear"><template x-for="i in sheet.items" :key="i.id"><li x-text="i.text"></li></template></ol>
 
         <h3>4. Information requested</h3>
@@ -616,7 +618,7 @@
       <summary>Privacy and limits</summary>
       <h2>Your data</h2>
       <ul>
-        <li>What you type (system details, bills, inverter kWh) stays in this browser, and SCND's server never receives it. SCND keeps no accounts, database or cookies.</li>
+        <li>Your system details, bills and inverter kWh stay in this browser, and SCND's server never receives them. The one exception is below. SCND keeps no accounts, database or cookies.</li>
         <li>"Check the weather" sends only your location, rounded to 0.1° (about 11 km), and a date range to Open-Meteo and NASA POWER, and only when you tap it.</li>
         <li>Your Auto, Light or Dark choice is kept in this browser's local storage. "Save" writes a file to your own device without uploading it.</li>
         <li>The site is served by Cloudflare, which sees your IP address to deliver the page, like any web host. SCND's own code turns it into a code that changes daily, for rate limiting, and does not log or store it.</li>

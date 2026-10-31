@@ -39,9 +39,10 @@ const FACINGS = [
   { label: 'Northeast', az: -135 }, { label: 'Northwest', az: 135 }, { label: 'North', az: 180 },
 ];
 
-// 'check': PR above calc.PR_PLAUSIBLE_MAX, more than panels can make, so a figure is likely wrong. Never called healthy.
+// 'check': PR above calc.PR_PLAUSIBLE_MAX (more than panels can make) or below calc.PR_PLAUSIBLE_MIN (checkLow: a typo or a
+// system that was off), so a figure is likely wrong. Never called healthy, never counted as red.
 const REPORT_BAND = { green: 'Within range', amber: 'Below range', red: 'Low', check: 'Check figures' };
-const REPORT_WORDING = { green: 'within the usual range', amber: 'a little below the usual range', red: 'low', check: 'above what panels this size can make, so a figure is likely wrong' };
+const REPORT_WORDING = { green: 'within the usual range', amber: 'a little below the usual range', red: 'low', check: 'above what panels this size can make, so a figure is likely wrong', checkLow: 'below what a working system makes, so a figure is likely wrong or the system was off' };
 const BAND_SHORT = { green: 'healthy', amber: 'a bit low', red: 'low', check: 'check numbers' };
 const BAND_LABEL = { green: 'Within range', amber: 'A bit low, worth watching', red: 'Low', check: 'Check figures' };
 const FLAG_TEXT = {
@@ -273,7 +274,7 @@ document.addEventListener('alpine:init', () => {
       const cum = this.cumulative, perDay = this.promisedPerDay;
       const payback = perDay && cum.length ? { saved: cum[cum.length - 1].saved, promised: perDay * cum[cum.length - 1].day, days: cum[cum.length - 1].day } : null;
       const f = findings({
-        payback, degradation: this.degradationResult, efficiency: this.efficiencyTrend,
+        payback, creditLeftOut: this.creditLeftOut, degradation: this.degradationResult, efficiency: this.efficiencyTrend,
         bills: rows.map(({ b, r }) => ({
           start: b.start, end: b.end, period: this.fmtRange(b.start, b.end), pr: r.pr, band: r.band, basis: r.basis, redRaised: this.redRaised(b), actualKwh: num(b.inverterKwh),
           expectedKwh: r.expectedKwh, weather: r.weather, flags: r.flags, savings: r.savings, hybridFlags: r.hybrid?.flags ?? [],
@@ -281,20 +282,21 @@ document.addEventListener('alpine:init', () => {
       });
       const s = this.s, face = (FACINGS.find((x) => x.az === num(s.azimuth))?.label ?? `${s.azimuth}°`).toLowerCase();
       const date = today(), lastRow = rows.length ? rows[rows.length - 1] : null;
-      const latest = lastRow ? { period: this.fmtRange(lastRow.b.start, lastRow.b.end), pr: this.fmt(lastRow.r.pr, 2), band: lastRow.r.band } : null;
+      const latest = lastRow ? { period: this.fmtRange(lastRow.b.start, lastRow.b.end), pr: this.fmt(lastRow.r.pr, 2), band: lastRow.r.band, checkLow: !!lastRow.r.checkLow } : null;
+      const wording = (x) => REPORT_WORDING[x.checkLow ? 'checkLow' : x.band];
       const nq = f.items.length;
       // Basis lines: what the numbers rest on. Data sources are ours (README "Sources decision", 29 Sep 2026).
       const weatherUsed = rows.some((x) => x.r.weather && !x.r.weather.missing);
       const adjusted = rows.some((x) => x.r.basis === 'weather');
       const sources = [
         `PR is the electricity produced divided by what the panels are rated to produce in the sun received. Within the usual range is ${calc.PR_BANDS.green} or more, with a lower limit of ${calc.PR_BANDS.amberWet} (June to October) or ${calc.PR_BANDS.amberDry} (November to May). Expected output assumes a PR of ${calc.PR_BANDS.green}.`,
-        `Sun data: NASA POWER typical-year climatology (2001 to 2020), transposed to the panel tilt and facing.${weatherUsed ? ' Weather index compares each period with a 2020 to 2025 baseline from satellite data (Himawari, through Open-Meteo) and NASA POWER, where 1.00 is a typical year.' : ''}`,
+        `Sun data: NASA POWER typical-year climatology (2001 to 2020), transposed to the panel tilt and facing.${this.manilaBias ? ` Around Metro Manila this data reads about ${calc.MANILA_BIAS.pct}% sunnier than Global Solar Atlas, so PR here may read about 4% low.` : ''}${weatherUsed ? ' Weather index compares each period with a 2020 to 2025 baseline from satellite data (Himawari, through Open-Meteo) and NASA POWER, where 1.00 is a typical year.' : ''}`,
         ...(adjusted ? ['Where the weather check gave a result and its sources agreed within 5 points, PR and expected output are adjusted for that period\'s weather. Otherwise they are against a typical year (marked "not used" in the weather column).'] : []),
       ];
       return {
         ...f,
         date, ref: `SCND-${date.replaceAll('-', '')}`,
-        summary: latest ? `For ${latest.period}, the performance ratio was ${latest.pr}, ${REPORT_WORDING[latest.band]}. ${nq ? `${nq} question${nq === 1 ? '' : 's'} ${nq === 1 ? 'is' : 'are'} raised for the installer.` : 'No questions are raised.'}` : '',
+        summary: latest ? `For ${latest.period}, the performance ratio was ${latest.pr}, ${wording(latest)}. ${nq ? `${nq} question${nq === 1 ? '' : 's'} ${nq === 1 ? 'is' : 'are'} raised for the installer.` : 'No questions are raised.'}` : '',
         system: [
           ['Array capacity', `${s.kWp} kWp`], ['Inverter', `${s.acKw} kW (DC/AC ${this.fmt(num(s.kWp) / num(s.acKw), 2)})`],
           ['Orientation', `${s.tilt}° tilt, facing ${face}`], ['System type', s.hybrid ? 'Hybrid with battery' : 'On-grid'],
@@ -307,11 +309,12 @@ document.addEventListener('alpine:init', () => {
           exported: Number.isFinite(num(b.exportKwh)) ? this.fmt(num(b.exportKwh), 0) : 'n/a', saved: r.savings !== null ? this.fmt(r.savings, 0) : 'n/a',
         })),
         shown: Math.min(rows.length, 5), total: rows.length, latest,
-        latestWording: latest ? REPORT_WORDING[latest.band] : '',
+        latestWording: latest ? wording(latest) : '',
         savedTotal: cum.length ? '₱' + this.fmt(cum[cum.length - 1].saved, 0) : null,
         sources: [...sources, ...f.uncertainty,
           ...rows.filter((x) => x.r.weatherRejected).map(({ b, r }) => `For ${this.fmtRange(b.start, b.end)} the weather-adjusted PR came out at ${this.fmt(r.prWeather, 2)}, above what panels can make, so the weather data for those dates looks off. That period is judged against a typical year.`),
-          ...rows.filter((x) => x.r.band === 'check').map(({ b, r }) => `PR for ${this.fmtRange(b.start, b.end)} works out at ${this.fmt(r.pr, 2)}, above the ${calc.PR_PLAUSIBLE_MAX.toFixed(2)} panels reach in practice, so a figure is likely wrong (reading dates, solar kWh or panel size). Check it before relying on this sheet.`),
+          ...rows.filter((x) => x.r.band === 'check' && x.r.checkLow).map(({ b, r }) => `PR for ${this.fmtRange(b.start, b.end)} works out at ${this.fmt(r.pr, 2)}, below the ${calc.PR_PLAUSIBLE_MIN.toFixed(2)} a working system makes, so a figure is likely wrong (reading dates, solar kWh or panel size) or the system was off for part of the period. It is not counted as a low month.`),
+          ...rows.filter((x) => x.r.band === 'check' && !x.r.checkLow).map(({ b, r }) => `PR for ${this.fmtRange(b.start, b.end)} works out at ${this.fmt(r.pr, 2)}, above the ${calc.PR_PLAUSIBLE_MAX.toFixed(2)} panels reach in practice, so a figure is likely wrong (reading dates, solar kWh or panel size). Check it before relying on this sheet.`),
           ...(this.gaps.length ? [`Bills are missing for ${this.gaps.map((g) => this.fmtRange(g.from, g.to)).join(', ')}. Two low months either side of a gap are not counted as in a row, and savings to date leave out the missing ${this.gaps.length === 1 ? 'period' : 'periods'}, so the payback pace reads low.`] : [])],
       };
     },
@@ -394,7 +397,7 @@ document.addEventListener('alpine:init', () => {
     headline(b) {
       const r = this.result(b);
       if (!r || r.pr === null) return '';
-      if (r.band === 'check') return 'Higher than panels this size can make. Check the dates and kWh.';
+      if (r.band === 'check') return r.checkLow ? 'Lower than a working system makes. Check the dates and kWh, or whether the system was off.' : 'Higher than panels this size can make. Check the dates and kWh.';
       if (r.band === 'green') return 'Looks healthy.';
       if (r.band === 'amber') return 'A bit low. Worth watching, not worrying.';
       if (!this.redRaised(b)) return 'Low this month. One month is not enough to call a fault.';
@@ -568,6 +571,8 @@ document.addEventListener('alpine:init', () => {
           weatherRejected: !!j.weatherRejected, prWeather: j.prWeather ?? null });
         // Above what panels can make: a wrong figure, not a healthy month (Fred, 1 Oct 2026).
         if (calc.prTooHigh(out.pr)) out.band = 'check';
+        // Below what a working system makes: a typo or a system that was off, not a red month (audit M-8, Fred, 31 Oct 2026).
+        else if (calc.prTooLow(out.pr)) { out.band = 'check'; out.checkLow = true; }
       }
       out.flags = calc.sanityFlags({ kWp: num(s.kWp), acKw: num(s.acKw), exportKwh: Number.isFinite(x) ? x : undefined, netMeteringActive: s.netMetering, outageHours: num(b.outageHours) });
       // Overlap with an earlier bill (or the same dates entered twice): flagged on the later one. One shared day is
@@ -586,7 +591,7 @@ document.addEventListener('alpine:init', () => {
       for (const b of this.bills) {
         const r = this.result(b), pr = r?.weather?.prAdjusted;
         // A rejected weather index or an implausible PR would put a wrong figure into the year-over-year pairs.
-        if (r && Number.isFinite(pr) && pr > 0 && !r.weatherRejected && !calc.prTooHigh(pr)) records.push({ year: r.midYear, month: r.midMonth, pr });
+        if (r && Number.isFinite(pr) && pr > 0 && !r.weatherRejected && !calc.prTooHigh(pr) && !calc.prTooLow(pr)) records.push({ year: r.midYear, month: r.midMonth, pr });
       }
       const warrantyPct = num(this.s.warrantyPct), d = calc.degradation(records, warrantyPct);
       return d && !calc.isError(d) ? { ...d, warrantyPct } : null;
@@ -648,6 +653,12 @@ document.addEventListener('alpine:init', () => {
       let sum = 0;
       return rows.map(({ b, r }) => { sum += r.savings; return { day: (Date.parse(b.end) - t0) / 86400000, saved: sum, date: b.end }; });
     },
+    // Export credit left out of savings by the variable-charges cap, summed over bills with savings (audit M-3).
+    get creditLeftOut() {
+      return this.bills.reduce((t, b) => { const r = this.result(b); return t + (r && r.savings !== null && r.uncounted > 0 ? r.uncounted : 0); }, 0);
+    },
+    // Typical-year sun reads high around Manila (calc.MANILA_BIAS, audit M-4): a note on the dial and the sheet.
+    get manilaBias() { return this.ready && calc.nearManila(this.s.lat, this.s.lon); },
     get startDate() { const b = this.bills.filter((x) => x.start).sort((a, c) => (a.start < c.start ? -1 : 1))[0]; return b ? b.start : ''; },
 
     // Promised line: cost spread evenly over the promised years, from the first reading date.
