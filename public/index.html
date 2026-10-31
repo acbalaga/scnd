@@ -64,19 +64,22 @@
     <div class="lcd-panel" aria-hidden="true" x-show="!ready"><div class="digits"><span>2nd</span></div><small>Your second meter<br>for rooftop solar</small></div>
     <h1 :class="{ 'sr-only': ready }" x-text="ready ? 'SCND: your solar check' : 'Is your solar doing its job?'">Is your solar doing its job?</h1>
     <p x-show="!ready">Check your rooftop system against your own bill. Free, and your bills and kWh stay in this browser.</p>
+    <p class="need" x-show="!ready"><b>You need:</b> your latest electric bill, and the solar kWh for the same dates from your inverter app.</p>
     <div class="row" style="margin-top:12px" x-show="!ready">
       <button type="button" class="primary" @click="started = true; $nextTick(() => { scrollTo('setup'); $refs.fPlace?.focus({ preventScroll: true }); })">Check my system</button>
       <button type="button" @click="loadExample()">Try an example</button>
     </div>
-    <div x-show="!ready"><button type="button" class="link" style="padding-left:0" @click="openIntro()">What is SCND?</button></div>
+    <div x-show="!ready && started"><button type="button" class="link" style="padding-left:0" @click="openIntro()">What is SCND?</button></div>
   </section>
 
-  <!-- Explainer: hidden until the visitor asks for it ("What is SCND?" in the header or hero). Copy makes no claims about regulation, rates or programs. -->
-  <section class="explainer" id="about" x-show="introOpen" aria-labelledby="explainer-h">
+  <!-- Explainer: open on the landing page as "What you get", so a first-time visitor sees the four checks and a sample
+       answer before deciding (product review, 31 Oct 2026). Once the form opens or setup is done it hides until asked for
+       ("About" in the header, "What is SCND?" in the hero). Copy makes no claims about regulation, rates or programs. -->
+  <section class="explainer" id="about" x-show="introOpen || landing" aria-labelledby="explainer-h">
     <div class="card explainer-body">
       <div class="explainer-head">
-        <h2 id="explainer-h">About SCND</h2>
-        <button type="button" class="link" @click="closeIntro()">Close</button>
+        <h2 id="explainer-h" x-text="landing ? 'What you get' : 'About SCND'">About SCND</h2>
+        <button type="button" class="link" x-show="!landing" @click="closeIntro()">Close</button>
       </div>
       <p class="why">Your inverter app shows how much your panels made. Your bill shows what you paid. SCND lines the two up for your roof and tells you whether the system is performing or whether there is something to ask your installer.</p>
       <ul class="tiles">
@@ -102,6 +105,15 @@
         </li>
       </ul>
       <!-- The how-to is one sentence pointing at the step rail, so the page has a single three-step path. -->
+      <p class="also"><b>Also:</b> a weather check for low months, savings and payback against what your installer promised, battery health for hybrid systems, and a one-page findings sheet to hand your installer.</p>
+      <!-- Sample answer: made-up numbers, drawn by the same dial code as a real bill (app.js sampleDial). Landing only. -->
+      <figure class="sample" x-show="landing">
+        <figcaption>What an answer looks like <span>(made-up numbers)</span></figcaption>
+        <div class="dial" x-html="sampleDial"></div>
+        <p class="headline">Looks healthy.</p>
+        <p class="sub">600 kWh made, against about 570 kWh for a healthy system in that sun (5% over).</p>
+        <button type="button" class="link" @click="loadExample()">See a full example</button>
+      </figure>
       <p class="help">The three steps below take you through it: your system details once, then a bill with your inverter kWh, then the answer, which prints as a one-page list of questions for your installer.</p>
     </div>
   </section>

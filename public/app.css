@@ -87,6 +87,12 @@ button.theme svg { width:18px; height:18px; flex:none; }
 .explainer-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; }
 .explainer-body { margin:4px 0 0; }
 .explainer .why { font-size:16px; }
+.explainer .also { font-size:15px; margin:0 0 4px; }
+.hero .need { font-size:15px; color:var(--ink); }
+.sample { margin:14px 0 10px; padding:14px 12px 8px; border:1.5px dashed var(--line); border-radius:12px; text-align:center; }
+.sample figcaption { font:700 14px var(--body); color:var(--ink); margin-bottom:6px; } .sample figcaption span { font-weight:400; color:var(--muted); }
+.sample .dial { max-width:240px; }
+.sample .sub { color:var(--muted); font-size:14px; max-width:30em; margin:0 auto; }
 .tiles { list-style:none; margin:12px 0; padding:0; display:grid; grid-template-columns:1fr 1fr; gap:10px; }
 .tiles li { background:var(--soft); border:1.5px solid var(--line); border-radius:12px; padding:10px; }
 .tiles svg { width:100%; max-width:84px; height:auto; display:block; margin-bottom:6px; }

@@ -415,7 +415,11 @@ document.addEventListener('alpine:init', () => {
     // looked like a failure. The needle clamps at the ends; the LCD always shows the true PR. Display only, bands unchanged.
     dial(b) {
       const r = this.result(b);
-      if (!r || r.pr === null) return '';
+      return !r || r.pr === null ? '' : this.dialSvg(r);
+    },
+    // Landing preview: the same dial as a real answer, for made-up numbers (August, so the wet-season bands).
+    get sampleDial() { return this.dialSvg({ pr: 0.79, band: 'green', midMonth: 8 }, 'Example answer: performance ratio 0.79, healthy. Healthy is 0.75 or more.'); },
+    dialSvg(r, label) {
       const amberFloor = calc.isDrySeason(r.midMonth) ? calc.PR_BANDS.amberDry : calc.PR_BANDS.amberWet, green = calc.PR_BANDS.green;
       const pos = (pr) => Math.max(0, Math.min((pr - DIAL_MIN) / (DIAL_MAX - DIAL_MIN), 1));
       const pt = (pr, rad) => { const a = Math.PI * (1 - pos(pr)); return [100 + rad * Math.cos(a), 100 - rad * Math.sin(a)]; };
@@ -425,7 +429,7 @@ document.addEventListener('alpine:init', () => {
       const pr = this.fmt(r.pr, 2);
       // PR above what panels can make: one grey arc, grey needle and digits, so the gauge reads as "check this", not a result.
       const check = r.band === 'check';
-      return `<svg viewBox="-6 -4 212 150" role="img" class="${check ? 'is-check' : ''}" aria-label="Performance ratio ${pr}, ${BAND_SHORT[r.band]}. Healthy is ${green} or more.">`
+      return `<svg viewBox="-6 -4 212 150" role="img" class="${check ? 'is-check' : ''}" aria-label="${label ?? `Performance ratio ${pr}, ${BAND_SHORT[r.band]}. Healthy is ${green} or more.`}">`
         + (check ? arc(DIAL_MIN, DIAL_MAX, 'd-grey')
           : arc(DIAL_MIN, amberFloor - gap, 'd-red') + arc(amberFloor + gap, green - gap, 'd-amber') + arc(green + gap, DIAL_MAX, 'd-green'))
         + `<text class="scale" x="${ax.toFixed(1)}" y="${ay.toFixed(1)}" text-anchor="middle">${amberFloor}</text><text class="scale" x="${gx.toFixed(1)}" y="${gy.toFixed(1)}" text-anchor="middle">${green}</text>`
@@ -761,6 +765,8 @@ document.addEventListener('alpine:init', () => {
     get unsaved() { return !this.example && this.snap() !== this.savedSnap; },
     // Explainer: hidden until asked for. Nothing is stored.
     introOpen: false,
+    get landing() { return !this.ready && !this.started; },   // first screen: hero plus "What you get"
+
     openIntro() { this.introOpen = true; this.$nextTick(() => this.scrollTo('about')); },
     closeIntro() { this.introOpen = false; },
     init() {
