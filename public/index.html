@@ -69,6 +69,7 @@
       <button type="button" class="primary" @click="started = true; $nextTick(() => { scrollTo('setup'); $refs.fPlace?.focus({ preventScroll: true }); })">Check my system</button>
       <button type="button" @click="loadExample()">Try an example</button>
     </div>
+    <div x-show="!ready"><button type="button" class="link" style="padding-left:0" @click="loadExample('hybrid')">Or try a hybrid example: battery, 14 months of bills</button></div>
     <div x-show="!ready && started"><button type="button" class="link" style="padding-left:0" @click="openIntro()">What is SCND?</button></div>
   </section>
 
@@ -207,7 +208,7 @@
   <template x-if="ready">
     <section id="bills">
       <div class="banner" x-show="example">
-        <span><strong>Example numbers.</strong> Made up, so you can see how it works. The weather check uses real weather, so it will not match these made-up numbers.</span>
+        <span><strong>Example numbers.</strong> Made up, so you can see how it works. The weather check uses real weather, so it will not match these made-up numbers.<template x-if="example === 'hybrid'"><span> This one has 14 months of bills, a battery whose efficiency drops in the last two, and a payback promise to compare against.</span></template></span>
         <button type="button" class="link" @click="clearExample()">Start with mine</button>
       </div>
 
@@ -618,7 +619,17 @@
       <a class="foot-main" :href="feedbackHref" x-show="feedbackHref" target="_blank" rel="noopener noreferrer">Give feedback</a>
       <!-- Hidden while the tip box above is showing, so the page carries one Ko-fi link at a time. -->
       <a :href="kofiHref" x-show="kofiHref && !(showSheet && sheet)" target="_blank" rel="noopener noreferrer">Tip on Ko-fi</a>
+      <!-- Shares the site address only (Web Share API, or the clipboard where that is missing). Nothing typed goes with it. -->
+      <button type="button" class="link foot-share" @click="shareSite()">Share SCND</button>
     </p>
+    <p class="help foot-shared" role="status" x-show="shareMsg" x-text="shareMsg"></p>
+    <nav class="foot-guides" aria-label="Guides">
+      <b>Guides:</b>
+      <a href="/guide/net-metering-bill">Why your bill is not zero</a>
+      <a href="/guide/app-vs-bill">App vs bill</a>
+      <a href="/guide/performance-ratio">What PR means</a>
+      <a href="/guide/method">How SCND works</a>
+    </nav>
     <!-- Pre-launch audit M-7 (Fred, 2 Oct 2026): who runs SCND and where a data question goes. The Google Form is the only contact path.
          Was a "Feedback and contact" fold (3 Oct); shown as one line under the links from 6 Oct so the bill-number warning
          is read before the form opens. Who runs SCND and the deletion route moved to the Feedback bullet in "Privacy and limits". -->

@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Why your inverter app and your bill do not match | SCND</title>
+<meta name="description" content="Your inverter app shows what the panels made. Your bill shows only what crossed the meter. How to line the two up and see how much solar your home really used.">
+<link rel="canonical" href="https://myscnd.app/guide/app-vs-bill">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="SCND">
+<meta property="og:url" content="https://myscnd.app/guide/app-vs-bill">
+<meta property="og:title" content="Why your inverter app and your bill do not match">
+<meta property="og:description" content="Your inverter app shows what the panels made. Your bill shows only what crossed the meter. How to line the two up and see how much solar your home really used.">
+<meta property="og:image" content="https://myscnd.app/icons/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="SCND logo and the line: Is your solar doing its job?">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#F3F6FA" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0A1424" media="(prefers-color-scheme: dark)">
+<script>try{var t=localStorage.getItem("scnd-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<!-- Guide page: plain HTML, no script beyond the shared theme line (same bytes as index.html, so the CSP hash covers it). -->
+<main class="guide">
+  <header class="top"><a class="brand" href="/"><img src="/icons/logo.svg" width="84" height="38" alt="SCND home"></a><a class="guide-cta" href="/">Check my system</a></header>
+  <article class="card">
+  <h1>Why your inverter app and your bill do not match</h1>
+  <p class="lede">Your inverter app says the panels made 600 kWh. The bill says you exported 360. Nothing is missing: the two count different things.</p>
+
+  <h2>The app counts everything the panels made</h2>
+  <!-- Source: SolarPro Install, read 29 Sep 2026, on the app-to-bill confusion. -->
+  <p>The inverter measures all the electricity the panels produce. Most of it never reaches the utility's meter, because your house uses it first.</p>
+
+  <h2>The bill counts only what crossed the meter</h2>
+  <p>The utility's meter sees two flows: power you bought from the grid, and power you sent to it. Solar your house used directly does not show on the bill at all.</p>
+
+  <h2>Putting them together</h2>
+  <div class="eg">
+    <p><b>Made by the panels</b> (app): 600 kWh<br><b>Sent to the grid</b> (bill): 360 kWh<br><b>Used at home from solar</b>: 600 − 360 = 240 kWh</p>
+    <p>If the bill also shows 300 kWh bought, the whole house used 300 + 240 = 540 kWh that month.</p>
+  </div>
+  <p>With a battery it takes two more numbers from the app: energy charged into the battery and energy taken back out. Solar used at home is then made − sent − charged + discharged, so battery losses are not counted as solar you used.</p>
+
+  <h2>Use the bill's reading dates</h2>
+  <p>Apps usually show calendar months. Bills run from one meter reading to the next, for example 14 March to 13 April. Comparing a calendar month with a bill period gives nonsense, sometimes even negative self-use. Open the app's daily view and add up the days between the two reading dates printed on the bill.</p>
+
+  <h2>Signs the numbers do not line up</h2>
+  <ul>
+    <li>Sent to the grid is more than the panels made (on a system without a battery).</li>
+    <li>Self-use comes out below zero.</li>
+    <li>The bill shows 0 kWh sent although net metering is on. The meter may not have been changed yet.</li>
+  </ul>
+
+  <p>SCND asks for the reading dates and works out the split for each bill.</p>
+  <p class="guide-next"><a class="button primary" href="/">Check your own system in SCND</a></p>
+  <p class="help">SCND is free and runs in your browser. Your bills and kWh stay on your device.</p>
+  </article>
+  <section class="sources"><h2>Sources</h2><ul><li><a href="https://solarproinstall.com/meralco-net-metering-bill-philippines/" rel="noopener noreferrer">SolarPro Install, reading the net-metered Meralco bill (read 29 Sep 2026)</a></li></ul></section>
+  <nav class="foot-guides" aria-label="Guides"><b>Guides:</b>
+    <a href="/guide/net-metering-bill">Why your bill is not zero</a>
+    <a href="/guide/app-vs-bill">App vs bill</a>
+    <a href="/guide/performance-ratio">What PR means</a>
+    <a href="/guide/method">How SCND works</a>
+  </nav>
+  <p class="foot-sign"><img src="/icons/logo.svg" width="48" height="22" alt=""><span>Your second meter for rooftop solar. A personal project by Alfred Balaga.</span></p>
+</main>
+</body>
+</html>

@@ -4,6 +4,7 @@ import * as calc from './calc.js';
 import { loadGrid, lookup, isLowDiffuse } from './grid.js';
 import { fetchSatellite, fetchNasa } from './weather.js';
 import { serialize, parse } from './data.js';
+import { EXAMPLES, exampleBills } from './examples.js';
 import { findings, MIN_DEGRADATION_PAIRS, PAYBACK_MIN_DAYS } from './findings.js';
 
 const num = (v) => (v === '' || v === null || v === undefined ? NaN : Number(v));
@@ -450,20 +451,15 @@ document.addEventListener('alpine:init', () => {
 
     // ---- Example: a made-up system with two bills, so an owner sees a full result in one tap ----
     // Example numbers only. 9.70 PHP/kWh is Meralco's September 2026 generation charge (docs/SPEC.md); the rest is made up.
-    async loadExample() {
-      this.place = 'Manila';
-      this.s = { ...this.s, lat: 14.6, lon: 121, kWp: 5.5, acKw: 5, tilt: 10, azimuth: 0, commissioned: '', hybrid: false, netMetering: true, cost: '', promisedYears: '', warrantyPct: '', batteryCost: '' };
+    // Made-up systems from examples.js: 'ongrid' (two bills, quick look) or 'hybrid' (14 months, battery, payback).
+    async loadExample(kind = 'ongrid') {
+      const ex = EXAMPLES[kind];
+      this.place = ex.place;
+      this.s = { ...this.s, ...ex.setup };
       await this.continueSetup();
       if (!this.ready) return;
-      const now = new Date(), y = now.getUTCFullYear(), m = now.getUTCMonth();
-      const iso = (mm) => new Date(Date.UTC(y, mm, 1)).toISOString().slice(0, 10);
-      const bills = [[iso(m - 2), iso(m - 1), 0.79], [iso(m - 1), iso(m), 0.70]].map(([start, end, pr], k, all) => {
-        const p = calc.poaPeriod({ ghi: this.climate.ghi, dif: this.climate.dif, tilt: 10, azimuth: 0, lat: this.s.lat, start, end });
-        const solar = Math.round(pr * 5.5 * p.hPoa), used = Math.round(solar * 0.4), sent = solar - used, bought = 450 - used;
-        const variable = Math.round(bought * 12), credit = sent * 9.7;
-        return { ...newBill(), start, end, inverterKwh: solar, importKwh: bought, exportKwh: sent, genAmount: Math.round(bought * 970) / 100, varCharges: variable, total: Math.round(Math.max(variable - credit, 0) + 620), open: false };
-      });
-      this.bills = bills; this.example = true; this.savedOnce = false; this.saveNudgeHidden = false;
+      this.bills = exampleBills(kind, { climate: this.climate }).map((b) => ({ ...newBill(), ...b, open: false }));
+      this.example = kind; this.savedOnce = false; this.saveNudgeHidden = false;
       this.resetWeather();
       this.$nextTick(() => this.focusBill(0, '.bill-title h3'));
     },
@@ -764,6 +760,17 @@ document.addEventListener('alpine:init', () => {
     snap() { return serialize({ ...this.s, place: this.place }, this.bills, new Date(0)); },
     get unsaved() { return !this.example && this.snap() !== this.savedSnap; },
     // Explainer: hidden until asked for. Nothing is stored.
+    // Share the site address only: the OS share sheet where the browser has one, else copy to the clipboard.
+    shareMsg: '',
+    async shareSite() {
+      const url = 'https://myscnd.app/', text = 'A free, private check for Philippine rooftop solar, from your own bill and inverter app.';
+      try {
+        if (navigator.share) { await navigator.share({ title: 'SCND: your second meter', text, url }); return; }
+        await navigator.clipboard.writeText(url); this.shareMsg = 'Link copied: ' + url;
+      } catch (e) {
+        if (e?.name !== 'AbortError') this.shareMsg = 'Could not share from this browser. The address is ' + url;
+      }
+    },
     introOpen: false,
     get landing() { return !this.ready && !this.started; },   // first screen: hero plus "What you get"
 
