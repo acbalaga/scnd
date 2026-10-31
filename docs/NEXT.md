@@ -263,3 +263,13 @@ Requested by Fred after a product review: close the open calculation and claims 
 - [x] **M-5, privacy claim made exact.** Hero and `og:description` now say "your bills and kWh stay in this browser"; the footer names the weather check as the one exception.
 - Checked in headless Chromium at 390 px with a Manila on-grid save (typo bill at 1.25 kWh, credit above variable charges) and a Cebu hybrid save (G 300, X 320, C 50, D 100): grey check-low dial, Manila note on screen and sheet, credit line on the Payback card, hybrid savings shown with no misalignment message, no page errors. `node --test`: 140 pass.
 - **Noted, not changed:** a check-low bill still adds its savings to the payback total (₱15 in the typo case). Small, and the bill is already flagged.
+
+## 20. Landing that shows what SCND does (31 Oct 2026)
+
+Requested by Fred after the product review: a visitor from a post saw a headline, two buttons and the step rail, with every feature behind "What is SCND?".
+
+- [x] **"What you get" open on the landing page.** The About card shows by default before the form opens (`landing` getter in `app.js`), headed "What you get", with no Close button. After "Check my system" or setup it goes back to opening on demand as "About SCND". The hero's "What is SCND?" link shows only once the form is open, since the card is already on screen before that.
+- [x] **"You need" line** in the hero: the latest bill and the solar kWh for the same dates from the inverter app. No time claim, because the 5-minute check is still unverified.
+- [x] **"Also" line** under the four tiles naming the weather check, payback against the promise, battery health and the findings sheet.
+- [x] **Sample answer.** The dial is drawn by the same code as a real bill (`dial` now calls `dialSvg`, `sampleDial` passes made-up PR 0.79 in August), labelled "made-up numbers", with "See a full example". Figures are consistent: 600 kWh against 570 kWh expected at PR 0.75 is 5% over.
+- No new request, dependency or claim about regulation, rates or programs. Checked in headless Chromium at 390 px (light and dark) and 1280 px: no horizontal overflow, no page errors, card hides after "Check my system" and reopens from "About" without the sample. `node --test`: 140 pass.
