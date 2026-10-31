@@ -64,3 +64,31 @@ test('html: the footer says who runs SCND and where a data question goes', () =>
   assert.match(foot, /to have a feedback answer deleted, use "Give feedback"/);
   assert.match(foot, /<p class="foot-note" x-show="feedbackHref">Please leave bill and account numbers out of feedback\.<\/p>/);
 });
+
+// Guide pages (Reach batch, 31 Oct 2026): plain HTML for search and sharing. No script beyond the theme line, which
+// must be byte-identical to index.html's so the CSP hash in src/headers.js covers it.
+import { readdirSync } from 'node:fs';
+const guideDir = new URL('../public/guide/', import.meta.url);
+const guides = readdirSync(guideDir).filter((f) => f.endsWith('.html'));
+const themeLine = html.match(/<script>try\{var t=localStorage[^<]*<\/script>/)[0];
+
+test('guides: each page has a title, description, matching canonical and only the shared theme script', () => {
+  assert.ok(guides.length >= 4);
+  for (const f of guides) {
+    const g = readFileSync(new URL(f, guideDir), 'utf8'), slug = f.replace(/\.html$/, '');
+    assert.match(g, /<title>[^<]+ \| SCND<\/title>/, f);
+    assert.match(g, /<meta name="description" content="[^"]{60,}">/, f);
+    assert.ok(g.includes(`<link rel="canonical" href="https://myscnd.app/guide/${slug}">`), f);
+    const scripts = g.match(/<script[\s\S]*?<\/script>/g) ?? [];
+    assert.deepEqual(scripts, [themeLine], f);
+    assert.ok(!g.includes('—'), `${f} has an em dash`);
+    assert.equal((g.match(/<h1>/g) ?? []).length, 1, f);
+  }
+});
+test('guides: sitemap and footer links point at files we ship', () => {
+  const sitemap = readFileSync(new URL('../public/sitemap.xml', import.meta.url), 'utf8');
+  const locs = [...sitemap.matchAll(/<loc>https:\/\/myscnd\.app(\/[^<]*)<\/loc>/g)].map((m) => m[1]);
+  const linked = [...html.matchAll(/href="(\/guide\/[^"]+)"/g)].map((m) => m[1]);
+  for (const p of [...locs.filter((x) => x !== '/'), ...linked]) assert.ok(existsSync(new URL('../public' + p + '.html', import.meta.url)), p);
+  assert.equal(locs.length, guides.length + 1);
+});

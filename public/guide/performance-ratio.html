@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>What performance ratio (PR) means for your solar | SCND</title>
+<meta name="description" content="Performance ratio in plain words: what it measures, the healthy range for Philippine rooftops, and why one cloudy month proves nothing.">
+<link rel="canonical" href="https://myscnd.app/guide/performance-ratio">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="SCND">
+<meta property="og:url" content="https://myscnd.app/guide/performance-ratio">
+<meta property="og:title" content="What performance ratio (PR) means for your solar">
+<meta property="og:description" content="Performance ratio in plain words: what it measures, the healthy range for Philippine rooftops, and why one cloudy month proves nothing.">
+<meta property="og:image" content="https://myscnd.app/icons/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="SCND logo and the line: Is your solar doing its job?">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#F3F6FA" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0A1424" media="(prefers-color-scheme: dark)">
+<script>try{var t=localStorage.getItem("scnd-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<!-- Guide page: plain HTML, no script beyond the shared theme line (same bytes as index.html, so the CSP hash covers it). -->
+<main class="guide">
+  <header class="top"><a class="brand" href="/"><img src="/icons/logo.svg" width="84" height="38" alt="SCND home"></a><a class="guide-cta" href="/">Check my system</a></header>
+  <article class="card">
+  <h1>What performance ratio (PR) means</h1>
+  <p class="lede">PR compares what your panels made with what panels their size would make in the sun they got, if nothing were lost. It is the fairest single number for "is my system doing its job?", because it takes the weather out.</p>
+
+  <h2>How it is worked out</h2>
+  <div class="eg"><p>PR = kWh made ÷ (panel size in kWp × sun on the panels in kWh per m²)</p>
+  <p>A 5 kWp system that got 150 kWh/m² of sun in a month would make 750 kWh with no losses. If it made 600 kWh, its PR is 600 ÷ 750 = 0.80.</p></div>
+  <p>Heat, dust, wiring and the inverter always take some, so real systems sit below 1.00. PR is not panel efficiency (about 20% for modern panels). It measures the losses after the panel rating.</p>
+
+  <h2>What is healthy</h2>
+  <!-- Bands: PR_BANDS in public/js/calc.js (Fred, 29 Sep 2026). Benchmark: Solaren Power, read 29 Sep 2026. -->
+  <ul>
+    <li><b>0.75 or more:</b> healthy. SCND expects this from a working home system.</li>
+    <li><b>0.65 to 0.75</b> (June to October) or <b>0.62 to 0.75</b> (November to May): a bit low, worth watching. The dry-season floor is lower because the sun data SCND uses reads a little low in those months.</li>
+    <li><b>Below that:</b> low.</li>
+    <li><b>Above 0.90 or below 0.30:</b> SCND says "check numbers". That usually means the dates, the kWh or the panel size were entered wrong, or the system was off for part of the period.</li>
+  </ul>
+  <p>Philippine installers publish 78 to 82% as a benchmark for commercial rooftops. Homes often sit a little lower because of shade and heat.</p>
+
+  <h2>Why one month proves nothing</h2>
+  <p>The sun on your roof in a given month is an estimate from satellite data, and it can be off by 5 to 10% for one place and month. A cloudy month also reads low against a typical year. That is why SCND raises a flag only after two low months in a row, and why it offers a weather check that compares your bill dates with the sun that actually fell.</p>
+
+  <h2>What pulls PR down</h2>
+  <ul>
+    <li>Shade from a neighbour's wall, a water tank or a tree, often only part of the day.</li>
+    <li>Dust, bird droppings and leaves, worst late in the dry season.</li>
+    <li>Heat: panels make less when hot.</li>
+    <li>An inverter much smaller than the panels, which caps output on sunny days.</li>
+    <li>Brownouts: on-grid inverters switch off when the grid goes down.</li>
+    <li>Faults: a tripped breaker, a failed string or an inverter error.</li>
+  </ul>
+  <p>SCND works out PR for each bill from your inverter kWh, your panel size and the sun at your location.</p>
+  <p class="guide-next"><a class="button primary" href="/">Check your own system in SCND</a></p>
+  <p class="help">SCND is free and runs in your browser. Your bills and kWh stay on your device.</p>
+  </article>
+  <section class="sources"><h2>Sources</h2><ul><li><a href="https://solaren-power.com/comparing-solar-quotes-in-the-philippines/" rel="noopener noreferrer">Solaren Power, comparing solar quotes in the Philippines (read 29 Sep 2026)</a></li><li><a href="https://power.larc.nasa.gov/docs/" rel="noopener noreferrer">NASA POWER data access</a></li></ul></section>
+  <nav class="foot-guides" aria-label="Guides"><b>Guides:</b>
+    <a href="/guide/net-metering-bill">Why your bill is not zero</a>
+    <a href="/guide/app-vs-bill">App vs bill</a>
+    <a href="/guide/performance-ratio">What PR means</a>
+    <a href="/guide/method">How SCND works</a>
+  </nav>
+  <p class="foot-sign"><img src="/icons/logo.svg" width="48" height="22" alt=""><span>Your second meter for rooftop solar. A personal project by Alfred Balaga.</span></p>
+</main>
+</body>
+</html>

@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How SCND works out its numbers | SCND</title>
+<meta name="description" content="Data sources, sky model, bands, weather check and limits behind SCND, for installers and engineers. Plus how installers can use the findings sheet with clients.">
+<link rel="canonical" href="https://myscnd.app/guide/method">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="SCND">
+<meta property="og:url" content="https://myscnd.app/guide/method">
+<meta property="og:title" content="How SCND works out its numbers">
+<meta property="og:description" content="Data sources, sky model, bands, weather check and limits behind SCND, for installers and engineers. Plus how installers can use the findings sheet with clients.">
+<meta property="og:image" content="https://myscnd.app/icons/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="SCND logo and the line: Is your solar doing its job?">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#F3F6FA" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0A1424" media="(prefers-color-scheme: dark)">
+<script>try{var t=localStorage.getItem("scnd-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<!-- Guide page: plain HTML, no script beyond the shared theme line (same bytes as index.html, so the CSP hash covers it). -->
+<main class="guide">
+  <header class="top"><a class="brand" href="/"><img src="/icons/logo.svg" width="84" height="38" alt="SCND home"></a><a class="guide-cta" href="/">Check my system</a></header>
+  <article class="card">
+  <h1>How SCND works out its numbers</h1>
+  <p class="lede">For installers, engineers and careful owners. Every number is worked out in the browser from the owner's own figures and public sun data. Nothing the owner types is sent to a server of ours.</p>
+
+  <h2>Typical-year sun</h2>
+  <!-- Facts: docs/SPEC.md "Calculation method" and "Spike 2 result" (29 Sep 2026); docs/NEXT.md tasks 1 and 2. -->
+  <p>Monthly global and diffuse horizontal irradiation come from NASA POWER climatology (2001 to 2020) on a 0.5° grid over the Philippines (748 cells), interpolated to the owner's location rounded to 0.1°. Each month's mean day is integrated hour by hour (Collares-Pereira and Rabl for global, Liu-Jordan for diffuse), isotropic sky, ground albedo 0.2, for the panel tilt and facing. The transposition matches pvlib within 0.07% on eight reference cases. That check shares the hourly apportioning method, so it validates geometry and transposition, not the apportioning model.</p>
+  <p>Against Global Solar Atlas, NASA POWER is within about ±5% in the wet season and reads up to about 8% low in the dry season. In Manila it reads 3.9% high on the annual mean, so PR there can show about 4% low, and SCND says so on screen and on the sheet.</p>
+
+  <h2>Performance ratio and bands</h2>
+  <p>PR = inverter kWh ÷ (kWp × plane-of-array irradiation), with bill periods split across calendar months by days. Hybrids use PV yield, not inverter AC output, so battery losses do not read as a PV fault. Green is 0.75 or more. Amber runs down to 0.65 (June to October) or 0.62 (November to May, wider because of the dry-season bias). Red is below that, and a red flag is raised only after two consecutive bills. PR above 0.90 or below 0.30 reads "check numbers", never green or red.</p>
+
+  <h2>Weather or system</h2>
+  <p>On request, SCND fetches daily irradiation for the bill's own dates from two sources: Himawari satellite data through Open-Meteo, and NASA POWER. Each is compared with its own 2020 to 2025 baseline, so each source's absolute bias cancels, and the two indices are averaged. If they differ by more than 5 points, the weather call is labelled uncertain and the bill stays judged against a typical year. If one source covers under 80% of the days, the other is used alone and labelled inferred. A trusted call judges the bill on weather-adjusted PR. If the adjustment alone pushes PR above 0.90, the weather data is treated as suspect and not used.</p>
+
+  <h2>Energy split, savings and payback</h2>
+  <p>Self-consumed solar S = G − X (generated minus exported), or G − X − C + D with a battery (charged, discharged). House load = imported + S. Savings = S × the bill's average buying rate (variable charges ÷ kWh bought) + export credit at the bill's generation charge. Export credit above the bill's variable charges is left out and named, because carry-over is not verified. Rates are always read from the owner's own bill. The payback question on the sheet waits for about a year of bills, because a wet-season start always reads behind.</p>
+
+  <h2>Degradation and battery</h2>
+  <p>Year over year compares weather-adjusted PR for the same calendar month, once bills span 13 months with a weather check. Monthly noise is far larger than a year's degradation, so the sheet raises it only from six same-month pairs. For batteries, monthly discharged ÷ charged is an apparent round-trip efficiency. A drop is flagged when the latest two bills are both 5 or more points below the average of the first three. Grid charging is flagged when the battery took in more than the PV left after export. Curtailment is not modelled, because it needs daily state of charge.</p>
+
+  <h2>What is sent, and what is not</h2>
+  <p>Bills, kWh and system details stay in the browser. The weather check sends only the location rounded to 0.1° (about 11 km) and a date range to Open-Meteo and NASA POWER, and only when the owner taps it. Saving writes a file to the owner's device. There are no accounts, no database and no cookies.</p>
+
+  <h2>Limits</h2>
+  <p>SCND is a screening check from monthly totals. It does not diagnose specific faults, see string-level data, model shading or replace an inspection. Satellite sun data can be off by 5 to 10% for one place and month.</p>
+
+  <h2 id="installers">For installers</h2>
+  <p>If a client doubts their system, send them the link. SCND gives both of you a neutral reading from the client's own bill and inverter app.</p>
+  <ul>
+    <li><b>It can clear you.</b> The weather check splits a shortfall into the part the weather explains and the part it does not. A cloudy month shows up as weather, not as a fault.</li>
+    <li><b>Questions, not a verdict.</b> The findings sheet is a one-page list of questions for the installer: fault log, shading check, how the payback was worked out. It never names an installer, and SCND stores no installer names.</li>
+    <li><b>It asks for what you already have:</b> the design yield estimate and its assumptions, the inverter event log, and the warranty terms.</li>
+    <li><b>Export credit at the generation charge.</b> The bill decoder explains it from the client's own bill, which helps when a client was told exports earn the retail rate.</li>
+  </ul>
+  <p class="guide-next"><a class="button primary" href="/">Check your own system in SCND</a></p>
+  <p class="help">SCND is free and runs in your browser. Your bills and kWh stay on your device.</p>
+  </article>
+  <section class="sources"><h2>Sources</h2><ul><li><a href="https://power.larc.nasa.gov/docs/" rel="noopener noreferrer">NASA POWER data access</a></li><li><a href="https://open-meteo.com/en/features" rel="noopener noreferrer">Open-Meteo features (satellite radiation, non-commercial use)</a></li></ul></section>
+  <nav class="foot-guides" aria-label="Guides"><b>Guides:</b>
+    <a href="/guide/net-metering-bill">Why your bill is not zero</a>
+    <a href="/guide/app-vs-bill">App vs bill</a>
+    <a href="/guide/performance-ratio">What PR means</a>
+    <a href="/guide/method">How SCND works</a>
+  </nav>
+  <p class="foot-sign"><img src="/icons/logo.svg" width="48" height="22" alt=""><span>Your second meter for rooftop solar. A personal project by Alfred Balaga.</span></p>
+</main>
+</body>
+</html>

@@ -13,8 +13,8 @@
     // Unknown paths get public/404.html (status 404) instead of an empty body (audit M-6).
     "not_found_handling": "404-page",
     // "!/..." patterns go straight to the asset server. test/worker.test.mjs fails if a file under public/ other
-    // than the page is left on the Worker path.
-    "run_worker_first": ["/*", "!/js/*", "!/vendor/*", "!/fonts/*", "!/icons/*", "!/data/*", "!/assets/*", "!/app.css", "!/manifest.webmanifest"]
+    // than the pages (app, 404, guide/*.html) is left on the Worker path.
+    "run_worker_first": ["/*", "!/js/*", "!/vendor/*", "!/fonts/*", "!/icons/*", "!/data/*", "!/assets/*", "!/app.css", "!/manifest.webmanifest", "!/sitemap.xml"]
   },
   // 100 requests per 10 seconds per visitor, counted on page requests only (static files skip the Worker). The limit is loose on purpose:
   // many Philippine mobile users share one public IP behind carrier-grade NAT.
