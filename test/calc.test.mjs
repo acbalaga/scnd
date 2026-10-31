@@ -331,3 +331,22 @@ test('billCharges edge: no imported kWh leaves the derived number missing, not z
   assert.ok(Number.isNaN(c.billCharges({ unit: 'rate', i: NaN, genRate: 9.7, varRate: 12 }).varCharges));
   assert.ok(Number.isNaN(c.billCharges({ unit: 'rate', i: 300, genRate: 9.7, varRate: NaN }).varCharges));
 });
+
+// ---- Trust fixes, 31 Oct 2026 (pre-launch audit M-4, M-8, M-9) ----
+test('energySplit golden, hybrid (M-9): export above PV yield is fine when battery discharge covers it', () => {
+  const r = c.energySplit({ g: 300, x: 320, i: 100, c: 50, d: 100 });
+  assert.equal(r.error, undefined); near(r.selfConsumed, 30); near(r.load, 130);
+});
+test('energySplit edge (M-9): on-grid export above generation is still a misalignment error', () => {
+  assert.equal(c.energySplit({ g: 300, x: 320, i: 100 }).error, 'period_misalignment');
+});
+test('prTooLow golden (M-8): below 0.30 points at a wrong figure; 0.30 itself and non-numbers do not', () => {
+  assert.equal(c.PR_PLAUSIBLE_MIN, 0.30);
+  assert.equal(c.prTooLow(0.29), true); assert.equal(c.prTooLow(0), true);
+  assert.equal(c.prTooLow(0.30), false); assert.equal(c.prTooLow(0.55), false); assert.equal(c.prTooLow(NaN), false);
+});
+test('nearManila golden (M-4): Manila and Quezon City are inside the checked area; Cebu and Baguio are not', () => {
+  assert.equal(c.nearManila(14.6, 121.0), true); assert.equal(c.nearManila(14.7, 121.0), true);
+  assert.equal(c.nearManila(10.3, 123.9), false); assert.equal(c.nearManila(16.4, 120.6), false);
+  assert.equal(c.nearManila('', ''), false);
+});

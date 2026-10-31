@@ -87,3 +87,16 @@ test('findings edge: two low months judged without a weather check say so in the
   const mixed = findings({ bills: [bill({ band: 'red', pr: 0.5, basis: 'typical' }), bill({ band: 'red', pr: 0.48, redRaised: true, basis: 'weather' })], payback: null }).items[0].text;
   assert.match(mixed, /not checked/);
 });
+
+// Pre-launch audit M-3 (31 Oct 2026): export credit left out of savings is named wherever the payback gap is shown.
+test('findings golden (M-3): payback question names credit left out of savings', () => {
+  const r = findings({ bills: [bill()], payback: { saved: 8000, promised: 10000, days: PAYBACK_MIN_DAYS }, creditLeftOut: 1250 });
+  const t = r.items.find((i) => i.id === 'payback').text;
+  assert.match(t, /₱1,250/); assert.match(t, /carries over/);
+});
+test('findings edge (M-3): before a year, the credit caveat joins the awareness note; no credit, no caveat', () => {
+  const early = findings({ bills: [bill()], payback: { saved: 8000, promised: 10000, days: 90 }, creditLeftOut: 900 });
+  assert.ok(early.uncertainty.some((u) => /₱900/.test(u)));
+  const none = findings({ bills: [bill()], payback: { saved: 8000, promised: 10000, days: PAYBACK_MIN_DAYS }, creditLeftOut: 0 });
+  assert.ok(!/carries over/.test(none.items.find((i) => i.id === 'payback').text));
+});

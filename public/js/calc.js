@@ -136,6 +136,21 @@ export function prBand(pr, month) {
 // so it points at a wrong input: dates, kWh, panel size, or the weather data. Decided by Fred, 1 Oct 2026.
 export const PR_PLAUSIBLE_MAX = 0.90;
 export const prTooHigh = (pr) => Number.isFinite(pr) && pr > PR_PLAUSIBLE_MAX;
+// A PR below this is a typo or a system that was off, not a weather or performance reading (pre-launch audit M-8:
+// a decimal comma, "1.250,5", reads as 1.25 kWh and gave PR 0.00, "Low this month"). Shown as "check numbers",
+// never red, so it cannot count toward the two-low-months flag. Decided by Fred, 31 Oct 2026.
+export const PR_PLAUSIBLE_MIN = 0.30;
+export const prTooLow = (pr) => Number.isFinite(pr) && pr < PR_PLAUSIBLE_MIN;
+
+// Typical-year sun reads +3.9% high around Manila against Global Solar Atlas (docs/NEXT.md task 1 check), so PR
+// reads about 4% low there. Only Manila was checked against GSA, so the note covers the 0.5 degree grid cells around
+// it. Disclosed, not corrected: Fred, 31 Oct 2026 (pre-launch audit M-4). Bands and sun data are unchanged.
+export const MANILA_BIAS = { lat: 14.6, lon: 121.0, radiusDeg: 0.5, pct: 3.9 };
+export function nearManila(lat, lon) {
+  const y = Number(lat), x = Number(lon);
+  if (lat === '' || lon === '' || !Number.isFinite(y) || !Number.isFinite(x)) return false;
+  return Math.abs(y - MANILA_BIAS.lat) <= MANILA_BIAS.radiusDeg && Math.abs(x - MANILA_BIAS.lon) <= MANILA_BIAS.radiusDeg;
+}
 
 // When the weather adjustment alone lifts PR above PR_PLAUSIBLE_MAX (the typical-year PR is plausible), the weather
 // index is the suspect, not the owner's numbers: judge on the typical year and say why (weatherRejected, prWeather).
@@ -264,7 +279,8 @@ export function energySplit({ g, x, i, c, d }) {
   if (![g, x, i].every(Number.isFinite) || g < 0 || x < 0 || i < 0) return err('bad_input', 'Need G, X and I as numbers >= 0.');
   const battery = c !== undefined || d !== undefined;
   if (battery && (![c, d].every(Number.isFinite) || c < 0 || d < 0)) return err('bad_input', 'Need battery charge and discharge as numbers >= 0.');
-  if (g - x < 0) return err('period_misalignment', 'Exported kWh is more than generated kWh. The inverter and bill periods probably do not line up.');
+  // On-grid only: a hybrid can export battery energy, so export above PV yield is fine while S stays >= 0 (audit M-9).
+  if (!battery && g - x < 0) return err('period_misalignment', 'Exported kWh is more than generated kWh. The inverter and bill periods probably do not line up.');
   const s = battery ? g - x - c + d : g - x;
   if (s < 0) return err('period_misalignment', 'Solar used in the house works out below zero. Check that the battery numbers cover the same dates as the bill.');
   return { selfConsumed: s, load: i + s, selfConsumptionRatio: g > 0 ? s / g : null };

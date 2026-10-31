@@ -24,8 +24,9 @@ const span = (b) => b.period ?? `${b.start} to ${b.end}`;
 // payback: null, or { saved, promised, days } (pesos to date, days since the first reading date)
 // efficiency: null, or { baseline, latest, dropPoints, flagged } from calc.efficiencyDrop (fractions of 1)
 // degradation: null, or { annualLossPct, pairs, exceedsWarranty, warrantyPct } from calc.degradation
+// creditLeftOut: pesos of export credit left out of savings by the variable-charges cap (calc.uncountedCredit), summed
 // Returns { items: [{ id, text }], requests: [text], uncertainty: [text], allClear: boolean, allGreen: boolean }.
-export function findings({ bills, payback, degradation = null, efficiency = null }) {
+export function findings({ bills, payback, degradation = null, efficiency = null, creditLeftOut = 0 }) {
   const items = [];
   const last = bills[bills.length - 1];
   const raised = [...bills].reverse().find((b) => b.redRaised);
@@ -66,9 +67,12 @@ export function findings({ bills, payback, degradation = null, efficiency = null
   }
   const behind = payback && payback.promised > 0 && payback.saved < payback.promised ? 1 - payback.saved / payback.promised : 0;
   const paybackRaised = behind > 0 && payback.days >= PAYBACK_MIN_DAYS;
+  // Pre-launch audit M-3 (Fred, 31 Oct 2026): credit above a bill's variable charges is not counted, because carry-over
+  // to later bills is not verified. Name it wherever the gap is shown, so the pace is not read as worse than it is.
+  const creditNote = creditLeftOut > 0 ? ` Export credit of ${peso(creditLeftOut)} above the bills' variable charges is left out of these savings, because whether it carries over to later bills is not confirmed, so the real pace may be closer.` : '';
   if (paybackRaised) {
     const gap = Math.round(behind * 100);
-    items.push({ id: 'payback', text: `Savings so far are ${peso(payback.saved)} against ${peso(payback.promised)} at the promised payback pace (${gap}% behind). How was the promised payback worked out? Was the export credit assumed at the utility's generation charge or at the full retail rate? What rate increases were assumed?` });
+    items.push({ id: 'payback', text: `Savings so far are ${peso(payback.saved)} against ${peso(payback.promised)} at the promised payback pace (${gap}% behind).${creditNote} How was the promised payback worked out? Was the export credit assumed at the utility's generation charge or at the full retail rate? What rate increases were assumed?` });
   }
 
   const requests = [
@@ -86,7 +90,7 @@ export function findings({ bills, payback, degradation = null, efficiency = null
     uncertainty.push(`Year-over-year check so far: weather-adjusted PR is about ${Math.abs(degradation.annualLossPct).toFixed(1)}% ${dir} a year over ${degradation.pairs} same-month pair${degradation.pairs === 1 ? '' : 's'}. That is too few months to act on, because monthly sun data is noisy. It is shown so you know it is being tracked.`);
   }
   if (behind > 0 && !paybackRaised) {
-    uncertainty.push(`Savings so far are ${Math.round(behind * 100)}% behind the promised payback pace, over ${Math.round(payback.days)} days. Savings swing with the seasons, so this is not raised as a question until there is about a year of bills.`);
+    uncertainty.push(`Savings so far are ${Math.round(behind * 100)}% behind the promised payback pace, over ${Math.round(payback.days)} days. Savings swing with the seasons, so this is not raised as a question until there is about a year of bills.${creditNote}`);
   }
   if (bills.some((b) => b.weather?.uncertain)) uncertainty.push('For at least one period the two weather sources disagreed by more than 5 points, so the weather call is uncertain.');
   if (bills.some((b) => b.weather?.inferred)) uncertainty.push('For at least one period the weather index came from a single source with no cross-check.');

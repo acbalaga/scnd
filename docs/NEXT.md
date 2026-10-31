@@ -251,3 +251,15 @@ Requested by Fred: audit M-6, M-7 and M-11. Nothing else changed.
 - [x] **Peso sign on screen and on the findings sheet.** None of the Latin font files has ₱, and Google's latin-ext files are 23 to 60 KB each for that one glyph. `scripts/fetch-fonts.py` (dev-only, needs `fonttools` and `brotli`) cuts a ₱-only file per family (1.1 to 1.4 KB), served on a `unicode-range: U+20B1` face. The sheet writes ₱ again instead of PHP. The Source faces need one rule per weight: Chrome only combines faces whose weight descriptors match, and with a 200 to 900 range it fell back to Liberation Serif for ₱.
 - Verified in headless Chromium at 390 px, light and dark: every font comes from our own host, no third-party request, no console errors, no horizontal scroll, ₱ drawn by Chivo Mono in the result cards and by Source Serif 4 on the sheet (checked with DevTools platform fonts). 133 unit tests pass.
 - **Not verified:** Safari (iPhone) and how Chivo reads on your phone.
+
+## 19. Trust fixes from the audit (31 Oct 2026)
+
+Requested by Fred after a product review: close the open calculation and claims items before promoting further. Thresholds and wording decided by Fred, 31 Oct 2026.
+
+- [x] **M-9, hybrid export above PV yield.** `energySplit` only rejects export above generation for on-grid systems; hybrids are checked on S = G − X − C + D alone, so a battery that discharges to the grid gets its savings. 2 tests.
+- [x] **M-8, PR floor 0.30.** `PR_PLAUSIBLE_MIN` and `prTooLow` in `calc.js`. A bill below it gets band `check` with `checkLow`: grey dial, chip "check numbers", headline "Lower than a working system makes. Check the dates and kWh, or whether the system was off.", sheet row "Check figures" and a basis line. Never red, so it cannot count toward the two-low-months flag, and it is left out of the year-over-year pairs. 1 test.
+- [x] **M-4, Manila bias disclosed, not corrected.** `MANILA_BIAS` and `nearManila` in `calc.js` (0.5° around 14.6, 121.0, the only point checked against Global Solar Atlas). The dial's basis line and the sheet's sun-data line say PR may read about 4% low there. Bands and sun data unchanged. 1 test.
+- [x] **M-3, credit carry-over caveat.** `findings()` takes `creditLeftOut` (sum of `uncountedCredit` over bills with savings). The payback question and the early awareness note name the amount and say the real pace may be closer if the utility carries it over; the Payback card says the same. 2 tests.
+- [x] **M-5, privacy claim made exact.** Hero and `og:description` now say "your bills and kWh stay in this browser"; the footer names the weather check as the one exception.
+- Checked in headless Chromium at 390 px with a Manila on-grid save (typo bill at 1.25 kWh, credit above variable charges) and a Cebu hybrid save (G 300, X 320, C 50, D 100): grey check-low dial, Manila note on screen and sheet, credit line on the Payback card, hybrid savings shown with no misalignment message, no page errors. `node --test`: 140 pass.
+- **Noted, not changed:** a check-low bill still adds its savings to the payback total (₱15 in the typo case). Small, and the bill is already flagged.
