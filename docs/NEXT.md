@@ -285,3 +285,29 @@ Requested by Fred after the product review. Topics, example and installer placem
 - Tests: guides have title, description, canonical, one h1, no em dash and only the theme script; sitemap and footer links point at shipped files; routing test lets guide pages run the Worker. `node --test`: 145 pass.
 - Checked in headless Chromium at 390 px behind the real CSP (local server with the Worker's header and clean URLs, wrangler not installed here): no overflow, Chivo loads, no console errors or CSP violations; hybrid example shows 14 bills, Battery and Payback cards, and the battery and payback questions on the sheet; share falls back to "Link copied".
 - **Not verified:** clean URLs on Cloudflare itself (default `html_handling` serves `/guide/method` from `method.html`; check one guide on the live site after deploy), and the share sheet on a real phone.
+
+## 22. Audit and ticket queue (13 Nov 2026)
+
+Requested by Fred: audit security, functionality and the maths, propose improvements, and file ranked tickets for another agent to execute. Full report: `docs/audit-2026-11-13.md`. Tickets are GitHub issues #37 to #55. Nothing in the app changed in this task.
+
+Work them in the order the report suggests. One ticket per commit, tick the box here with the result, and stop at every "ask Fred" line in a ticket.
+
+- [ ] **P0-1 (#37)** Pages as static assets so a request flood cannot spend the Free plan's daily quota. Decision needed (retires the in-code limiter, changes CLAUDE.md rule 2).
+- [ ] **P0-2 (#38)** Manila typical-year sun reads 5 to 10% high from September to April, not 4%. Decision needed (irradiance source handling).
+- [ ] **P0-3 (#39)** Cache bill results: 14 bills take about 0.9 s per keystroke on a throttled CPU, 56 bills about 17 s.
+- [ ] **P1-4 (#40)** Single-source weather index can turn a healthy month red; Manila had almost no satellite data in 2026. Decision needed.
+- [ ] **P1-5 (#41)** Test gate before deploy (GitHub Actions, Workers Builds build command, vendor hash test).
+- [ ] **P1-6 (#42)** Timeout and shape checks on the weather requests.
+- [ ] **P1-7 (#43)** Opt-in "Keep on this device". Decision needed (privacy wording).
+- [ ] **P2-8 (#44)** Move bill orchestration and payback maths into the tested core; fix the chart start date.
+- [ ] **P2-9 (#45)** Year-over-year check: same-month collision, uncertain calls, spread. Decision needed.
+- [ ] **P2-10 (#46)** Alpine CSP build, drop `'unsafe-eval'` (audit M-2). Decision needed.
+- [ ] **P2-11 (#47)** Small security hardening.
+- [ ] **P2-12 (#48)** Monthly source-health check. Decision needed.
+- [ ] **P2-13 (#49)** Quote check: expected yield from setup alone. Decision needed.
+- [ ] **P2-14 (#50)** Calendar reminder file.
+- [ ] **P2-15 (#51)** Service worker for offline use. Decision needed.
+- [ ] **P2-16 (#52)** Owner checklist: dashboard, DNS, real-device checks. Fred.
+- [ ] **P3-17 (#53)** Investigate a cached weather proxy on the Worker. Decision needed.
+- [ ] **P3-18 (#54)** Independent POA reference; use or drop `t2m`. Decision needed.
+- [ ] **P3-19 (#55)** README and comment drift.
