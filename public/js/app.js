@@ -2,7 +2,7 @@
 // Nothing is sent anywhere. Sun data comes from public/data/ph-grid.json (static file).
 import * as calc from './calc.js';
 import { loadGrid, lookup, isLowDiffuse } from './grid.js';
-import { fetchSatellite, fetchNasa } from './weather.js';
+import { fetchSatellite, fetchNasa, SOURCE_LABELS } from './weather.js';
 import { serialize, parse } from './data.js';
 import { EXAMPLES, exampleBills } from './examples.js';
 import { findings, MIN_DEGRADATION_PAIRS, PAYBACK_MIN_DAYS } from './findings.js';
@@ -128,10 +128,10 @@ document.addEventListener('alpine:init', () => {
     qrOk: false,
     qrProbed: false,
     showSheet: false,
-    weather: { status: 'idle', sat: null, nasa: null, satBase: null, nasaBase: null, errors: [] },
+    weather: { status: 'idle', sat: null, nasa: null, satBase: null, nasaBase: null, errors: [], noAnswer: false },
     weatherAt: null,
     ver: { all: 0, fold: 0 },   // per-bill result versions, bumped by the effect in init() (see the note above `let model`)
-    resetWeather() { this.weather = { status: 'idle', sat: null, nasa: null, satBase: null, nasaBase: null, errors: [] }; this.weatherAt = null; },
+    resetWeather() { this.weather = { status: 'idle', sat: null, nasa: null, satBase: null, nasaBase: null, errors: [], noAnswer: false }; this.weatherAt = null; },
 
     // Called when the findings sheet opens. A missing file never fires onload, so the QR entry stays hidden.
     probeQr() {
@@ -222,9 +222,18 @@ document.addEventListener('alpine:init', () => {
       w.status = 'loading'; w.errors = [];
       this.weatherAt = { lat: this.s.lat, lon: this.s.lon };
       const [sat, nasa] = await Promise.allSettled([fetchSatellite(this.s.lat, this.s.lon), fetchNasa(this.s.lat, this.s.lon)]);
-      for (const [key, r, label] of [['sat', sat, 'Satellite (Himawari)'], ['nasa', nasa, 'NASA POWER']]) {
+      w.noAnswer = true;   // stays true only if every source failed to answer at all (no connection or too slow)
+      for (const [key, r] of [['sat', sat], ['nasa', nasa]]) {
+        const label = SOURCE_LABELS[key];
         w[key] = null; w[key + 'Base'] = null;
-        if (r.status === 'rejected') { w.errors.push(`${label} could not be reached.`); continue; }
+        if (r.status === 'rejected') {
+          // weather.js words its own errors (no answer, too slow, an error, unreadable data); anything else is a bug here.
+          const e = r.reason;
+          w.errors.push(e?.name === 'WeatherError' ? e.message : `${label} could not be reached.`);
+          if (e?.kind !== 'unreachable' && e?.kind !== 'timeout') w.noAnswer = false;
+          continue;
+        }
+        w.noAnswer = false;
         const base = calc.weatherBaseline(r.value);
         if (calc.isError(base)) { w.errors.push(`${label}: ${base.message}`); continue; }
         w[key] = r.value; w[key + 'Base'] = base;
@@ -457,7 +466,7 @@ document.addEventListener('alpine:init', () => {
       const w = this.weather;
       if (w.status === 'loading') return 'Checking the weather for these dates.';
       if (w.status !== 'failed') return '';
-      const unreachable = w.errors.length && w.errors.every((e) => e.endsWith('could not be reached.'));
+      const unreachable = w.errors.length && w.noAnswer;
       return `The weather check did not get through: ${unreachable ? 'neither weather service could be reached. Check your connection and try again' : 'the weather services gave no usable data for these dates. Try again later'}, or go ahead with the findings sheet, which shows PR against a typical year's sun.`;
     },
     get canCheckWeather() { return this.bills.some((b) => this.result(b)?.pr != null); },
