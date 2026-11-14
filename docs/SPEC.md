@@ -66,7 +66,7 @@ Every number is computed in the browser from the user's inputs plus a monthly ir
 PR = \frac{E_{PV}}{P_{kWp} \times H_{POA}}
 ```
 
-Bands (tunable, `PR_BANDS` in `calc.js`): green ≥ 0.75; amber 0.65 to 0.75 in Jun to Oct and 0.62 to 0.75 in Nov to May; red below the amber floor. A PR above 0.90 or below 0.30 reads "check numbers", never green or red, because it points at a wrong figure (or, below 0.30, a system that was off). Around Manila the typical-year sun reads +3.9% against Global Solar Atlas, so the UI notes that PR may read about 4% low there. The dry-season floor is lower because NASA POWER reads up to about 8% low in the dry months (spike 2). Red is only raised after two consecutive bills (the second starting within 7 days of the first one's end), because satellite monthly irradiance carries roughly ±5 to 10% error at a single point. Once the F4 weather check gives a call that is not "uncertain", the bill is judged on weather-adjusted PR instead (`judgedPr`), so a cloudy month does not read as a fault. Locations with a diffuse fraction under 0.3 in any month (26 grid cells, February to April, around Mindoro, Panay, northern Palawan and the seas west of Luzon) carry an extra caveat in the UI. A commercial rooftop benchmark of 78 to 82% PR is published by PH installers ([Solaren](https://solaren-power.com/comparing-solar-quotes-in-the-philippines/)); residential sits lower with shading and heat.
+Bands (tunable, `PR_BANDS` in `calc.js`): green ≥ 0.75; amber 0.65 to 0.75 in Jun to Oct and 0.62 to 0.75 in Nov to May; red below the amber floor. A PR above 0.90 or below 0.30 reads "check numbers", never green or red, because it points at a wrong figure (or, below 0.30, a system that was off). Around Metro Manila the grid takes NASA's inland 1° cell rather than a blend with the Manila Bay cell (14 Nov 2026, ticket #38), which puts Manila within 5% of Global Solar Atlas in every month; before that it read +5 to +10% from September to April. The dry-season floor is lower because NASA POWER reads up to about 8% low in the dry months (spike 2). Red is only raised after two consecutive bills (the second starting within 7 days of the first one's end), because satellite monthly irradiance carries roughly ±5 to 10% error at a single point. Once the F4 weather check gives a call that is not "uncertain", the bill is judged on weather-adjusted PR instead (`judgedPr`), so a cloudy month does not read as a fault. Locations with a diffuse fraction under 0.3 in any month (26 grid cells, February to April, around Mindoro, Panay, northern Palawan and the seas west of Luzon) carry an extra caveat in the UI. A commercial rooftop benchmark of 78 to 82% PR is published by PH installers ([Solaren](https://solaren-power.com/comparing-solar-quotes-in-the-philippines/)); residential sits lower with shading and heat.
 
 **F4 Weather or system.** Weather index WI = actual-period sun ÷ typical-period sun, worked out from daily GHI for the bill's own dates against a 2020 to 2025 baseline. It is computed twice, from Himawari (Open-Meteo satellite) and from NASA POWER, each against its own baseline, and the two are averaged. If they are more than 5 points apart the call is labelled "uncertain". If one source has under 80% of the period's days, the index comes from the other alone and is shown as "inferred", not cross-checked. If neither has data, F4 says so and the PR stays against a typical year. The index is on GHI and applied to POA (actual diffuse is not available per period). Data is fetched only when the user clicks, with the location rounded to 0.1°. The shortfall against a typical period splits into two parts:
 
@@ -99,13 +99,13 @@ The tool is a set of static files with no server of ours, no accounts and no dat
 | Decision | Choice | Why |
 | --- | --- | --- |
 | App shell | Static HTML + Alpine.js, ES modules, no build step | Same mental model as SCNTL's Alpine layer; any static host serves it |
-| Typical-year irradiance (F1, F7) | Pre-computed JSON grid, 0.5° over the Philippines (748 cells): monthly GHI, diffuse and air temperature from NASA POWER climatology 2001 to 2020, 141.8 KB, built by `scripts/build-grid.mjs` and committed | Within ±5% of Global Solar Atlas in the wet season, reads up to about 8% low in the dry season (spike 2). PVGIS SARAH-3 does not cover the Philippines. Global Solar Atlas is the validation reference only |
+| Typical-year irradiance (F1, F7) | Pre-computed JSON grid, 0.5° over the Philippines (748 cells): monthly GHI and diffuse (air temperature dropped 14 Nov 2026, unused; ticket #54) from NASA POWER climatology (labelled 2001 to 2020 at the 29 Sep 2026 build, 2001 to 2025 by NASA from 14 Nov 2026 with identical values), 141.8 KB, built by `scripts/build-grid.mjs` and committed | Within ±5% of Global Solar Atlas in the wet season, reads up to about 8% low in the dry season (spike 2). PVGIS SARAH-3 does not cover the Philippines. Global Solar Atlas is the validation reference only |
 | Actual-month irradiance (F4) | Browser fetch, only on click, coordinates rounded to 0.1°: Open-Meteo satellite (Himawari) and NASA POWER daily GHI | CORS verified (spike 1). Himawari is used as a ratio to its own 2020 to 2025 baseline so its absolute bias cancels; NASA is the cross-check and the fallback ([Open-Meteo](https://open-meteo.com/en/features), non-commercial use) |
 | Persistence | None by default. "Save my data" downloads a JSON file; "Load" reads it back | Monthly return visits work without us storing anything |
 | Findings sheet (F3) | Print stylesheet + `window.print()` → Save as PDF | No PDF library, works on phones |
 | Charts | Inline SVG, hand-rolled | No dependency, prints cleanly |
 | Analytics | None, or a cookieless page counter | Privacy claim stays literally true |
-| Rate limiting | Worker with Cloudflare's Workers Rate Limiting binding: 100 requests per 10 seconds per visitor, keyed by a daily-rotating hash of the IP, fails open | Bot floods are stopped in our own code (a WAF rule was not available on the plan). Costs a Worker request per page request, see `docs/RATE-LIMITING.md` |
+| Rate limiting | None in our code since 14 Nov 2026 (ticket #37): static assets only, which are free and have no daily cap; Cloudflare's DDoS protection applies | The Worker limiter (29 Sep to 14 Nov 2026) did not block in production, and running it made every page a capped Worker request, see `docs/RATE-LIMITING.md` |
 
 **Spike 2 result (29 Sep 2026), the evidence behind the irradiance rows above.** PVGIS SARAH-3 does not cover the Philippines, so sources were scored against Global Solar Atlas long-term monthly GHI, 2020 to 2023, five cities (Laoag, Manila, Iloilo, Cebu, Davao).
 
@@ -144,7 +144,7 @@ The biggest risk is a false red flag that sends an owner to fight an installer o
 | Bill period vs inverter period misalignment | Negative self-consumption, nonsense savings | Force reading dates; S < 0 blocks the result and explains why |
 | Users treat output as a verdict on their installer | Reputational heat for you | Findings sheet framed as "questions to ask", no installer names stored or shown, disclaimer that it is a screening check, not an inspection |
 | Open-Meteo CORS or terms change | F4 breaks | NASA POWER alone (shown as inferred), then typical-only; non-commercial use only. Himawari has holes in 2026 today, which the fallback already covers |
-| Bot traffic | Free-plan Worker request cap reached, site unavailable | Per-visitor rate limit in the Worker; fails open; watch the daily request count in beta |
+| Bot traffic | Free-plan Worker request cap reached, site unavailable | Removed 14 Nov 2026: no Worker script runs, and static asset requests have no cap (ticket #37) |
 | Employer IP overlap | Ownership dispute | Low: residential net-metering is outside NAC's business. Build on personal hardware and time anyway, and keep it off company devices this time |
 
 **Out of scope:** diagnosing specific faults, string-level data, cell-level or SoC-curve battery analysis (v1 works from monthly charge and discharge totals), anything above 100 kW.
@@ -161,7 +161,7 @@ Built in the order of `docs/NEXT.md`, calc core before any UI, so the numbers ar
 6. **F4 weather check.** Done (task 5).
 7. **F3 findings sheet and save/load JSON.** Done (task 6).
 8. **F8 degradation and F9 hybrid.** Done (task 7).
-9. **Clean-up and rate limiting.** Done (tasks 8 and 9). Spike pages and proxy routes removed; per-visitor limiter in the Worker.
+9. **Clean-up and rate limiting.** Done (tasks 8 and 9). Spike pages and proxy routes removed; per-visitor limiter in the Worker (retired 14 Nov 2026 with the Worker itself, ticket #37).
 10. **Private beta** with 5 owners across Luzon, Visayas and Mindanao DUs; compare the tool's PR against each owner's installer claims. Open.
 11. **Deploy** to the subdomain; doorway page on alfredbalaga.com. Open.
 
@@ -181,7 +181,7 @@ Built in the order of `docs/NEXT.md`, calc core before any UI, so the numbers ar
 - [x] **Hybrid systems.** In v1 scope as F9
 - [x] **Language.** English UI throughout, including bill-decoder explanations, tooltips and nudges (Taglish dropped 2 Oct 2026); findings sheet is English because it goes to the installer
 - [x] **Obsolescence tracker.** Separate product and brand
-- [x] **Rate limiting.** In code: Worker with the Workers Rate Limiting binding (a WAF rule was not available on Fred's plan). See `docs/RATE-LIMITING.md`
+- [x] **Rate limiting.** Was in code (Worker with the Workers Rate Limiting binding). Retired 14 Nov 2026 with the Worker itself: static assets only (ticket #37). See `docs/RATE-LIMITING.md`
 - [ ] **Beta recruits.** Fred sourcing five owners across three DUs, with at least two hybrids
 
 ## Sources

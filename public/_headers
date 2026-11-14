@@ -1,6 +1,32 @@
-# Headers for static files served without the Worker (run_worker_first excludes them, see wrangler.jsonc).
-# The page itself gets its CSP and the rest from src/worker.js. CSP only matters on documents, so it is not
-# repeated here; the icons are plain SVG with no script.
+# Security headers for every file this site serves, pages included (ticket #37, 14 Nov 2026).
+# SCND is static assets only: no Worker script runs, so these rules are the only place headers are set. Static asset
+# requests are free and unlimited on the Workers Free plan, so a request flood cannot spend a daily quota and take the
+# site down (it could while pages ran a Worker: 100,000 requests a day, then 429 until 08:00 PH).
+#
+# Content-Security-Policy:
+# - script-src: the sha256 is the inline theme script in index.html and the guides (byte-identical). test/headers.test.mjs
+#   fails if they drift apart. No 'unsafe-eval': the app runs Alpine's CSP build, which parses template expressions
+#   without eval (ticket #46, 14 Nov 2026). Cloudflare Web Analytics (cookieless page-view counts, turned on in the
+#   Cloudflare dashboard) injects its beacon from static.cloudflareinsights.com and reports to cloudflareinsights.com,
+#   disclosed in "Privacy and limits" (Fred, 2 Oct 2026; audit M-10).
+# - style-src 'unsafe-inline' is for the style="" attributes in index.html.
+# - connect-src: this origin, the two irradiance sources (only on "Check the weather") and the analytics endpoint.
+# - worker-src 'self': the offline service worker, public/sw.js (ticket #51).
+# - upgrade-insecure-requests: any http:// reference is fetched over https (ticket #47).
+# X-Frame-Options repeats frame-ancestors 'none' for older browsers; COOP keeps other sites' windows out of this one.
 /*
-  X-Content-Type-Options: nosniff
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-B8U7Anw7zuz9OFoSuoKagKsf+/k9rF62FJxi1G4tCEw=' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://satellite-api.open-meteo.com https://power.larc.nasa.gov https://cloudflareinsights.com; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; worker-src 'self'; upgrade-insecure-requests
   Referrer-Policy: no-referrer
+  X-Content-Type-Options: nosniff
+  Permissions-Policy: geolocation=(self), camera=(), microphone=(), payment=()
+  X-Frame-Options: DENY
+  Cross-Origin-Opener-Policy: same-origin
+
+# Fonts never change under the same name, so browsers keep them a year instead of checking nine files on every visit over
+# mobile data (ticket #47). A regenerated font must get a new file name (scripts/fetch-fonts.py says so).
+/fonts/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# The service worker must be checked on every visit, or a fix to it could take a day to reach phones (ticket #51).
+/sw.js
+  Cache-Control: no-cache

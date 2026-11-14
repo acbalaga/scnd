@@ -1,13 +1,17 @@
 // SCND app: Alpine component. All maths is in calc.js; this file only wires inputs to it.
 // Nothing is sent anywhere. Sun data comes from public/data/ph-grid.json (static file).
 import * as calc from './calc.js';
+import * as engine from './engine.js';
 import { loadGrid, lookup, isLowDiffuse } from './grid.js';
-import { fetchSatellite, fetchNasa } from './weather.js';
-import { serialize, parse } from './data.js';
+import { fetchSatellite, fetchNasa, SOURCE_LABELS } from './weather.js';
+import { serialize, parse, keptText, restoreKept, STORAGE_KEY, MAX_BYTES } from './data.js';
 import { EXAMPLES, exampleBills } from './examples.js';
+import { reminderIcs, nextReminderDate } from './reminder.js';
+import { CITIES } from './cities.js';
+import { satelliteGaps } from './sources.js';
 import { findings, MIN_DEGRADATION_PAIRS, PAYBACK_MIN_DAYS } from './findings.js';
 
-const num = (v) => (v === '' || v === null || v === undefined ? NaN : Number(v));
+const { num, NUM_FIELDS } = engine;
 // Number boxes take digits, one decimal point and (only where min allows) a leading minus. Browsers
 // otherwise let "e", "+" and pasted text through type="number" fields.
 const numberOk = (el, text) => /^-?\d*\.?\d*$/.test(text) && (!text.includes('-') || el.min === '' || Number(el.min) < 0);
@@ -23,15 +27,6 @@ document.addEventListener('paste', (e) => {
 const round1 = (v) => Math.round(v * 10) / 10;
 // Today on the owner's own clock, as YYYY-MM-DD. toISOString() is UTC, which is yesterday in PH before 8 am.
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
-
-// Nearest-city shortcuts, coordinates rounded to 0.1 degree.
-const CITIES = [
-  ['Laoag', 18.2, 120.6], ['Tuguegarao', 17.6, 121.7], ['Baguio', 16.4, 120.6], ['Angeles', 15.1, 120.6],
-  ['Quezon City', 14.7, 121.0], ['Manila', 14.6, 121.0], ['Batangas', 13.8, 121.1], ['Legazpi', 13.1, 123.7],
-  ['Puerto Princesa', 9.7, 118.7], ['Iloilo', 10.7, 122.6], ['Bacolod', 10.7, 123.0], ['Cebu', 10.3, 123.9],
-  ['Tacloban', 11.2, 125.0], ['Cagayan de Oro', 8.5, 124.6], ['Davao', 7.1, 125.6], ['General Santos', 6.1, 125.2],
-  ['Zamboanga', 6.9, 122.1],
-].map(([name, lat, lon]) => ({ name, lat, lon }));
 
 // azimuth: 0 = south, 90 = west, -90 = east (same as calc.js).
 const FACINGS = [
@@ -81,22 +76,29 @@ const PAYEE_NAME = 'AL***D B.';   // as GCash shows it after a scan (masked by G
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const dayMonth = (t, withYear) => { const d = new Date(t); return `${d.getUTCDate()} ${MON[d.getUTCMonth()]}${withYear ? ' ' + d.getUTCFullYear() : ''}`; };
 const DIAL_MIN = 0.45, DIAL_MAX = 0.95;   // PR range the dial arc covers (see dial())
-// Bill number fields with the names the owner sees, for plain error messages.
-const NUM_FIELDS = [['inverterKwh', 'solar produced'], ['chargeKwh', 'battery charged'], ['dischargeKwh', 'battery discharged'], ['homeLoadKwh', 'home load'],
-  ['importKwh', 'bought from the grid'], ['exportKwh', 'sent to the grid'], ['genRate', 'generation charge'], ['genAmount', 'generation charge'], ['varRate', 'variable charges'], ['varCharges', 'variable charges'],
-  ['total', 'total amount due'], ['outageHours', 'outage hours']];
 const BILL_FIELDS = ['start', 'end', ...NUM_FIELDS.map(([k]) => k)];
 let nextId = 1;
+// Every bill's result, worked out once per change to the inputs (ticket #39). Templates call result(b) about 100 times
+// per bill and several getters scan all bills, so recomputing on each call took about 17 s per keystroke at 56 bills on
+// a slow phone. An effect in init() reads every input and rebuilds the model. It then bumps `ver[id]` only for the bills
+// whose result changed, `ver.fold` when the first or last answered bill moved, and `ver.all` on every change, so a
+// keystroke re-renders only the bills it affects plus the summaries. Getters that summarise all bills are memoized on
+// the model (memo()), so the many bindings that read them share one computation. The model is kept
+// outside Alpine's reactive state on purpose, so filling it never triggers a re-render. It is built from `raw`, the
+// plain object Alpine wraps (see Alpine.data below): Alpine.raw() cannot reach it, because methods run with `this` set to
+// a merged scope proxy rather than the reactive object.
 const newBill = () => ({ id: nextId++, start: '', end: '', inverterKwh: '', importKwh: '', exportKwh: '', chargeUnit: 'amount', genRate: '', genAmount: '', varRate: '', varCharges: '', total: '', outageHours: '', chargeKwh: '', dischargeKwh: '', homeLoadKwh: '', open: true });
 
 document.addEventListener('alpine:init', () => {
   document.getElementById('boot')?.remove();   // the "Loading" fallback in index.html (audit M-11); only a failed start leaves it showing
-  Alpine.data('scnd', () => ({
+  let model = null, built = null;
+  const memos = new Map();
+  Alpine.data('scnd', () => { const raw = {
     minPairs: MIN_DEGRADATION_PAIRS,
     cities: CITIES,
     facings: FACINGS,
     place: '',
-    s: { lat: '', lon: '', kWp: '', acKw: '', tilt: 10, azimuth: 0, commissioned: '', hybrid: false, netMetering: false, cost: '', promisedYears: '', warrantyPct: '', batteryCost: '' },
+    s: { lat: '', lon: '', kWp: '', acKw: '', tilt: 10, azimuth: 0, commissioned: '', hybrid: false, netMetering: false, cost: '', promisedYears: '', warrantyPct: '', batteryCost: '', promisedKwhYear: '' },
     ready: false,
     setupError: '',
     climate: null,
@@ -109,6 +111,11 @@ document.addEventListener('alpine:init', () => {
     started: false,   // landing shows the hero first; the setup form opens on "Check my system"
     example: false,
     savedOnce: false,
+    // "Keep my data on this device" (ticket #43): opt-in, local storage in this browser only. keepOk is false after a
+    // failed write (private window, storage full or blocked), so the leave-page prompt comes back.
+    keep: false,
+    keepOk: false,
+    keepMsg: '',
     saveNudgeHidden: false,
     feedbackHref: FEEDBACK_URL,
     kofiHref: KOFI_URL,
@@ -117,9 +124,10 @@ document.addEventListener('alpine:init', () => {
     qrOk: false,
     qrProbed: false,
     showSheet: false,
-    weather: { status: 'idle', sat: null, nasa: null, satBase: null, nasaBase: null, errors: [] },
+    weather: { status: 'idle', sat: null, nasa: null, satBase: null, nasaBase: null, errors: [], noAnswer: false },
     weatherAt: null,
-    resetWeather() { this.weather = { status: 'idle', sat: null, nasa: null, satBase: null, nasaBase: null, errors: [] }; this.weatherAt = null; },
+    ver: { all: 0, fold: 0 },   // per-bill result versions, bumped by the effect in init() (see the note above `let model`)
+    resetWeather() { this.weather = { status: 'idle', sat: null, nasa: null, satBase: null, nasaBase: null, errors: [], noAnswer: false }; this.weatherAt = null; },
 
     // Called when the findings sheet opens. A missing file never fires onload, so the QR entry stays hidden.
     probeQr() {
@@ -210,9 +218,18 @@ document.addEventListener('alpine:init', () => {
       w.status = 'loading'; w.errors = [];
       this.weatherAt = { lat: this.s.lat, lon: this.s.lon };
       const [sat, nasa] = await Promise.allSettled([fetchSatellite(this.s.lat, this.s.lon), fetchNasa(this.s.lat, this.s.lon)]);
-      for (const [key, r, label] of [['sat', sat, 'Satellite (Himawari)'], ['nasa', nasa, 'NASA POWER']]) {
+      w.noAnswer = true;   // stays true only if every source failed to answer at all (no connection or too slow)
+      for (const [key, r] of [['sat', sat], ['nasa', nasa]]) {
+        const label = SOURCE_LABELS[key];
         w[key] = null; w[key + 'Base'] = null;
-        if (r.status === 'rejected') { w.errors.push(`${label} could not be reached.`); continue; }
+        if (r.status === 'rejected') {
+          // weather.js words its own errors (no answer, too slow, an error, unreadable data); anything else is a bug here.
+          const e = r.reason;
+          w.errors.push(e?.name === 'WeatherError' ? e.message : `${label} could not be reached.`);
+          if (e?.kind !== 'unreachable' && e?.kind !== 'timeout') w.noAnswer = false;
+          continue;
+        }
+        w.noAnswer = false;
         const base = calc.weatherBaseline(r.value);
         if (calc.isError(base)) { w.errors.push(`${label}: ${base.message}`); continue; }
         w[key] = r.value; w[key + 'Base'] = base;
@@ -222,23 +239,6 @@ document.addEventListener('alpine:init', () => {
     },
 
     // F4 for one bill: two indices, combined, then the shortfall split. null until the user has checked the weather.
-    weatherResult(b, out) {
-      const w = this.weather;
-      if (w.status !== 'done' || out.pr === null) return null;
-      const idx = (daily, baseline) => {
-        if (!daily) return null;
-        const r = calc.weatherIndexPeriod({ daily, baseline, start: b.start, end: b.end });
-        return r && !calc.isError(r) ? r : null;
-      };
-      const sat = idx(w.sat, w.satBase), nasa = idx(w.nasa, w.nasaBase);
-      const call = calc.weatherCall(sat ? sat.wi : null, nasa ? nasa.wi : null);
-      if (call === null) return { missing: true };
-      const split = calc.weatherSplit({ eTypical: out.expectedKwh, wi: call.wi, eActual: num(b.inverterKwh) });
-      if (calc.isError(split)) return { missing: true };
-      const prAdjusted = calc.performanceRatio({ eKwh: num(b.inverterKwh), kWp: num(this.s.kWp), hPoa: out.hPoa * call.wi });
-      return { ...call, satWi: sat?.wi ?? null, nasaWi: nasa?.wi ?? null, validDays: (sat ?? nasa).validDays, days: (sat ?? nasa).days, split, prAdjusted: calc.isError(prAdjusted) ? null : prAdjusted };
-    },
-
     // Save and load: a JSON file on the user's own device. Nothing is stored by us.
     saveData() {
       const blob = new Blob([serialize({ ...this.s, place: this.place }, this.bills)], { type: 'application/json' });
@@ -254,28 +254,77 @@ document.addEventListener('alpine:init', () => {
       const file = ev.target.files?.[0];
       ev.target.value = '';
       if (!file) return;
+      // Refuse a large file before reading it into memory (a video or a backup picked by mistake), ticket #47.
+      if (file.size > MAX_BYTES) { this.fileMessage = 'That file is too large to be a SCND file.'; return; }
       const r = parse(await file.text());
       if (r.error) { this.fileMessage = r.error; return; }
+      await this.applyLoaded(r);
+      this.fileMessage = this.ready ? `Loaded ${this.bills.length} bill${this.bills.length === 1 ? '' : 's'}.` : '';
+    },
+    // Puts a parsed save file (or the kept copy) on screen, then runs setup on it. A kept copy can hold a setup the owner
+    // had not finished: then the form opens with what they typed, without error messages.
+    async applyLoaded(r, { kept = false } = {}) {
       this.place = r.setup.place;
       this.s = { ...this.s, ...r.setup };
       this.bills = r.bills.length ? r.bills.map((b, k, all) => ({ ...b, id: nextId++, open: k === all.length - 1 })) : [newBill()];
       this.example = false; this.savedOnce = true;
       this.resetWeather();
       this.ready = false; this.showSheet = false;
-      await this.continueSetup();
+      const s = this.s, done = Number.isFinite(num(s.lat)) && Number.isFinite(num(s.lon)) && num(s.kWp) > 0 && num(s.acKw) > 0;
+      if (kept && !done) { this.started = true; this.setupOpen = true; }
+      else await this.continueSetup();
       this.savedSnap = this.snap();
-      this.fileMessage = this.ready ? `Loaded ${this.bills.length} bill${this.bills.length === 1 ? '' : 's'}.` : '';
+    },
+    // "Remind me next month" (ticket #50): a calendar file made here, a month after the latest bill. Nothing is sent.
+    remindMsg: '',
+    remindMe() {
+      const end = this.bills.map((b) => b.end).filter(Boolean).sort().at(-1);
+      const next = end ? nextReminderDate(end, today()) : null, text = next ? reminderIcs({ nextDate: next }) : null;
+      if (!text) { this.remindMsg = 'Add a bill with its reading dates first.'; return; }
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([text], { type: 'text/calendar' }));
+      a.download = 'scnd-reminder.ics';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      this.remindMsg = `Calendar file saved. Open it to add a monthly reminder, starting ${this.fmtDate(next)}.`;
+    },
+    // Tick: keep a copy now (the effect in init() keeps it up to date). Untick: delete the kept copy. The theme stays.
+    setKeep(on) {
+      this.keep = on;
+      if (!on) {
+        try { localStorage.removeItem(STORAGE_KEY); } catch { /* nothing kept */ }
+        // Nothing holds the data now, so leaving the page asks first again (unless it was just saved to a file).
+        this.keepOk = false; this.savedSnap = ''; this.keepMsg = 'Deleted from this device. Use "Save" to keep a file instead.';
+        return;
+      }
+      this.writeKept();
+      if (this.keepOk) this.keepMsg = 'Kept on this device. Your setup and bills open again next time you visit SCND in this browser.';
+    },
+    writeKept() {
+      const text = keptText({ setup: { ...this.s, place: this.place }, bills: this.bills, example: this.example });
+      if (text === null) return;
+      try { localStorage.setItem(STORAGE_KEY, text); this.keepOk = true; }
+      catch { this.keepOk = false; this.keepMsg = 'This browser would not keep the data (a private window, or storage is full or blocked). Use "Save" to keep a file instead.'; }
+    },
+    // The kept copy, if there is one and it passes the save-file checks. A copy that fails them is deleted.
+    readKept() {
+      let text = null;
+      try { text = localStorage.getItem(STORAGE_KEY); } catch { return null; }
+      const r = restoreKept(text);
+      if (text !== null && !r) { try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ } }
+      return r;
     },
 
-    // Findings sheet (F3): the latest 6 bills as a table, plus questions built from the results.
-    get sheet() {
+    // Findings sheet (F3): the latest 5 bills as a table (what fits one printed page), plus questions built from all bills.
+    get sheet() { return this.memo('sheet', () => this.computeSheet()); },
+    computeSheet() {
       if (!this.ready) return null;
       const rows = this.bills.filter((b) => b.start && b.end).sort((a, c) => (a.start < c.start ? -1 : 1))
         .map((b) => ({ b, r: this.result(b) })).filter((x) => x.r && x.r.pr !== null);
       const cum = this.cumulative, perDay = this.promisedPerDay;
       const payback = perDay && cum.length ? { saved: cum[cum.length - 1].saved, promised: perDay * cum[cum.length - 1].day, days: cum[cum.length - 1].day } : null;
       const f = findings({
-        payback, creditLeftOut: this.creditLeftOut, degradation: this.degradationResult, efficiency: this.efficiencyTrend,
+        payback, creditLeftOut: this.creditLeftOut, promise: this.quote?.impliedPr != null ? { kwhYear: this.quote.promised, impliedPr: this.quote.impliedPr } : null, degradation: this.degradationResult, efficiency: this.efficiencyTrend,
         bills: rows.map(({ b, r }) => ({
           start: b.start, end: b.end, period: this.fmtRange(b.start, b.end), pr: r.pr, band: r.band, basis: r.basis, redRaised: this.redRaised(b), actualKwh: num(b.inverterKwh),
           expectedKwh: r.expectedKwh, weather: r.weather, flags: r.flags, savings: r.savings, hybridFlags: r.hybrid?.flags ?? [],
@@ -291,7 +340,7 @@ document.addEventListener('alpine:init', () => {
       const adjusted = rows.some((x) => x.r.basis === 'weather');
       const sources = [
         `PR is the electricity produced divided by what the panels are rated to produce in the sun received. Within the usual range is ${calc.PR_BANDS.green} or more, with a lower limit of ${calc.PR_BANDS.amberWet} (June to October) or ${calc.PR_BANDS.amberDry} (November to May). Expected output assumes a PR of ${calc.PR_BANDS.green}.`,
-        `Sun data: NASA POWER typical-year climatology (2001 to 2020), transposed to the panel tilt and facing.${this.manilaBias ? ` Around Metro Manila this data reads about ${calc.MANILA_BIAS.pct}% sunnier than Global Solar Atlas, so PR here may read about 4% low.` : ''}${weatherUsed ? ' Weather index compares each period with a 2020 to 2025 baseline from satellite data (Himawari, through Open-Meteo) and NASA POWER, where 1.00 is a typical year.' : ''}`,
+        `Sun data: NASA POWER typical-year climatology (2001 to 2025, as NASA labels it), transposed to the panel tilt and facing.${weatherUsed ? ' Weather index compares each period with a 2020 to 2025 baseline from satellite data (Himawari, through Open-Meteo) and NASA POWER, where 1.00 is a typical year.' : ''}`,
         ...(adjusted ? ['Where the weather check gave a result and its sources agreed within 5 points, PR and expected output are adjusted for that period\'s weather. Otherwise they are against a typical year (marked "not used" in the weather column).'] : []),
       ];
       return {
@@ -302,6 +351,7 @@ document.addEventListener('alpine:init', () => {
           ['Array capacity', `${s.kWp} kWp`], ['Inverter', `${s.acKw} kW (DC/AC ${this.fmt(num(s.kWp) / num(s.acKw), 2)})`],
           ['Orientation', `${s.tilt}° tilt, facing ${face}`], ['System type', s.hybrid ? 'Hybrid with battery' : 'On-grid'],
           ['Location (rounded)', `${s.lat}, ${s.lon}`], ['Switched on', s.commissioned || 'Not given'],
+          ...(this.quote?.impliedPr != null ? [['Promised yield', `${this.fmt(this.quote.promised, 0)} kWh a year (PR ${this.fmt(this.quote.impliedPr, 2)} for this system and location)`]] : []),
         ],
         rows: rows.slice(-5).map(({ b, r }) => ({
           period: this.fmtRange(b.start, b.end), actual: this.fmt(num(b.inverterKwh), 0), expected: this.fmt(r.expectedKwh, 0),
@@ -314,11 +364,33 @@ document.addEventListener('alpine:init', () => {
         savedTotal: cum.length ? '₱' + this.fmt(cum[cum.length - 1].saved, 0) : null,
         sources: [...sources, ...f.uncertainty,
           ...rows.filter((x) => x.r.weatherRejected).map(({ b, r }) => `For ${this.fmtRange(b.start, b.end)} the weather-adjusted PR came out at ${this.fmt(r.prWeather, 2)}, above what panels can make, so the weather data for those dates looks off. That period is judged against a typical year.`),
+          // Ticket #40 (Fred, 14 Nov 2026): a one-source index may clear a low month but not make one (calc.judgedPr).
+          ...rows.filter((x) => x.r.inferredRejected).map(({ b, r }) => `For ${this.fmtRange(b.start, b.end)} the weather index came from one source with nothing to cross-check it, and it would have put PR at ${this.fmt(r.prWeather, 2)}, a lower band than against a typical year. A single unchecked source is not used to mark a month lower, so that period is judged against a typical year.`),
           ...rows.filter((x) => x.r.band === 'check' && x.r.checkLow).map(({ b, r }) => `PR for ${this.fmtRange(b.start, b.end)} works out at ${this.fmt(r.pr, 2)}, below the ${calc.PR_PLAUSIBLE_MIN.toFixed(2)} a working system makes, so a figure is likely wrong (reading dates, solar kWh or panel size) or the system was off for part of the period. It is not counted as a low month.`),
           ...rows.filter((x) => x.r.band === 'check' && !x.r.checkLow).map(({ b, r }) => `PR for ${this.fmtRange(b.start, b.end)} works out at ${this.fmt(r.pr, 2)}, above the ${calc.PR_PLAUSIBLE_MAX.toFixed(2)} panels reach in practice, so a figure is likely wrong (reading dates, solar kWh or panel size). Check it before relying on this sheet.`),
+          // Data credits (Fred, 14 Nov 2026). NASA wording from power.larc.nasa.gov/docs/referencing (read 14 Nov 2026), which asks
+          // publications to credit POWER; Open-Meteo credit and CC BY 4.0 from memory, to check against open-meteo.com/en/licence.
+          `Data credits: the sun data was obtained from National Aeronautics and Space Administration (NASA) Langley Research Center's Prediction Of Worldwide Energy Resources (POWER) project funded through the NASA Earth Science Division.${weatherUsed ? ' Weather data by Open-Meteo.com (CC BY 4.0), from the Himawari satellite.' : ''}`,
           ...(this.gaps.length ? [`Bills are missing for ${this.gaps.map((g) => this.fmtRange(g.from, g.to)).join(', ')}. Two low months either side of a gap are not counted as in a row, and savings to date leave out the missing ${this.gaps.length === 1 ? 'period' : 'periods'}, so the payback pace reads low.`] : [])],
       };
     },
+
+    // ---- Alpine CSP build helpers (ticket #46) ----
+    // The CSP build parses template expressions without eval, so it has no arrow functions, `delete`, `if` statements,
+    // optional chaining or DOM property writes in markup, and no globals. These methods stand in for what the templates
+    // used to say inline.
+    abs: Math.abs, min: Math.min, max: Math.max, round: Math.round,
+    clearErr(name) { delete this.fieldErr[name]; },
+    choosePlace() { this.pickPlace(); this.clearErr('place'); },
+    startSetup() { this.started = true; this.$nextTick(() => { this.scrollTo('setup'); this.$refs.fPlace?.focus({ preventScroll: true }); }); },
+    openSheet() { this.showSheet = true; this.probeQr(); this.$nextTick(() => this.scrollTo('findings')); },
+    toggleSheet() { if (this.showSheet) this.showSheet = false; else this.openSheet(); },
+    openIfOutage(el, b) { el.open = num(b.outageHours) > 0; },
+    decodeTeaser(b) { return this.decode(b)?.flags?.includes('total_below_charges') ? 'Check the total' : 'Why it is not zero'; },
+    // Stands in for x-html, which the CSP build refuses. The markup is only ever the SVG built by dialSvg, chart and
+    // quoteChart from numbers, fixed labels and dates that data.js has checked against YYYY-MM-DD; no text the owner
+    // types reaches it (the place name is shown with x-text only). Rewrites only when the markup changes.
+    paintSvg(el, markup) { if (el._svg !== markup) { el.innerHTML = markup; el._svg = markup; } },
 
     // ---- Presentation helpers (no maths here) ----
     get step() {
@@ -349,7 +421,7 @@ document.addEventListener('alpine:init', () => {
       return '';
     },
     // Earlier bills that already have an answer fold to one line once a newer bill has one too (long scroll on phones).
-    foldable(i) { return i < this.bills.reduce((n, b, k) => (this.result(b)?.pr != null ? k : n), -1); },
+    foldable(i) { this.ver.fold; return i < (model ??= raw.buildModel()).lastAnswered; },
     folded(b, i) { return this.foldable(i) && !b.expanded && this.removing !== b.id; },
     // Placeholders only (never a value): last month's numbers as a reference while typing. Nothing is saved from them.
     prevHint(i, key) { const v = i > 0 ? num(this.bills[i - 1]?.[key]) : NaN; return Number.isFinite(v) ? `last bill: ${this.fmt(v, 0)}` : ''; },
@@ -369,9 +441,7 @@ document.addEventListener('alpine:init', () => {
       return `about ${this.fmt(rate * kwh, 0)}`;
     },
     // The bill's charges as the maths needs them, whichever way the owner entered them (calc.billCharges).
-    charges(b) {
-      return calc.billCharges({ unit: b.chargeUnit, i: num(b.importKwh), genRate: num(b.genRate), genAmount: num(b.genAmount), varRate: num(b.varRate), varCharges: num(b.varCharges) });
-    },
+    charges(b) { return engine.chargesOf(b); },
     billTitle(b, i) { return b.start && b.end ? this.fmtRange(b.start, b.end) : `Bill ${i + 1}`; },
     get summaryLine() {
       const s = this.s, face = FACINGS.find((x) => x.az === num(s.azimuth))?.label.toLowerCase() ?? '';
@@ -444,8 +514,24 @@ document.addEventListener('alpine:init', () => {
       const w = this.weather;
       if (w.status === 'loading') return 'Checking the weather for these dates.';
       if (w.status !== 'failed') return '';
-      const unreachable = w.errors.length && w.errors.every((e) => e.endsWith('could not be reached.'));
+      const unreachable = w.errors.length && w.noAnswer;
       return `The weather check did not get through: ${unreachable ? 'neither weather service could be reached. Check your connection and try again' : 'the weather services gave no usable data for these dates. Try again later'}, or go ahead with the findings sheet, which shows PR against a typical year's sun.`;
+    },
+    // Ticket #48: where the monthly source check found the satellite short at the nearest city, say before the click that
+    // those months will rest on NASA POWER alone. The status file is a static file from this site, loaded once on need.
+    sourceStatus: null,
+    sourceStatusAsked: false,
+    get satGapText() {
+      if (!this.canCheckWeather) return '';
+      if (!this.sourceStatusAsked) {
+        this.sourceStatusAsked = true;
+        fetch('/data/source-status.json').then((r) => (r.ok ? r.json() : null)).then((j) => { this.sourceStatus = j; }).catch(() => {});
+      }
+      const months = this.bills.map((b) => this.result(b)).filter((r) => r?.pr != null).map((r) => `${r.midYear}-${String(r.midMonth).padStart(2, '0')}`);
+      const g = satelliteGaps(this.sourceStatus, num(this.s.lat), num(this.s.lon), months);
+      if (!g.months.length) return '';
+      const names = g.months.map((ym) => `${MON[Number(ym.slice(5)) - 1]} ${ym.slice(0, 4)}`);
+      return `At ${g.city}, the satellite has too few days of data for ${this.listAnd(names)}, so for bills in ${g.months.length === 1 ? 'that month' : 'those months'} the check will use NASA POWER alone.`;
     },
     get canCheckWeather() { return this.bills.some((b) => this.result(b)?.pr != null); },
 
@@ -454,6 +540,8 @@ document.addEventListener('alpine:init', () => {
     // Made-up systems from examples.js: 'ongrid' (two bills, quick look) or 'hybrid' (14 months, battery, payback).
     async loadExample(kind = 'ongrid') {
       const ex = EXAMPLES[kind];
+      // Flag the example before its setup lands, so the kept copy (ticket #43) is never written with example data.
+      this.example = kind;
       this.place = ex.place;
       this.s = { ...this.s, ...ex.setup };
       await this.continueSetup();
@@ -464,9 +552,12 @@ document.addEventListener('alpine:init', () => {
       this.$nextTick(() => this.focusBill(0, '.bill-title h3'));
     },
     clearExample() {
+      // With "Keep my data" on, "Start with mine" brings back the owner's own kept setup and bills.
+      const kept = this.keep ? this.readKept() : null;
+      if (kept) { this.example = false; this.applyLoaded(kept, { kept: true }); return; }
       this.example = false; this.ready = false; this.setupOpen = true; this.started = true; this.place = '';
       setTimeout(() => { this.scrollTo('setup'); document.querySelector('[x-ref=fPlace]')?.focus({ preventScroll: true }); }, 50);
-      this.s = { lat: '', lon: '', kWp: '', acKw: '', tilt: 10, azimuth: 0, commissioned: '', hybrid: false, netMetering: false, cost: '', promisedYears: '', warrantyPct: '', batteryCost: '' };
+      this.s = { lat: '', lon: '', kWp: '', acKw: '', tilt: 10, azimuth: 0, commissioned: '', hybrid: false, netMetering: false, cost: '', promisedYears: '', warrantyPct: '', batteryCost: '', promisedKwhYear: '' };
       this.bills = [newBill()]; this.climate = null; this.lowDiffuse = false;
       this.resetWeather();
       this.savedSnap = this.snap();   // a fresh start has nothing to lose
@@ -507,124 +598,89 @@ document.addEventListener('alpine:init', () => {
       this.$nextTick(() => this.focusBill(Math.min(k, this.bills.length - 1), '.bill-title h3'));
     },
     // Index of the first bill with an answer: the PR definition is shown there only, not under every dial.
-    get firstAnswered() { return this.bills.findIndex((b) => this.result(b)?.pr != null); },
+    get firstAnswered() { this.ver.fold; return (model ??= raw.buildModel()).firstAnswered; },
 
-    // One result object per bill. Only fields the bill has enough data for are filled.
-    result(b) {
-      if (!this.ready || !this.climate) return null;
-      const s = this.s, errors = [], out = { errors, flags: [], pr: null, split: null, savings: null };
-      if (!b.start || !b.end) return null;
-      // Switch-on is a month, so only a period that ends before that month starts is certainly wrong (a bill spanning it is normal).
-      // No PR, savings or payback for it: numbers from before the system existed would only mislead.
-      if (/^\d{4}-\d{2}$/.test(s.commissioned || '') && b.end.slice(0, 7) < s.commissioned) { out.flags.push('before_commissioning'); return out; }
-      const negative = NUM_FIELDS.filter(([k]) => num(b[k]) < 0).map(([, label]) => label);
-      if (negative.length) { errors.push(`These cannot be below zero: ${negative.join(', ')}. Check the minus sign.`); return out; }
-      const p = calc.poaPeriod({ ghi: this.climate.ghi, dif: this.climate.dif, tilt: num(s.tilt), azimuth: num(s.azimuth), lat: s.lat, start: b.start, end: b.end });
-      if (calc.isError(p)) { errors.push(p.message); return out; }
-      const g = num(b.inverterKwh), x = num(b.exportKwh), i = num(b.importKwh);
-      if (Number.isFinite(g)) {
-        const pr = calc.performanceRatio({ eKwh: g, kWp: num(s.kWp), hPoa: p.hPoa });
-        if (calc.isError(pr)) errors.push(pr.message);
-        else {
-          Object.assign(out, { pr, hPoa: p.hPoa, band: calc.prBand(pr, p.midMonth), midMonth: p.midMonth, midYear: p.midYear });
-          out.expectedKwh = calc.expectedEnergy({ kWp: num(s.kWp), hPoa: p.hPoa, pr: calc.PR_BANDS.green });
-        }
-      }
-      // Hybrids need the battery numbers too, or battery losses would count as solar used (F9 balance).
-      const battery = s.hybrid ? { c: num(b.chargeKwh), d: num(b.dischargeKwh) } : {};
-      if (Number.isFinite(g) && Number.isFinite(x) && Number.isFinite(i) && Object.values(battery).every(Number.isFinite)) {
-        const split = calc.energySplit({ g, x, i, ...battery });
-        if (calc.isError(split)) errors.push(split.message);
-        else out.split = split;
-      }
-      const ch = this.charges(b);
-      if (out.split) {
-        const rImport = calc.importRate({ variableCharges: ch.varCharges, i });
-        const rExport = ch.genRate;
-        if (!calc.isError(rImport) && Number.isFinite(rExport)) {
-          out.rImport = rImport;
-          const creditCap = ch.varCharges;
-          out.savings = calc.savings({ s: out.split.selfConsumed, x, rImport, rExport, creditCap });
-          out.uncounted = calc.uncountedCredit({ x, rExport, creditCap });
-          out.shift = calc.loadShiftValue({ rImport, rExport });
-        }
-      }
-      // F9: hybrid balance, round-trip efficiency, battery value. Needs the battery's charge and discharge for the same period.
-      if (s.hybrid) {
-        const c = num(b.chargeKwh), d = num(b.dischargeKwh);
-        if ([g, x, i, c, d].every(Number.isFinite)) {
-          const hb = calc.hybridBalance({ i, gPv: g, x, c, d });
-          if (calc.isError(hb)) errors.push(hb.message);
-          else {
-            out.hybrid = hb;
-            const app = num(b.homeLoadKwh);
-            if (Number.isFinite(app)) { const lc = calc.loadCheck({ implied: hb.load, app }); if (!calc.isError(lc)) hb.loadCheck = lc; }
-            if (out.rImport !== undefined && Number.isFinite(ch.genRate)) hb.value = calc.batteryValue({ d, rImport: out.rImport, rExport: ch.genRate });
-          }
-        }
-      }
-      out.weather = this.weatherResult(b, out);
-      // Judge on weather-adjusted PR once the weather call is trusted (calc.judgedPr). The typical-year values are kept.
-      if (out.pr !== null) {
-        const j = calc.judgedPr({ pr: out.pr, expectedKwh: out.expectedKwh, call: out.weather && !out.weather.missing ? out.weather : null });
-        if (!calc.isError(j)) Object.assign(out, { prTypical: out.pr, expectedTypical: out.expectedKwh, pr: j.pr, expectedKwh: j.expectedKwh, basis: j.basis, band: calc.prBand(j.pr, out.midMonth),
-          weatherRejected: !!j.weatherRejected, prWeather: j.prWeather ?? null });
-        // Above what panels can make: a wrong figure, not a healthy month (Fred, 1 Oct 2026).
-        if (calc.prTooHigh(out.pr)) out.band = 'check';
-        // Below what a working system makes: a typo or a system that was off, not a red month (audit M-8, Fred, 31 Oct 2026).
-        else if (calc.prTooLow(out.pr)) { out.band = 'check'; out.checkLow = true; }
-      }
-      out.flags = calc.sanityFlags({ kWp: num(s.kWp), acKw: num(s.acKw), exportKwh: Number.isFinite(x) ? x : undefined, netMeteringActive: s.netMetering, outageHours: num(b.outageHours) });
-      // Overlap with an earlier bill (or the same dates entered twice): flagged on the later one. One shared day is
-      // an off-by-one in the reading dates, not a duplicate, so it is let through.
-      const k = this.bills.indexOf(b);
-      const earlier = this.bills.filter((o, n) => o !== b && o.start && o.end && (o.start < b.start || (o.start === b.start && n < k)));
-      if (earlier.some((o) => calc.overlapDays(o, b) > 1)) out.flags.push('overlap');
-      return out;
+    // Everything the bill results feed into, read once so the effect in init() depends on all of it and nothing else.
+    inputKey() {
+      const w = this.weather;
+      return [this.ready, this.climate, w.status, w.sat, w.nasa, w.satBase, w.nasaBase,
+        ...Object.keys(this.s).map((k) => this.s[k]),
+        ...this.bills.flatMap((b) => [b.id, b.chargeUnit, ...BILL_FIELDS.map((k) => b[k])])];
     },
+    // All bill results plus what is derived across bills. Built from `raw`, so it adds no reactive dependencies.
+    // Called by refreshModel, and once on first use if a template asks before init() has run. Returns { results, red, firstAnswered, lastAnswered, keys }.
+    buildModel() {
+      const m = engine.buildModel({ setup: raw.s, climate: raw.climate, ready: raw.ready, weather: raw.weather, bills: raw.bills });
+      // What each bill shows, as text: a bill is re-rendered only when this changes.
+      m.keys = new Map(raw.bills.map((b) => [b.id, JSON.stringify([m.results.get(b.id), m.red.has(b.id)])]));
+      return m;
+    },
+    // Rebuild the model and bump the versions of what changed. Readers re-run on the writes (made through the reactive
+    // proxy); the old versions are read from `raw` so this effect does not depend on its own writes.
+    // The writes wait for a microtask: Alpine runs each queued job once per flush and drops a re-trigger of a job that has
+    // already run in it, so a binding that read the old model earlier in this flush would otherwise keep showing it.
+    // The new model goes live in the same microtask, so every binding in one flush sees the same model: a child of an x-if
+    // could otherwise read the new model while its parent still shows for the old one.
+    refreshModel() {
+      const old = built ?? model, m = raw.buildModel();
+      built = m;
+      const bumped = [...m.keys].filter(([id, key]) => old?.keys.get(id) !== key).map(([id]) => id);
+      const fold = !old || old.firstAnswered !== m.firstAnswered || old.lastAnswered !== m.lastAnswered;
+      queueMicrotask(() => {
+        model = m;
+        for (const id of bumped) this.ver[id] = (raw.ver[id] ?? 0) + 1;
+        if (fold) this.ver.fold = raw.ver.fold + 1;
+        this.ver.all = raw.ver.all + 1;
+      });
+    },
+    // The model, built on first use if a template asks before init() has run. Readers depend on ver.all, which moves on
+    // every input change, so anything memoized on the model is recomputed exactly once per change.
+    get model() { this.ver.all; return model ??= raw.buildModel(); },
+    memo(name, fn) {
+      const m = this.model, c = memos.get(name);
+      if (c && c.m === m) return c.v;
+      const v = fn();
+      memos.set(name, { m, v });
+      return v;
+    },
+    // One result object per bill (null until setup is done and the bill has dates). Shared between callers: read only.
+    // Depends only on this bill's version, so a change to one bill does not re-render the others.
+    result(b) {
+      this.ver[b.id];
+      const r = (model ??= raw.buildModel()).results.get(b.id);
+      // A bill added since the last refresh: work it out directly once; the refresh puts it in the model.
+      return r !== undefined ? r : raw.computeResult(Alpine.raw(b));
+    },
+    // Only fields the bill has enough data for are filled.
+    computeResult(b) { return engine.billResult({ setup: this.s, climate: this.climate, ready: this.ready, weather: this.weather, bill: b, bills: this.bills }); },
 
     // F8: same-month weather-adjusted PR, one year apart. Bills are paired by the month and year of their midpoint.
     // Hidden (null) until the bills span 13 months and have a weather check.
-    get degradationResult() {
-      if (!this.ready) return null;
-      const records = [];
-      for (const b of this.bills) {
-        const r = this.result(b), pr = r?.weather?.prAdjusted;
-        // A rejected weather index or an implausible PR would put a wrong figure into the year-over-year pairs.
-        if (r && Number.isFinite(pr) && pr > 0 && !r.weatherRejected && !calc.prTooHigh(pr) && !calc.prTooLow(pr)) records.push({ year: r.midYear, month: r.midMonth, pr });
-      }
-      const warrantyPct = num(this.s.warrantyPct), d = calc.degradation(records, warrantyPct);
-      return d && !calc.isError(d) ? { ...d, warrantyPct } : null;
+    get degradationResult() { return this.memo('degradationResult', () => this.computeDegradationResult()); },
+    computeDegradationResult() { return this.ready ? engine.degradationFor({ setup: this.s, bills: this.bills, resultOf: (b) => this.result(b) }) : null; },
+
+    // Spread of the year-over-year pairs, as change in PR (ticket #45). Empty with one pair.
+    get degradationSpread() {
+      const d = this.degradationResult; if (!d || d.pairs < 2) return '';
+      const ch = (loss) => `${loss >= 0 ? 'down' : 'up'} ${this.fmt(Math.abs(loss), 1)}%`;
+      return `Single pairs range from ${ch(d.minLossPct)} to ${ch(d.maxLossPct)}. One month's sun data can be off by 5 to 10%, so the range stays wide until many months are paired.`;
     },
 
     // F9: sustained drop in round-trip efficiency against the owner's own first bills. null until 5 bills have one.
-    get efficiencyTrend() {
-      if (!this.s.hybrid) return null;
-      const ordered = this.bills.filter((b) => b.start).sort((a, c) => (a.start < c.start ? -1 : 1));
-      const r = calc.efficiencyDrop(ordered.map((b) => this.result(b)?.hybrid?.roundTripEfficiency ?? null));
-      return r && !calc.isError(r) ? r : null;
-    },
+    get efficiencyTrend() { return this.memo('efficiencyTrend', () => this.computeEfficiencyTrend()); },
+    computeEfficiencyTrend() { return engine.efficiencyFor({ setup: this.s, bills: this.bills, resultOf: (b) => this.result(b) }); },
 
     // F9: what the battery has earned over the bills entered, against its cost if given.
-    get batteryTotal() {
-      if (!this.s.hybrid) return null;
-      const vals = this.bills.map((b) => this.result(b)?.hybrid?.value).filter(Number.isFinite);
-      if (!vals.length) return null;
-      const earned = vals.reduce((a, v) => a + v, 0), cost = num(this.s.batteryCost);
-      return { earned, bills: vals.length, cost: cost > 0 ? cost : null };
-    },
+    get batteryTotal() { return this.memo('batteryTotal', () => this.computeBatteryTotal()); },
+    computeBatteryTotal() { return engine.batteryTotalFor({ setup: this.s, bills: this.bills, resultOf: (b) => this.result(b) }); },
 
     // A missing month before this bill (calc.billGaps): shown on the later bill and on the sheet.
-    get gaps() { return calc.billGaps(this.bills); },
+    get gaps() { return this.memo('gaps', () => this.computeGaps()); },
+    computeGaps() { return calc.billGaps(this.bills); },
     gapBefore(b) { return this.gaps.find((g) => g.to === b.start) ?? null; },
 
-    // Two consecutive red bills, oldest to newest, ending at this bill.
-    redRaised(b) {
-      const ordered = this.bills.filter((x) => x.start).sort((a, c) => (a.start < c.start ? -1 : 1));
-      const k = ordered.findIndex((x) => x.id === b.id);
-      if (k < 1 || !calc.isConsecutive(ordered[k - 1], ordered[k])) return false;   // a skipped month breaks the run
-      return calc.redFlag(ordered.slice(0, k + 1).map((x) => this.result(x)?.band ?? null));
-    },
+    // Two consecutive red bills, oldest to newest, ending at this bill (worked out in buildModel).
+    redRaised(b) { this.ver[b.id]; return (model ??= raw.buildModel()).red.has(b.id); },
 
     num,
     listAnd: (xs) => (xs.length < 2 ? xs.join('') : xs.slice(0, -1).join(', ') + ' and ' + xs[xs.length - 1]),
@@ -643,43 +699,60 @@ document.addEventListener('alpine:init', () => {
     },
     fmt: (v, d) => (Number.isFinite(v) ? v.toLocaleString('en-PH', { minimumFractionDigits: d, maximumFractionDigits: d }) : ''),
 
+    // ---- Quote check (ticket #49, Fred, 14 Nov 2026): a typical year for this roof, before any bill ----
+    // Expected kWh per month at PR 0.75 (calc.expectedYear), and the PR an installer's promised yearly kWh implies.
+    get quote() { return this.memo('quote', () => this.computeQuote()); },
+    computeQuote() {
+      if (!this.ready || !this.climate) return null;
+      const s = this.s, kWp = num(s.kWp);
+      const y = calc.expectedYear({ kWp, tilt: num(s.tilt), azimuth: num(s.azimuth), lat: num(s.lat), ghi: this.climate.ghi, dif: this.climate.dif });
+      if (calc.isError(y)) return null;
+      const promised = num(s.promisedKwhYear), pr = promised > 0 ? calc.impliedPr({ promisedKwhYear: promised, kWp, hPoaYear: y.hPoaYear }) : null;
+      return { ...y, promised: promised > 0 ? promised : null, impliedPr: pr !== null && !calc.isError(pr) ? pr : null };
+    },
+    // One plain sentence on the promise. A question for the installer, never a verdict.
+    get quoteText() {
+      const q = this.quote; if (!q || q.impliedPr === null) return '';
+      const pr = this.fmt(q.impliedPr, 2), healthy = calc.PR_BANDS.green.toFixed(2), max = calc.PR_PLAUSIBLE_MAX.toFixed(2);
+      if (calc.prTooHigh(q.impliedPr)) return `${this.fmt(q.promised, 0)} kWh a year works out at a PR of ${pr} for this size, tilt, facing and location. That is more than panels this size can make here (above ${max}). Ask your installer how it was worked out: which sun data, and what losses for heat, dust, wiring and the inverter.`;
+      if (q.impliedPr >= calc.PR_BANDS.green) return `${this.fmt(q.promised, 0)} kWh a year works out at a PR of ${pr} for this size, tilt, facing and location. A healthy system (PR ${healthy} or more) can reach that in a typical year.`;
+      return `${this.fmt(q.promised, 0)} kWh a year works out at a PR of ${pr} for this size, tilt, facing and location, below the ${healthy} SCND calls healthy, so a healthy system should make more than promised in a typical year.`;
+    },
+    // Bar chart: expected kWh per month, with a tick at the season's lower limit. Numbers only go into the SVG.
+    get quoteChart() {
+      const q = this.quote; if (!q) return '';
+      const W = 340, H = 170, L = 40, R = 8, T = 10, B = 24, pw = W - L - R, ph = H - T - B, bw = pw / 12;
+      const top = Math.max(...q.months.map((m) => m.expectedKwh)), raw = top / 4, pow = 10 ** Math.floor(Math.log10(raw)), n = raw / pow;
+      const step = (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * pow, yMax = Math.ceil(top / step) * step, Y = (v) => T + (1 - v / yMax) * ph;
+      const desc = `Expected kWh in a typical year, by month: ${q.months.map((m) => `${MON[m.month - 1]} ${this.fmt(m.expectedKwh, 0)}`).join(', ')}.`;
+      let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${desc}">`;
+      for (let v = 0; v <= yMax + 1e-9; v += step) svg += `<line class="${v === 0 ? 'axis-l' : 'grid-l'}" x1="${L}" x2="${W - R}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}"/><text x="${L - 6}" y="${(Y(v) + 4).toFixed(1)}" text-anchor="end">${this.fmt(v, 0)}</text>`;
+      q.months.forEach((m, k) => {
+        const x = L + k * bw + bw * 0.18, w = bw * 0.64;
+        svg += `<rect x="${x.toFixed(1)}" y="${Y(m.expectedKwh).toFixed(1)}" width="${w.toFixed(1)}" height="${(Y(0) - Y(m.expectedKwh)).toFixed(1)}" rx="2" style="fill:var(--c-save)" opacity=".85"/>`;
+        svg += `<line x1="${(x - 1).toFixed(1)}" x2="${(x + w + 1).toFixed(1)}" y1="${Y(m.lowKwh).toFixed(1)}" y2="${Y(m.lowKwh).toFixed(1)}" style="stroke:var(--ink)" stroke-width="2"/>`;
+        svg += `<text x="${(x + w / 2).toFixed(1)}" y="${H - 8}" text-anchor="middle">${MON[m.month - 1][0]}</text>`;
+      });
+      return svg + '</svg>';
+    },
+
     // ---- Payback (F6) ----
     // Points on the savings curve, oldest bill first. day = days since the first reading date.
-    get cumulative() {
-      const rows = this.bills.filter((b) => b.start).sort((a, c) => (a.start < c.start ? -1 : 1))
-        .map((b) => ({ b, r: this.result(b) })).filter((x) => x.r && x.r.savings !== null);
-      if (!rows.length) return [];
-      const t0 = Date.parse(rows[0].b.start);
-      let sum = 0;
-      return rows.map(({ b, r }) => { sum += r.savings; return { day: (Date.parse(b.end) - t0) / 86400000, saved: sum, date: b.end }; });
-    },
+    get cumulative() { return this.memo('cumulative', () => this.computeCumulative()); },
+    computeCumulative() { return engine.cumulativeSavings(this.bills, (b) => this.result(b)); },
     // Export credit left out of savings by the variable-charges cap, summed over bills with savings (audit M-3).
-    get creditLeftOut() {
-      return this.bills.reduce((t, b) => { const r = this.result(b); return t + (r && r.savings !== null && r.uncounted > 0 ? r.uncounted : 0); }, 0);
-    },
-    // Typical-year sun reads high around Manila (calc.MANILA_BIAS, audit M-4): a note on the dial and the sheet.
-    get manilaBias() { return this.ready && calc.nearManila(this.s.lat, this.s.lon); },
-    get startDate() { const b = this.bills.filter((x) => x.start).sort((a, c) => (a.start < c.start ? -1 : 1))[0]; return b ? b.start : ''; },
+    get creditLeftOut() { return this.memo('creditLeftOut', () => this.computeCreditLeftOut()); },
+    computeCreditLeftOut() { return engine.creditLeftOut(this.bills, (b) => this.result(b)); },
+    // The savings curve and the chart's date axis start on the same bill: the first one with savings (ticket #44; the
+    // axis used to start on the first bill with a date, so a bill without bill numbers shifted every date label).
+    get startDate() { return this.memo('startDate', () => this.computeStartDate()); },
+    computeStartDate() { return engine.savingsStart(this.bills, (b) => this.result(b)); },
 
-    // Promised line: cost spread evenly over the promised years, from the first reading date.
-    get promisedPerDay() {
-      const cost = num(this.s.cost), yrs = num(this.s.promisedYears);
-      return cost > 0 && yrs > 0 ? cost / (yrs * 365.25) : null;
-    },
+    // Promised line: cost spread evenly over the promised years, from the first bill with savings.
+    get promisedPerDay() { return engine.promisedPerDay(this.s); },
 
-    get paybackStats() {
-      const c = this.cumulative; if (!c.length) return null;
-      const last = c[c.length - 1], cost = num(this.s.cost), yrs = num(this.s.promisedYears);
-      const okNum = (v) => (calc.isError(v) ? null : v);
-      const promised = cost > 0 && yrs > 0 ? okNum(calc.promisedSavings({ cost, years: yrs, days: last.day })) : null;
-      const years = cost > 0 ? okNum(calc.paybackYearsAtPace({ cost, saved: last.saved, days: last.day })) : null;
-      // Before about a year of bills the pace leans on whichever season the bills cover (the sheet waits a year too).
-      const early = last.day < PAYBACK_MIN_DAYS;
-      const months = this.bills.map((b) => this.result(b)).filter((r) => r?.savings != null).map((r) => r.midMonth);
-      const dry = months.filter(calc.isDrySeason).length;
-      const season = dry === 0 ? 'wet' : dry === months.length ? 'dry' : 'mixed';
-      return { saved: last.saved, days: last.day, promised, gapPct: promised ? (last.saved / promised - 1) * 100 : null, years, promisedYears: yrs > 0 ? yrs : null, cost: cost > 0 ? cost : null, early, season };
-    },
+    get paybackStats() { return this.memo('paybackStats', () => this.computePaybackStats()); },
+    computePaybackStats() { return engine.paybackStats({ setup: this.s, cumulative: this.cumulative, bills: this.bills, resultOf: (b) => this.result(b), minDays: PAYBACK_MIN_DAYS }); },
     // Tag on the pace tiles while early, worded for the season the bills actually cover.
     get earlyTag() {
       const t = this.paybackStats; if (!t?.early) return '';
@@ -696,7 +769,8 @@ document.addEventListener('alpine:init', () => {
     },
 
     // Chart model: pixel positions in a 340 x 200 box, clean axis ticks, one point per bill.
-    get chartModel() {
+    get chartModel() { return this.memo('chartModel', () => this.computeChartModel()); },
+    computeChartModel() {
       const c = this.cumulative; if (!c.length) return null;
       const W = 340, H = 200, L = 48, R = 16, T = 14, B = 30, pw = W - L - R, ph = H - T - B;
       const perDay = this.promisedPerDay, xMax = Math.max(c[c.length - 1].day, 30);
@@ -719,6 +793,7 @@ document.addEventListener('alpine:init', () => {
       while (xTicks.length > 5) xTicks.splice(1, 1);
       return { W, H, L, R, T, B, pw, ph, xMax, yMax, X, Y, pts, yTicks, xTicks: xTicks.map((k) => ({ ...k, x: X(k.day) })), perDay, baseY: Y(0) };
     },
+    monthName: (m) => MON[m - 1],
     fmtShort(iso) { const t = Date.parse(iso); return Number.isFinite(t) ? dayMonth(t, false) : ''; },
 
     chartHover: null,
@@ -758,7 +833,7 @@ document.addEventListener('alpine:init', () => {
     // Unsaved-changes prompt: compares what a save would write with what was last saved or loaded. Nothing is stored.
     savedSnap: '',
     snap() { return serialize({ ...this.s, place: this.place }, this.bills, new Date(0)); },
-    get unsaved() { return !this.example && this.snap() !== this.savedSnap; },
+    get unsaved() { return !this.example && !(this.keep && this.keepOk) && this.snap() !== this.savedSnap; },
     // Explainer: hidden until asked for. Nothing is stored.
     // Share the site address only: the OS share sheet where the browser has one, else copy to the clipboard.
     shareMsg: '',
@@ -777,7 +852,18 @@ document.addEventListener('alpine:init', () => {
     openIntro() { this.introOpen = true; this.$nextTick(() => this.scrollTo('about')); },
     closeIntro() { this.introOpen = false; },
     init() {
+      // Offline copy of the app's own files (public/sw.js, ticket #51). Not on localhost unless ?sw is in the address, so
+      // local development is not served from a stale copy.
+      if ('serviceWorker' in navigator && (location.hostname !== 'localhost' || new URLSearchParams(location.search).has('sw'))) {
+        window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+      }
+      // Rebuild the bill results once per change to any input (ticket #39, see the note above `let model`).
+      Alpine.effect(() => { this.inputKey(); this.refreshModel(); });
       this.savedSnap = this.snap();
+      // Kept copy (ticket #43): open it, then keep it current on every change while the box is ticked.
+      const kept = this.readKept();
+      if (kept) { this.keep = true; this.keepOk = true; this.started = true; this.applyLoaded(kept, { kept: true }); }
+      Alpine.effect(() => { this.snap(); if (this.keep && !this.example) this.writeKept(); });
       window.addEventListener('beforeunload', (e) => { if (this.unsaved) { e.preventDefault(); e.returnValue = ''; } });
       try { const t = localStorage.getItem('scnd-theme'); if (t === 'light' || t === 'dark') this.theme = t; } catch { /* storage blocked: stay on auto */ }
       this.applyTheme();
@@ -796,5 +882,5 @@ document.addEventListener('alpine:init', () => {
         m.setAttribute('content', this.theme === 'auto' ? colours[wants] : colours[this.theme]);
       });
     },
-  }));
+  }; return raw; });
 });

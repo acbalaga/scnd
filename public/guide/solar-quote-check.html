@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How to check a solar quote in the Philippines | SCND</title>
+<meta name="description" content="Check an installer's promised kWh against the sun on your roof before you sign: the PR it needs, and the questions to ask.">
+<link rel="canonical" href="https://myscnd.app/guide/solar-quote-check">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="SCND">
+<meta property="og:url" content="https://myscnd.app/guide/solar-quote-check">
+<meta property="og:title" content="How to check a solar quote">
+<meta property="og:description" content="Check an installer's promised kWh against the sun on your roof before you sign: the PR it needs, and the questions to ask.">
+<meta property="og:image" content="https://myscnd.app/icons/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="SCND logo and the line: Is your solar doing its job?">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#F3F6FA" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0A1424" media="(prefers-color-scheme: dark)">
+<script>try{var t=localStorage.getItem("scnd-theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}</script>
+<link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<!-- Guide page: plain HTML, no script beyond the shared theme line (same bytes as index.html, so the CSP hash covers it). -->
+<main class="guide">
+  <header class="top"><a class="brand" href="/"><img src="/icons/logo.svg" width="84" height="38" alt="SCND home"></a><a class="guide-cta" href="/">Check my system</a></header>
+  <article class="card">
+  <h1>How to check a solar quote</h1>
+  <p class="lede">A quote usually promises a number of kWh a year. Before you sign, check that the panels on your roof can make it in the sun your town gets. SCND does that from the quote alone, with no bill needed.</p>
+
+  <h2>What to take from the quote</h2>
+  <ul>
+    <li><b>Panel size</b> in kWp (kilowatts peak), and the inverter size in kW.</li>
+    <li><b>Roof tilt and facing</b>: the angle of the panels and the direction they point.</li>
+    <li><b>Promised yield</b>: the kWh a year the installer expects. A kWh is the unit on your bill.</li>
+  </ul>
+
+  <h2>What SCND works out</h2>
+  <p>Enter the system in SCND and open "What this system should make in a typical year". It shows the kWh to expect each month at a performance ratio (PR) of 0.75, the level SCND calls healthy, using NASA POWER sun data for your location, tilt and facing. PR compares what panels make with what they would make if nothing were lost.</p>
+  <div class="eg"><p>Then type the promised kWh a year. SCND shows the PR that promise needs on your roof:</p>
+  <p>PR needed = promised kWh a year ÷ (panel size in kWp × sun on the panels in a year, in kWh per m²)</p></div>
+  <!-- Bands and limits: PR_BANDS.green 0.75 (Fred, 29 Sep 2026) and PR_PLAUSIBLE_MAX 0.90 (Fred, 1 Oct 2026), public/js/calc.js. -->
+  <ul>
+    <li><b>0.75 to 0.90:</b> a healthy system can make it in a typical year.</li>
+    <li><b>Below 0.75:</b> a careful promise. A healthy system should make more.</li>
+    <li><b>Above 0.90:</b> more than panels that size can make there, after heat, dust, wiring and the inverter take their share. Ask how it was worked out.</li>
+  </ul>
+
+  <h2>Questions to ask the installer</h2>
+  <ul>
+    <li>Which sun data was the yield based on, and for which town?</li>
+    <li>What losses were assumed for heat, dust, wiring, the inverter and any shade from walls, tanks or trees?</li>
+    <li>If the panels are much bigger than the inverter, how much does the inverter cap output on sunny days?</li>
+    <li>What yearly drop in output (degradation) does the panel warranty allow, and is it in the payback sum?</li>
+    <!-- Claim: export credit is paid at the generation charge, not the full retail rate. Sources: Lakasolar and Blueshift,
+         read 29 Sep 2026 (docs/SPEC.md "Problem and evidence"), the same as guide/net-metering-bill.html. -->
+    <li>Was the payback worked out with exports credited at the generation charge, which is what net metering pays, or at the full price you pay per kWh?</li>
+  </ul>
+  <p>Once the system is running, keep each bill and the solar kWh from the inverter app. SCND checks each month against the same typical year, and its findings sheet turns any gap into questions for the installer.</p>
+  <p class="guide-next"><a class="button primary" href="/">Check a quote in SCND</a></p>
+  <p class="help">SCND is free and runs in your browser. Your system details and bills stay on your device.</p>
+  </article>
+  <section class="sources"><h2>Sources</h2><ul><li><a href="https://power.larc.nasa.gov/docs/" rel="noopener noreferrer">NASA POWER data access</a></li><li><a href="https://lakasolar.ph/news/meralco-solar-rebate-vs-net-metering-philippines-2026" rel="noopener noreferrer">Lakasolar, Meralco solar rebate vs net metering (read 29 Sep 2026)</a></li><li><a href="https://blueshift.ph/articles/net-metering-philippines" rel="noopener noreferrer">Blueshift, net metering in the Philippines (September 2026 rates, read 29 Sep 2026)</a></li></ul></section>
+  <nav class="foot-guides" aria-label="Guides"><b>Guides:</b>
+    <a href="/guide/net-metering-bill">Why your bill is not zero</a>
+    <a href="/guide/app-vs-bill">App vs bill</a>
+    <a href="/guide/performance-ratio">What PR means</a>
+    <a href="/guide/method">How SCND works</a>
+    <a href="/guide/solar-quote-check">Check a solar quote</a>
+  </nav>
+  <p class="foot-sign"><img src="/icons/logo.svg" width="48" height="22" alt=""><span>Your second meter for rooftop solar. A personal project by Alfred Balaga.</span></p>
+</main>
+</body>
+</html>

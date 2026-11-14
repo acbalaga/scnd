@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { serialize, parse } from '../public/js/data.js';
+import { serialize, parse, keptText, restoreKept, STORAGE_KEY } from '../public/js/data.js';
 
 const setup = { lat: 14.6, lon: 121, kWp: 5.5, acKw: 5, tilt: 10, azimuth: 0, commissioned: '2025-06', hybrid: false, netMetering: true, cost: 300000, promisedYears: 6, place: 'Manila', junk: 'x' };
 const bills = [{ id: 7, start: '2026-01-15', end: '2026-02-14', inverterKwh: 560, importKwh: 300, exportKwh: 220, genRate: 9.7, varCharges: 3600, total: 2100, outageHours: '', extra: 'y' }];
@@ -54,4 +54,38 @@ test('parse opens a file saved before the charge unit existed as amounts, genera
   const r = parse(JSON.stringify(old));
   assert.equal(r.error, undefined);
   assert.equal(r.bills[0].chargeUnit, 'amount'); assert.equal(r.bills[0].genAmount, 2910); assert.equal(r.bills[0].varCharges, 3600);
+});
+
+// Ticket #43: the copy kept on the device.
+test('keep golden: the kept copy is the save-file text and restores to the same setup and bills', () => {
+  const setup = { lat: 14.6, lon: 121, kWp: 5.5, acKw: 5, tilt: 10, azimuth: 0, hybrid: false, netMetering: true, place: 'Manila' };
+  const bills = [{ start: '2026-09-01', end: '2026-10-01', inverterKwh: 600, importKwh: 300, exportKwh: 200, chargeUnit: 'amount', genAmount: 2910, varCharges: 3600 }];
+  const text = keptText({ setup, bills, example: false, savedOn: new Date('2026-11-14T00:00:00Z') });
+  assert.equal(STORAGE_KEY, 'scnd-data');
+  const r = restoreKept(text);
+  assert.equal(r.setup.place, 'Manila'); assert.equal(r.setup.kWp, 5.5); assert.equal(r.bills[0].inverterKwh, 600); assert.equal(r.bills[0].start, '2026-09-01');
+});
+test('keep edge: an example is never kept, and a damaged or hostile copy restores nothing', () => {
+  assert.equal(keptText({ setup: {}, bills: [], example: 'ongrid' }), null);
+  assert.equal(restoreKept(null), null); assert.equal(restoreKept(''), null); assert.equal(restoreKept('{not json'), null);
+  assert.equal(restoreKept(JSON.stringify({ format: 'scnd', version: 1, setup: { kWp: 'DROP TABLE' }, bills: [] })), null);
+});
+
+// Ticket #47: values no real system has are refused in a save file, and blanked in the copy kept on the device.
+test('parse edge: out-of-range setup and bill values are refused with a plain message', () => {
+  const file = (setup = {}, bill = {}) => JSON.stringify({ format: 'scnd', version: 1, setup: { lat: 14.6, lon: 121, kWp: 5, acKw: 5, tilt: 10, azimuth: 0, ...setup }, bills: [{ start: '2026-09-01', end: '2026-10-01', inverterKwh: 500, ...bill }] });
+  assert.equal(parse(file()).error, undefined);
+  assert.match(parse(file({ tilt: 95 })).error, /tilt.*0 to 90/);
+  assert.match(parse(file({ azimuth: 270 })).error, /facing/);
+  assert.match(parse(file({ lat: 40 })).error, /latitude/);
+  assert.match(parse(file({ lon: 100 })).error, /longitude/);
+  assert.match(parse(file({ kWp: 0 })).error, /above zero/);
+  assert.match(parse(file({ cost: -1 })).error, /zero or more/);
+  assert.match(parse(file({}, { exportKwh: -3 })).error, /Bill 1: "exportKwh" cannot be below zero/);
+  assert.equal(parse(file({ cost: '', kWp: '' })).error, undefined);   // blanks are fine
+});
+test('keep edge: an out-of-range value in the kept copy is blanked, the rest is kept', () => {
+  const text = JSON.stringify({ format: 'scnd', version: 1, setup: { lat: 14.6, lon: 121, kWp: 5, acKw: 5, tilt: 95, azimuth: 0 }, bills: [{ start: '2026-09-01', end: '2026-10-01', inverterKwh: 500, exportKwh: -3 }] });
+  const r = restoreKept(text);
+  assert.equal(r.setup.tilt, ''); assert.equal(r.setup.kWp, 5); assert.equal(r.bills[0].exportKwh, ''); assert.equal(r.bills[0].inverterKwh, 500);
 });

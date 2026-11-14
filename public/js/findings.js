@@ -1,9 +1,10 @@
 // Findings sheet (F3): turns the app's own results into questions to ask the installer.
 // Pure: no DOM. Never a verdict, and no installer names anywhere (none are stored).
-import { PR_BANDS } from './calc.js';
+import { PR_BANDS, PR_PLAUSIBLE_MAX, prTooHigh } from './calc.js';
 
-// PROPOSED, not yet confirmed by Fred: the degradation question goes on the sheet only from this many same-month
-// pairs. Monthly sun data is noisy (5 to 10%) against a yearly loss under 1%, so one or two pairs would raise false alarms.
+// The degradation question goes on the sheet only from this many same-month pairs (decided by Fred, 29 Sep 2026,
+// docs/NEXT.md task 7). Monthly sun data is noisy (5 to 10%) against a yearly loss under 1%, so one or two pairs would
+// raise false alarms.
 export const MIN_DEGRADATION_PAIRS = 6;
 
 // The payback question needs about a year of bills: a rainy-season start always reads behind, however large the gap.
@@ -14,6 +15,10 @@ export const PAYBACK_MIN_DAYS = 360;
 const f0 = (v) => Math.round(v).toLocaleString('en-PH');
 const f2 = (v) => v.toFixed(2);
 const peso = (v) => '₱' + Math.round(v).toLocaleString('en-PH');
+// Spread of the pair losses (calc.degradation, ticket #45), shown only when there is more than one pair.
+// Written as change in PR: a loss of 2% reads "down 2%", a gain reads "up".
+const pctChange = (loss) => `${loss >= 0 ? 'down' : 'up'} ${Math.abs(loss).toFixed(1)}%`;
+const spread = (d) => (d.pairs > 1 && Number.isFinite(d.minLossPct) && Number.isFinite(d.maxLossPct) ? ` (pairs range from ${pctChange(d.minLossPct)} to ${pctChange(d.maxLossPct)})` : '');
 // The app passes `period` in the same "1 Sep to 1 Oct 2026" style as the screen; raw dates are the fallback.
 const span = (b) => b.period ?? `${b.start} to ${b.end}`;
 
@@ -24,9 +29,10 @@ const span = (b) => b.period ?? `${b.start} to ${b.end}`;
 // payback: null, or { saved, promised, days } (pesos to date, days since the first reading date)
 // efficiency: null, or { baseline, latest, dropPoints, flagged } from calc.efficiencyDrop (fractions of 1)
 // degradation: null, or { annualLossPct, pairs, exceedsWarranty, warrantyPct } from calc.degradation
+// promise: null, or { kwhYear, impliedPr } (calc.impliedPr): the installer's promised yearly kWh (ticket #49)
 // creditLeftOut: pesos of export credit left out of savings by the variable-charges cap (calc.uncountedCredit), summed
 // Returns { items: [{ id, text }], requests: [text], uncertainty: [text], allClear: boolean, allGreen: boolean }.
-export function findings({ bills, payback, degradation = null, efficiency = null, creditLeftOut = 0 }) {
+export function findings({ bills, payback, degradation = null, efficiency = null, creditLeftOut = 0, promise = null }) {
   const items = [];
   const last = bills[bills.length - 1];
   const raised = [...bills].reverse().find((b) => b.redRaised);
@@ -63,7 +69,7 @@ export function findings({ bills, payback, degradation = null, efficiency = null
     items.push({ id: 'rte_drop', text: `Battery round-trip efficiency has been about ${Math.round(efficiency.dropPoints * 100)} points below the owner's first bills for two bills in a row (${Math.round(efficiency.baseline * 100)}% at the start, ${Math.round(efficiency.latest * 100)}% now). Has the battery or BMS firmware changed? Are there battery fault codes or temperature warnings? Is a round-trip efficiency stated in the battery warranty?` });
   }
   if (degradation && degradation.exceedsWarranty && degradation.pairs >= MIN_DEGRADATION_PAIRS) {
-    items.push({ id: 'degradation', text: `Weather-adjusted PR is down about ${degradation.annualLossPct.toFixed(1)}% a year over ${degradation.pairs} same-month pair${degradation.pairs === 1 ? '' : 's'}, against a module warranty of ${degradation.warrantyPct}% a year. Monthly weather noise is large next to a yearly loss, so treat this as a reason to keep tracking. How does the installer measure degradation (IV curve, flash test)? What does the warranty require as evidence?` });
+    items.push({ id: 'degradation', text: `Weather-adjusted PR is down about ${degradation.annualLossPct.toFixed(1)}% a year over ${degradation.pairs} same-month pair${degradation.pairs === 1 ? '' : 's'}${spread(degradation)}, against a module warranty of ${degradation.warrantyPct}% a year. Monthly weather noise is large next to a yearly loss, so treat this as a reason to keep tracking. How does the installer measure degradation (IV curve, flash test)? What does the warranty require as evidence?` });
   }
   const behind = payback && payback.promised > 0 && payback.saved < payback.promised ? 1 - payback.saved / payback.promised : 0;
   const paybackRaised = behind > 0 && payback.days >= PAYBACK_MIN_DAYS;
@@ -73,6 +79,11 @@ export function findings({ bills, payback, degradation = null, efficiency = null
   if (paybackRaised) {
     const gap = Math.round(behind * 100);
     items.push({ id: 'payback', text: `Savings so far are ${peso(payback.saved)} against ${peso(payback.promised)} at the promised payback pace (${gap}% behind).${creditNote} How was the promised payback worked out? Was the export credit assumed at the utility's generation charge or at the full retail rate? What rate increases were assumed?` });
+  }
+
+  // Ticket #49 (Fred, 14 Nov 2026): a promise that needs more than panels can make here is a question, never a verdict.
+  if (promise && prTooHigh(promise.impliedPr)) {
+    items.push({ id: 'promise', text: `The promised yield of ${f0(promise.kwhYear)} kWh a year works out at a PR of ${f2(promise.impliedPr)} for this system's size, tilt, facing and location, above the ${f2(PR_PLAUSIBLE_MAX)} panels reach in practice. Which sun data and which losses (heat, dust, wiring, inverter) was the promise based on?` });
   }
 
   const requests = [
@@ -87,7 +98,7 @@ export function findings({ bills, payback, degradation = null, efficiency = null
   // Early degradation readings are shown for awareness, not action: too few pairs to be a finding.
   if (degradation && degradation.pairs < MIN_DEGRADATION_PAIRS) {
     const dir = degradation.annualLossPct >= 0 ? 'down' : 'up';
-    uncertainty.push(`Year-over-year check so far: weather-adjusted PR is about ${Math.abs(degradation.annualLossPct).toFixed(1)}% ${dir} a year over ${degradation.pairs} same-month pair${degradation.pairs === 1 ? '' : 's'}. That is too few months to act on, because monthly sun data is noisy. It is shown so you know it is being tracked.`);
+    uncertainty.push(`Year-over-year check so far: weather-adjusted PR is about ${Math.abs(degradation.annualLossPct).toFixed(1)}% ${dir} a year over ${degradation.pairs} same-month pair${degradation.pairs === 1 ? '' : 's'}${spread(degradation)}. That is too few months to act on, because monthly sun data is noisy. It is shown so you know it is being tracked.`);
   }
   if (behind > 0 && !paybackRaised) {
     uncertainty.push(`Savings so far are ${Math.round(behind * 100)}% behind the promised payback pace, over ${Math.round(payback.days)} days. Savings swing with the seasons, so this is not raised as a question until there is about a year of bills.${creditNote}`);

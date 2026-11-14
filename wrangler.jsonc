@@ -1,35 +1,20 @@
 {
-  // SCND: static assets, with the Worker in src/worker.js running first on the page itself so it can rate-limit
-  // and set the security headers. Static files (scripts, styles, fonts, icons, data) skip the Worker: they are
-  // free and unlimited, while every Worker request counts against the Free plan's 100,000 a day. With the Worker
-  // first on every file, one visit cost about 14 Worker requests, so about 7,000 visits a day would hit the cap
-  // and the Free plan then answers 429 to everything. See docs/RATE-LIMITING.md and public/_headers.
+  // SCND: static assets only. Cloudflare serves public/ straight from its asset server; no Worker script runs (ticket #37,
+  // Fred, 14 Nov 2026). Static asset requests are free and unlimited, so there is no daily request cap to run out of.
+  // Security headers, the CSP included, come from public/_headers. The old Worker (rate limiter and headers) is in git
+  // history, last at commit fb8fc5a. A Worker may come back only to proxy a public data source (CLAUDE.md rule 2).
   "name": "scnd",
-  "main": "src/worker.js",
   "compatibility_date": "2026-09-01",
   "assets": {
     "directory": "./public",
-    "binding": "ASSETS",
     // Unknown paths get public/404.html (status 404) instead of an empty body (audit M-6).
-    "not_found_handling": "404-page",
-    // "!/..." patterns go straight to the asset server. test/worker.test.mjs fails if a file under public/ other
-    // than the pages (app, 404, guide/*.html) is left on the Worker path.
-    "run_worker_first": ["/*", "!/js/*", "!/vendor/*", "!/fonts/*", "!/icons/*", "!/data/*", "!/assets/*", "!/app.css", "!/manifest.webmanifest", "!/sitemap.xml"]
+    "not_found_handling": "404-page"
   },
-  // 100 requests per 10 seconds per visitor, counted on page requests only (static files skip the Worker). The limit is loose on purpose:
-  // many Philippine mobile users share one public IP behind carrier-grade NAT.
-  "ratelimits": [
-    {
-      "name": "LIMITER",
-      "namespace_id": "1001",
-      "simple": { "limit": 100, "period": 10 }
-    }
-  ],
   // Per-version preview URLs off now that the site is live on myscnd.app (Fred, 2 Oct 2026). Preview URLs bypass
   // the custom domain and are an extra public surface.
   "preview_urls": false,
-  // The scnd.<account>.workers.dev address is off: beta ends and the site lives on myscnd.app (Fred, 2 Oct 2026).
-  // Beta testers must use myscnd.app. To bring workers.dev back, remove this line (the default is on).
+  // The scnd.<account>.workers.dev address is off: beta ended and the site lives on myscnd.app (Fred, 2 Oct 2026).
+  // To bring workers.dev back, remove this line (the default is on).
   "workers_dev": false,
   // Production custom domain, bought in Cloudflare 2 Oct 2026. Cloudflare creates the DNS record and certificate.
   // See docs/CUSTOM-DOMAIN.md.

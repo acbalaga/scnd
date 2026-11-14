@@ -66,7 +66,7 @@ test('html: the footer says who runs SCND and where a data question goes', () =>
 });
 
 // Guide pages (Reach batch, 31 Oct 2026): plain HTML for search and sharing. No script beyond the theme line, which
-// must be byte-identical to index.html's so the CSP hash in src/headers.js covers it.
+// must be byte-identical to index.html's so the CSP hash in public/_headers covers it.
 import { readdirSync } from 'node:fs';
 const guideDir = new URL('../public/guide/', import.meta.url);
 const guides = readdirSync(guideDir).filter((f) => f.endsWith('.html'));
@@ -91,4 +91,27 @@ test('guides: sitemap and footer links point at files we ship', () => {
   const linked = [...html.matchAll(/href="(\/guide\/[^"]+)"/g)].map((m) => m[1]);
   for (const p of [...locs.filter((x) => x !== '/'), ...linked]) assert.ok(existsSync(new URL('../public' + p + '.html', import.meta.url)), p);
   assert.equal(locs.length, guides.length + 1);
+});
+
+// Ticket #46: Alpine's CSP build parses template expressions without eval and refuses x-html, arrow functions, `delete`,
+// `if` statements, optional chaining, several statements in one handler, writes to DOM properties and globals such as
+// Math. Put that logic in a component method instead. A test here is cheaper than finding it in the browser console.
+test('templates use only expressions the Alpine CSP build can run', () => {
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
+  assert.doesNotMatch(html, /\sx-html=/, 'x-html: use paintSvg($el, markup) via x-effect');
+  const exprs = [...html.matchAll(/\s((?:x-[\w:.-]+|@[\w.:-]+|:[\w.-]+))="([^"]*)"/g)].map((m) => [m[1], m[2]]);
+  const quoted = /'(?:[^'\\]|\\.)*'/g;   // ignore what sits inside string literals
+  for (const [name, expr] of exprs) {
+    const code = expr.replace(quoted, "''");
+    for (const [bad, why] of [[/=>/, 'arrow function'], [/\bdelete\b/, 'delete'], [/\bif\s*\(/, 'if statement'], [/\?\./, 'optional chaining'],
+      [/;/, 'more than one statement'], [/\bMath\./, 'global Math'], [/\$el\.[\w]+\s*=(?!=)/, 'write to a DOM property'], [/`/, 'template literal']]) {
+      assert.doesNotMatch(code, bad, `${name}="${expr.slice(0, 80)}": ${why}`);
+    }
+  }
+});
+
+// Ticket #55: the README said "94 tests" long after the count moved on. A count goes stale with every ticket, so it is not stated.
+test('README does not state a test count', () => {
+  const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+  assert.doesNotMatch(readme, /\b\d+ tests\b/);
 });

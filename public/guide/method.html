@@ -33,8 +33,10 @@
 
   <h2>Typical-year sun</h2>
   <!-- Facts: docs/SPEC.md "Calculation method" and "Spike 2 result" (29 Sep 2026); docs/NEXT.md tasks 1 and 2. -->
-  <p>Monthly global and diffuse horizontal irradiation come from NASA POWER climatology (2001 to 2020) on a 0.5° grid over the Philippines (748 cells), interpolated to the owner's location rounded to 0.1°. Each month's mean day is integrated hour by hour (Collares-Pereira and Rabl for global, Liu-Jordan for diffuse), isotropic sky, ground albedo 0.2, for the panel tilt and facing. The transposition matches pvlib within 0.07% on eight reference cases. That check shares the hourly apportioning method, so it validates geometry and transposition, not the apportioning model.</p>
-  <p>Against Global Solar Atlas, NASA POWER is within about ±5% in the wet season and reads up to about 8% low in the dry season. In Manila it reads 3.9% high on the annual mean, so PR there can show about 4% low, and SCND says so on screen and on the sheet.</p>
+  <p>Monthly global and diffuse horizontal irradiation come from NASA POWER climatology (2001 to 2025, as NASA labels it) on a 0.5° grid over the Philippines (748 cells), interpolated to the owner's location rounded to 0.1°. Each month's mean day is integrated hour by hour (Collares-Pereira and Rabl for global, Liu-Jordan for diffuse), isotropic sky, ground albedo 0.2, for the panel tilt and facing. The transposition matches pvlib within 0.07% on eight reference cases. That check shares the hourly apportioning method, so it validates geometry and transposition, not the apportioning model.</p>
+  <!-- Ticket #54 (Fred, 14 Nov 2026: keep the isotropic sky). Figures: docs/POA-CHECK.md, pvlib 0.16.1 reference. -->
+  <p>A second check uses a reference that shares none of that method: every day of the month, clear-sky hourly shapes, the Erbs beam and diffuse split, and the Perez sky model. The apportioning holds (within 0.4% at 10° tilt). The isotropic sky reads the sun on south-facing panels 2 to 3.4% low at 10° tilt from October to January, and more on steeper roofs, so PR there can read about 3% high in those months. East and west faces are within 1.5%. SCND keeps the isotropic model: the effect runs opposite to NASA POWER's dry-season low bias, so the two partly cancel, and the bands were set with the model as it is.</p>
+  <p>Against Global Solar Atlas, NASA POWER is within about ±5% in the wet season and reads up to about 8% low in the dry season. Metro Manila sits on the edge between two of NASA's 1° cells, a sunnier one over Manila Bay and an inland one. SCND uses the inland cell there, which agrees with Global Solar Atlas within 5% in every month.</p>
 
   <h2>Performance ratio and bands</h2>
   <p>PR = inverter kWh ÷ (kWp × plane-of-array irradiation), with bill periods split across calendar months by days. Hybrids use PV yield, not inverter AC output, so battery losses do not read as a PV fault. Green is 0.75 or more. Amber runs down to 0.65 (June to October) or 0.62 (November to May, wider because of the dry-season bias). Red is below that, and a red flag is raised only after two consecutive bills. PR above 0.90 or below 0.30 reads "check numbers", never green or red.</p>
@@ -65,12 +67,16 @@
   <p class="guide-next"><a class="button primary" href="/">Check your own system in SCND</a></p>
   <p class="help">SCND is free and runs in your browser. Your bills and kWh stay on your device.</p>
   </article>
-  <section class="sources"><h2>Sources</h2><ul><li><a href="https://power.larc.nasa.gov/docs/" rel="noopener noreferrer">NASA POWER data access</a></li><li><a href="https://open-meteo.com/en/features" rel="noopener noreferrer">Open-Meteo features (satellite radiation, non-commercial use)</a></li></ul></section>
+  <!-- Data credits (Fred, 14 Nov 2026, docs/WEATHER-PROXY.md finding 8). NASA POWER wording: power.larc.nasa.gov/docs/referencing,
+       read 14 Nov 2026. Open-Meteo: data under CC BY 4.0 with the credit "Weather data by Open-Meteo.com", written from
+       memory because this sandbox could not open open-meteo.com; check it against open-meteo.com/en/licence. -->
+  <section class="sources"><h2>Sources</h2><ul><li><a href="https://power.larc.nasa.gov/docs/" rel="noopener noreferrer">NASA POWER data access</a></li><li><a href="https://open-meteo.com/en/features" rel="noopener noreferrer">Open-Meteo features (satellite radiation, non-commercial use)</a></li></ul><p class="help">Data credits: the sun data was obtained from National Aeronautics and Space Administration (NASA) Langley Research Center's Prediction Of Worldwide Energy Resources (POWER) project funded through the NASA Earth Science Division. Weather data by <a href="https://open-meteo.com/" rel="noopener noreferrer">Open-Meteo.com</a>, licensed <a href="https://creativecommons.org/licenses/by/4.0/" rel="noopener noreferrer">CC BY 4.0</a>, from the Himawari satellite.</p></section>
   <nav class="foot-guides" aria-label="Guides"><b>Guides:</b>
     <a href="/guide/net-metering-bill">Why your bill is not zero</a>
     <a href="/guide/app-vs-bill">App vs bill</a>
     <a href="/guide/performance-ratio">What PR means</a>
     <a href="/guide/method">How SCND works</a>
+    <a href="/guide/solar-quote-check">Check a solar quote</a>
   </nav>
   <p class="foot-sign"><img src="/icons/logo.svg" width="48" height="22" alt=""><span>Your second meter for rooftop solar. A personal project by Alfred Balaga.</span></p>
 </main>

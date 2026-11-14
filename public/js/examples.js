@@ -17,14 +17,14 @@ export const EXAMPLES = {
   // Quick look: an on-grid Manila system, two bills, the second a little low.
   ongrid: {
     place: 'Manila',
-    setup: { lat: 14.6, lon: 121, kWp: 5.5, acKw: 5, tilt: 10, azimuth: 0, commissioned: '', hybrid: false, netMetering: true, cost: '', promisedYears: '', warrantyPct: '', batteryCost: '' },
+    setup: { lat: 14.6, lon: 121, kWp: 5.5, acKw: 5, tilt: 10, azimuth: 0, commissioned: '', hybrid: false, netMetering: true, cost: '', promisedYears: '', warrantyPct: '', batteryCost: '', promisedKwhYear: '' },
   },
   // Everything at once: a Cebu hybrid over 14 months, with costs, payback promise and warranty filled in. The battery
   // gives back about 92% at first and about 84% in the last two bills, which raises the efficiency-drop question
   // (calc.efficiencyDrop: 5 points below the first three bills, two bills running).
   hybrid: {
     place: 'Cebu',
-    setup: { lat: 10.3, lon: 123.9, kWp: 6, acKw: 5, tilt: 10, azimuth: 0, commissioned: '', hybrid: true, netMetering: true, cost: 620000, promisedYears: 6, warrantyPct: 0.55, batteryCost: 210000 },
+    setup: { lat: 10.3, lon: 123.9, kWp: 6, acKw: 5, tilt: 10, azimuth: 0, commissioned: '', hybrid: true, netMetering: true, cost: 620000, promisedYears: 6, warrantyPct: 0.55, batteryCost: 210000, promisedKwhYear: '' },
   },
 };
 

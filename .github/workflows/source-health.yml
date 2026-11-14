@@ -1,0 +1,39 @@
+# Monthly weather-source check (ticket #48, Fred, 14 Nov 2026). Runs scripts/source-health.mjs, which calls Open-Meteo and
+# NASA POWER for the public city points only (no user data), and opens a pull request with public/data/source-status.json
+# for Fred to merge. Fails if a source answered for no city. Needs, once, in GitHub: Settings > Actions > General >
+# Workflow permissions > "Allow GitHub Actions to create and approve pull requests".
+name: source-health
+on:
+  schedule:
+    - cron: '17 3 2 * *'   # 03:17 UTC on the 2nd of each month (11:17 in the Philippines)
+  workflow_dispatch:
+permissions:
+  contents: write
+  pull-requests: write
+concurrency: source-health
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - run: node scripts/source-health.mjs
+      - run: node --test
+      - name: Open a pull request if the status changed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --quiet -- public/data/source-status.json; then echo "No change."; exit 0; fi
+          branch="source-health/$(date -u +%Y-%m)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git add public/data/source-status.json
+          git commit -m "Update weather-source status for $(date -u +%B\ %Y)"
+          git push -u origin "$branch" --force
+          gh pr create --base main --head "$branch" \
+            --title "Weather-source status, $(date -u +%B\ %Y)" \
+            --body "Monthly check of the satellite and NASA POWER data at the 17 city points (scripts/source-health.mjs). Merge to update what the app says before a weather check."

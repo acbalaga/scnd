@@ -142,6 +142,26 @@ test('judgedPr edge: no call or an uncertain one stays on the typical year; bad 
   assert.equal(c.judgedPr({ pr: 0.58, expectedKwh: 600, call: { wi: 0.75, uncertain: true } }).basis, 'typical');
   assert.ok(c.isError(c.judgedPr({ pr: NaN, expectedKwh: 600, call: null })));
 });
+// Ticket #40 (Fred, 14 Nov 2026): a one-source (inferred) index may clear a low month but may not make one. Manila had
+// almost no satellite data in 2026, and NASA POWER alone gave indices up to 1.20, which turns a healthy 0.78 into 0.65.
+test('judgedPr edge: an inferred index that would lower the band is not used', () => {
+  const r = c.judgedPr({ pr: 0.78, expectedKwh: 600, month: 8, call: { wi: 1.25, uncertain: false, inferred: true } });
+  assert.equal(r.basis, 'typical'); assert.equal(r.inferredRejected, true); near(r.pr, 0.78); near(r.expectedKwh, 600); near(r.prWeather, 0.78 / 1.25);
+  // amber to red is a lower band too (dry season: amber floor 0.62)
+  const a = c.judgedPr({ pr: 0.66, expectedKwh: 600, month: 1, call: { wi: 1.10, uncertain: false, inferred: true } });
+  assert.equal(a.basis, 'typical'); assert.equal(a.inferredRejected, true);
+});
+test('judgedPr golden: an inferred index may lift a band or keep it, and a cross-checked one may lower it', () => {
+  const up = c.judgedPr({ pr: 0.58, expectedKwh: 600, month: 8, call: { wi: 0.8, uncertain: false, inferred: true } });
+  assert.equal(up.basis, 'weather'); near(up.pr, 0.725); assert.equal(up.inferredRejected, undefined);
+  const same = c.judgedPr({ pr: 0.85, expectedKwh: 600, month: 8, call: { wi: 1.05, uncertain: false, inferred: true } });
+  assert.equal(same.basis, 'weather'); near(same.pr, 0.85 / 1.05);
+  const both = c.judgedPr({ pr: 0.78, expectedKwh: 600, month: 8, call: { wi: 1.25, uncertain: false, inferred: false } });
+  assert.equal(both.basis, 'weather'); near(both.pr, 0.624);
+});
+test('judgedPr edge: an inferred call needs the month to compare bands', () => {
+  assert.ok(c.isError(c.judgedPr({ pr: 0.78, expectedKwh: 600, call: { wi: 1.25, uncertain: false, inferred: true } })));
+});
 test('judgedPr edge: a weather index that lifts a plausible PR above 0.90 is rejected for the typical year', () => {
   // The example's August bill: PR 0.79 against a typical year, NASA-only index 0.657 -> 1.20.
   const r = c.judgedPr({ pr: 0.79, expectedKwh: 556, call: { wi: 0.657, uncertain: false } });
@@ -254,6 +274,23 @@ test('degradation edge: null under 13 months, error on bad pr', () => {
   assert.equal(c.degradation(months(2025, 0.8)), null);
   assert.ok(c.isError(c.degradation([{ year: 2025, month: 1, pr: 0 }])));
 });
+// Ticket #45 (Fred, 14 Nov 2026). Two bills whose midpoints fall in the same month used to overwrite each other.
+test('degradation edge: bills in the same month are averaged by days, not dropped', () => {
+  const r = c.degradation([{ year: 2025, month: 3, pr: 0.80 }, { year: 2026, month: 3, pr: 0.60, days: 10 }, { year: 2026, month: 3, pr: 0.80, days: 30 }, { year: 2026, month: 4, pr: 0.8 }]);
+  // March 2026 = (0.60 x 10 + 0.80 x 30) / 40 = 0.75, against 0.80 a year earlier: 6.25% down.
+  assert.equal(r.pairs, 1); assert.ok(Math.abs(r.annualLossPct - 6.25) < 1e-9);
+});
+test('degradation edge: a pair needs both months from the same weather source', () => {
+  const recs = [{ year: 2025, month: 1, pr: 0.80, source: 'both' }, { year: 2025, month: 2, pr: 0.80, source: 'nasa' }, { year: 2025, month: 3, pr: 0.80, source: 'nasa' },
+    { year: 2026, month: 1, pr: 0.79, source: 'both' }, { year: 2026, month: 2, pr: 0.70, source: 'both' }, { year: 2026, month: 3, pr: 0.79, source: 'nasa' }];
+  const r = c.degradation(recs);
+  assert.equal(r.pairs, 2);   // January (both, both) and March (nasa, nasa); February mixes sources and is skipped
+  assert.ok(Math.abs(r.annualLossPct - 1.25) < 1e-9);
+});
+test('degradation golden: the spread of the pair losses is returned', () => {
+  const r = c.degradation([...months(2025, 0.8), { year: 2026, month: 1, pr: 0.78 }, { year: 2026, month: 2, pr: 0.80 }, { year: 2026, month: 3, pr: 0.784 }]);
+  assert.equal(r.pairs, 3); assert.ok(Math.abs(r.minLossPct - 0) < 1e-9); assert.ok(Math.abs(r.maxLossPct - 2.5) < 1e-9);
+});
 test('degradation edge: loss above warranty is flagged', () => {
   const r = c.degradation([...months(2025, 0.8), { year: 2026, month: 1, pr: 0.78 }], 1.0);
   near(r.annualLossPct, 2.5); assert.equal(r.exceedsWarranty, true);
@@ -345,8 +382,26 @@ test('prTooLow golden (M-8): below 0.30 points at a wrong figure; 0.30 itself an
   assert.equal(c.prTooLow(0.29), true); assert.equal(c.prTooLow(0), true);
   assert.equal(c.prTooLow(0.30), false); assert.equal(c.prTooLow(0.55), false); assert.equal(c.prTooLow(NaN), false);
 });
-test('nearManila golden (M-4): Manila and Quezon City are inside the checked area; Cebu and Baguio are not', () => {
-  assert.equal(c.nearManila(14.6, 121.0), true); assert.equal(c.nearManila(14.7, 121.0), true);
-  assert.equal(c.nearManila(10.3, 123.9), false); assert.equal(c.nearManila(16.4, 120.6), false);
-  assert.equal(c.nearManila('', ''), false);
+
+// ---- Quote check (ticket #49) ----
+test('expectedYear golden: monthly table at PR 0.75 matches poaPeriod for whole calendar months', () => {
+  const ghi = [4.8, 5.4, 6.1, 6.5, 6.0, 5.2, 4.9, 4.8, 4.9, 4.8, 4.6, 4.3], dif = ghi.map((g) => g * 0.42);
+  const y = c.expectedYear({ kWp: 5, tilt: 10, azimuth: 0, lat: 10.3, ghi, dif });
+  assert.equal(y.months.length, 12);
+  const mar = c.poaPeriod({ ghi, dif, tilt: 10, azimuth: 0, lat: 10.3, start: '2026-03-01', end: '2026-04-01' });
+  near(y.months[2].hPoa, mar.hPoa, 1e-9); near(y.months[2].expectedKwh, 5 * mar.hPoa * 0.75, 1e-9);
+  near(y.months[2].lowKwh, 5 * mar.hPoa * c.PR_BANDS.amberDry, 1e-9); near(y.months[6].lowKwh, 5 * y.months[6].hPoa * c.PR_BANDS.amberWet, 1e-9);
+  near(y.totalKwh, y.months.reduce((t, m) => t + m.expectedKwh, 0), 1e-9); near(y.specificYield, y.totalKwh / 5, 1e-9);
+});
+test('expectedYear edge: flat panels get GHI, and bad input is an error', () => {
+  const ghi = Array(12).fill(5), dif = Array(12).fill(2), y = c.expectedYear({ kWp: 1, tilt: 0, azimuth: 0, lat: 14.6, ghi, dif });
+  const days = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  y.months.forEach((m, k) => near(m.hPoa / (5 * days[k]), 1, 0.001));
+  assert.ok(c.isError(c.expectedYear({ kWp: 0, tilt: 10, azimuth: 0, lat: 14.6, ghi, dif })));
+  assert.ok(c.isError(c.expectedYear({ kWp: 5, tilt: 10, azimuth: 0, lat: 14.6, ghi: [1], dif })));
+});
+test('impliedPr golden and edge: promised kWh over the sun the panels get', () => {
+  near(c.impliedPr({ promisedKwhYear: 7500, kWp: 5, hPoaYear: 2000 }), 0.75);
+  assert.ok(c.prTooHigh(c.impliedPr({ promisedKwhYear: 9500, kWp: 5, hPoaYear: 2000 })));
+  assert.ok(c.isError(c.impliedPr({ promisedKwhYear: 0, kWp: 5, hPoaYear: 2000 })));
 });

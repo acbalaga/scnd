@@ -100,6 +100,33 @@ export function poaPeriod({ ghi, dif, tilt, azimuth, lat, start, end }) {
   return { hPoa, days, midMonth: mid.getUTCMonth() + 1, midYear: mid.getUTCFullYear() };
 }
 
+// ---------- Quote check: a typical year for this roof (ticket #49, Fred, 14 Nov 2026) ----------
+
+// Expected energy in each calendar month of a typical year at PR_BANDS.green, and the lower limit for that season's
+// amber band, from the 12 monthly means. Lets an owner with no bill yet (or a buyer comparing quotes) see what panels
+// this size should make here. Returns { months: [{ month, hPoa, expectedKwh, lowKwh }], hPoaYear, totalKwh, lowKwh,
+// specificYield } with specificYield in kWh per kWp per year. Feb is 28 days, as in poaMonth.
+export function expectedYear({ kWp, tilt, azimuth, lat, ghi, dif }) {
+  if (!Number.isFinite(kWp) || kWp <= 0 || !Array.isArray(ghi) || !Array.isArray(dif) || ghi.length !== 12 || dif.length !== 12) return err('bad_input', 'Need kWp > 0 and 12 monthly ghi and dif values.');
+  const months = [];
+  for (let m = 1; m <= 12; m++) {
+    const h = poaMonth({ ghi: ghi[m - 1], dif: dif[m - 1], tilt, azimuth, lat, month: m });
+    if (isError(h)) return h;
+    const floor = isDrySeason(m) ? PR_BANDS.amberDry : PR_BANDS.amberWet;
+    months.push({ month: m, hPoa: h, expectedKwh: kWp * h * PR_BANDS.green, lowKwh: kWp * h * floor });
+  }
+  const sum = (k) => months.reduce((t, x) => t + x[k], 0);
+  const totalKwh = sum('expectedKwh');
+  return { months, hPoaYear: sum('hPoa'), totalKwh, lowKwh: sum('lowKwh'), specificYield: totalKwh / kWp };
+}
+
+// The PR an installer's promised yearly kWh implies for this roof and location: promised / (kWp x yearly POA sun).
+// Compare with PR_PLAUSIBLE_MAX: above it, the promise is more than panels this size can make here.
+export function impliedPr({ promisedKwhYear, kWp, hPoaYear }) {
+  if (![promisedKwhYear, kWp, hPoaYear].every(Number.isFinite) || promisedKwhYear <= 0 || kWp <= 0 || hPoaYear <= 0) return err('bad_input', 'Need promised kWh, kWp and yearly sun above zero.');
+  return promisedKwhYear / (kWp * hPoaYear);
+}
+
 // ---------- F1: performance ratio and bands ----------
 
 // PR = E_inverter / (kWp x H_POA). Use PV yield, not inverter AC output, for hybrids (F9).
@@ -129,8 +156,10 @@ export function prBand(pr, month) {
 
 // Which PR a bill is judged on (Fred, 30 Sep 2026, docs/NEXT.md task 11). Once the weather check gives a call that
 // is not "uncertain", the bill is judged on weather-adjusted PR, so a cloudy month does not read as a fault. With no
-// call, or an uncertain one, it stays against a typical year. An inferred call (one source) is used: it is labelled.
-// pr and expectedKwh are the typical-year values; call is weatherCall's result or null.
+// call, or an uncertain one, it stays against a typical year. An inferred call (one source) is used only where it does not
+// lower the bill's band (see INFERRED_RULE below).
+// pr and expectedKwh are the typical-year values; call is weatherCall's result or null; month (1 to 12, the bill's
+// midpoint) picks the season's bands and is needed when the call is inferred.
 // Returns { pr, expectedKwh, basis: 'weather' | 'typical' }. Adjusted PR = pr / WI (same as PR on H_POA x WI).
 // A PR above this is more than panels can make in practice (heat, wiring, inverter and soiling losses always apply),
 // so it points at a wrong input: dates, kWh, panel size, or the weather data. Decided by Fred, 1 Oct 2026.
@@ -142,24 +171,24 @@ export const prTooHigh = (pr) => Number.isFinite(pr) && pr > PR_PLAUSIBLE_MAX;
 export const PR_PLAUSIBLE_MIN = 0.30;
 export const prTooLow = (pr) => Number.isFinite(pr) && pr < PR_PLAUSIBLE_MIN;
 
-// Typical-year sun reads +3.9% high around Manila against Global Solar Atlas (docs/NEXT.md task 1 check), so PR
-// reads about 4% low there. Only Manila was checked against GSA, so the note covers the 0.5 degree grid cells around
-// it. Disclosed, not corrected: Fred, 31 Oct 2026 (pre-launch audit M-4). Bands and sun data are unchanged.
-export const MANILA_BIAS = { lat: 14.6, lon: 121.0, radiusDeg: 0.5, pct: 3.9 };
-export function nearManila(lat, lon) {
-  const y = Number(lat), x = Number(lon);
-  if (lat === '' || lon === '' || !Number.isFinite(y) || !Number.isFinite(x)) return false;
-  return Math.abs(y - MANILA_BIAS.lat) <= MANILA_BIAS.radiusDeg && Math.abs(x - MANILA_BIAS.lon) <= MANILA_BIAS.radiusDeg;
-}
-
 // When the weather adjustment alone lifts PR above PR_PLAUSIBLE_MAX (the typical-year PR is plausible), the weather
 // index is the suspect, not the owner's numbers: judge on the typical year and say why (weatherRejected, prWeather).
 // Seen with real data: Manila, Aug 2026, NASA POWER alone (satellite gap) gave an index of 0.66. Fred, 1 Oct 2026.
-export function judgedPr({ pr, expectedKwh, call }) {
+// INFERRED_RULE (ticket #40, Fred, 14 Nov 2026): an index from one source with no cross-check may clear a low month (a
+// cloudy stretch explains it) but may not make a month read worse than its typical-year band. When it would, the bill
+// stays on the typical year and says why (inferredRejected, prWeather). Manila had almost no satellite data from January
+// to October 2026, and NASA POWER alone gave indices up to 1.20, which turns a healthy 0.78 into 0.65.
+const BAND_RANK = { red: 0, amber: 1, green: 2 };
+const bandRank = (pr, month) => (prTooLow(pr) ? -1 : BAND_RANK[prBand(pr, month)]);
+export function judgedPr({ pr, expectedKwh, call, month }) {
   if (!Number.isFinite(pr) || !Number.isFinite(expectedKwh)) return err('bad_input', 'Need a numeric PR and expected energy.');
   if (!call || call.uncertain || !Number.isFinite(call.wi) || call.wi <= 0) return { pr, expectedKwh, basis: 'typical' };
   const adjusted = pr / call.wi;
   if (prTooHigh(adjusted) && !prTooHigh(pr)) return { pr, expectedKwh, basis: 'typical', weatherRejected: true, prWeather: adjusted };
+  if (call.inferred) {
+    if (!(Number.isInteger(month) && month >= 1 && month <= 12)) return err('bad_input', 'An inferred weather call needs the month 1 to 12.');
+    if (bandRank(adjusted, month) < bandRank(pr, month)) return { pr, expectedKwh, basis: 'typical', inferredRejected: true, prWeather: adjusted };
+  }
   return { pr: adjusted, expectedKwh: expectedKwh * call.wi, basis: 'weather' };
 }
 
@@ -373,20 +402,37 @@ export function loadShiftValue({ rImport, rExport }) {
 
 // ---------- F8: degradation ----------
 
-// records: [{ year, month, pr }] where pr is weather-normalised (computed on actual-month POA).
+// records: [{ year, month, pr, days?, source? }] where pr is weather-normalised (computed on actual-month POA).
 // Averages the year-over-year loss for each calendar month that has a twin 12 months earlier.
 // Returns null until the records span 13 months. warrantyPctPerYear is optional.
+// Ticket #45 (Fred, 14 Nov 2026):
+//  - Records in the same month (28-day cycles, a short bill after a meter change) are averaged, weighted by days, instead
+//    of the later one silently replacing the earlier.
+//  - A pair counts only when both months came from the same weather source ('both' = cross-checked, or one source
+//    alone), so a switch between sources is not read as degradation. A month that mixes sources pairs with nothing.
+//    Records without a source pair freely.
+//  - minLossPct and maxLossPct give the spread of the pair losses: one month's sun data carries 5 to 10% noise.
 export function degradation(records, warrantyPctPerYear) {
   if (!Array.isArray(records) || records.some((r) => !Number.isFinite(r.pr) || r.pr <= 0)) return err('bad_input', 'Need records with pr > 0.');
   const idx = (r) => r.year * 12 + (r.month - 1);
-  const byIdx = new Map(records.map((r) => [idx(r), r.pr]));
+  const byIdx = new Map();
+  for (const r of records) {
+    const w = Number.isFinite(r.days) && r.days > 0 ? r.days : 1, k = idx(r), m = byIdx.get(k);
+    if (!m) byIdx.set(k, { sum: r.pr * w, w, source: r.source });
+    else { m.sum += r.pr * w; m.w += w; if (m.source !== r.source) m.source = 'mixed'; }
+  }
   const keys = [...byIdx.keys()];
   if (keys.length === 0 || Math.max(...keys) - Math.min(...keys) < 12) return null;
   const losses = [];
-  for (const [k, pr] of byIdx) if (byIdx.has(k - 12)) losses.push((1 - pr / byIdx.get(k - 12)) * 100);
+  for (const [k, m] of byIdx) {
+    const prev = byIdx.get(k - 12);
+    if (!prev || m.source === 'mixed' || prev.source !== m.source) continue;
+    losses.push((1 - m.sum / m.w / (prev.sum / prev.w)) * 100);
+  }
   if (losses.length === 0) return null;
   const annualLossPct = losses.reduce((s, v) => s + v, 0) / losses.length;
-  return { annualLossPct, pairs: losses.length, exceedsWarranty: Number.isFinite(warrantyPctPerYear) ? annualLossPct > warrantyPctPerYear : null };
+  return { annualLossPct, pairs: losses.length, minLossPct: Math.min(...losses), maxLossPct: Math.max(...losses),
+    exceedsWarranty: Number.isFinite(warrantyPctPerYear) ? annualLossPct > warrantyPctPerYear : null };
 }
 
 // ---------- F9: hybrid balance ----------

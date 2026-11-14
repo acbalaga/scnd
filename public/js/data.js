@@ -4,10 +4,11 @@
 
 export const FORMAT = 'scnd';
 export const VERSION = 1;
-const MAX_BYTES = 1_000_000;
+export const MAX_BYTES = 1_000_000;   // app.js checks a picked file's size against this before reading it (ticket #47)
 const MAX_BILLS = 60;
 
-const SETUP_NUM = ['lat', 'lon', 'kWp', 'acKw', 'tilt', 'azimuth', 'cost', 'promisedYears', 'warrantyPct', 'batteryCost'];
+// promisedKwhYear: the installer's promised yearly kWh, for the quote check (ticket #49). Older files without it load as blank.
+const SETUP_NUM = ['lat', 'lon', 'kWp', 'acKw', 'tilt', 'azimuth', 'cost', 'promisedYears', 'warrantyPct', 'batteryCost', 'promisedKwhYear'];
 const SETUP_BOOL = ['hybrid', 'netMetering'];
 const BILL_NUM = ['inverterKwh', 'importKwh', 'exportKwh', 'genRate', 'genAmount', 'varRate', 'varCharges', 'total', 'outageHours', 'chargeKwh', 'dischargeKwh', 'homeLoadKwh'];
 const BILL_DATE = ['start', 'end'];
@@ -33,8 +34,24 @@ export function serialize(setup, bills, savedOn = new Date()) {
   return JSON.stringify({ format: FORMAT, version: VERSION, saved: savedOn.toISOString().slice(0, 10), setup: s, bills: b }, null, 2);
 }
 
-// Returns { setup, bills } or { error: 'message' }.
-export function parse(text) {
+// Values no real system has (ticket #47). lat and lon are the sun grid's box (scripts/build-grid.mjs); tilt and azimuth
+// match the setup form (azimuth 0 = south, 90 = west); everything else is kWh, pesos, years or % and cannot be negative.
+// kWp and acKw must be above zero when given. [min, max, what the owner sees]
+const RANGES = {
+  lat: [4.5, 21, 'latitude (4.5 to 21, the Philippines)'], lon: [116.5, 127, 'longitude (116.5 to 127, the Philippines)'],
+  tilt: [0, 90, 'roof tilt (0 to 90 degrees)'], azimuth: [-180, 180, 'facing (-180 to 180 degrees)'],
+};
+const POSITIVE = new Set(['kWp', 'acKw']);
+const inRange = (k, v) => {
+  if (v === '') return true;
+  if (RANGES[k]) return v >= RANGES[k][0] && v <= RANGES[k][1];
+  return POSITIVE.has(k) ? v > 0 : v >= 0;
+};
+const rangeText = (k) => RANGES[k]?.[2] ?? (POSITIVE.has(k) ? 'above zero' : 'zero or more');
+
+// Returns { setup, bills } or { error: 'message' }. lenient: a value out of range is blanked instead of failing the file,
+// for the copy kept on the device, where a half-typed value must not cost the owner every bill (restoreKept).
+export function parse(text, { lenient = false } = {}) {
   if (typeof text !== 'string' || text.length > MAX_BYTES) return { error: 'That file is too large to be a SCND file.' };
   let j;
   try { j = JSON.parse(text); } catch { return { error: 'That file is not a SCND save file (it is not valid JSON).' }; }
@@ -44,7 +61,11 @@ export function parse(text) {
   if (j.bills.length > MAX_BILLS) return { error: `A save file holds at most ${MAX_BILLS} bills.` };
 
   const setup = {};
-  for (const k of SETUP_NUM) { setup[k] = num(j.setup[k]); if (setup[k] === null) return { error: `Setup field "${k}" is not a number.` }; }
+  for (const k of SETUP_NUM) {
+    setup[k] = num(j.setup[k]);
+    if (setup[k] === null) return { error: `Setup field "${k}" is not a number.` };
+    if (!inRange(k, setup[k])) { if (lenient) setup[k] = ''; else return { error: `Setup field "${k}" is out of range: it must be ${rangeText(k)}.` }; }
+  }
   for (const k of SETUP_BOOL) setup[k] = j.setup[k] === true;
   setup.commissioned = month(j.setup.commissioned);
   if (setup.commissioned === null) return { error: 'Setup field "commissioned" is not a month.' };
@@ -55,7 +76,11 @@ export function parse(text) {
     if (!x || typeof x !== 'object') return { error: `Bill ${i + 1} is not readable.` };
     const o = {};
     for (const k of BILL_DATE) { o[k] = date(x[k]); if (o[k] === null) return { error: `Bill ${i + 1}: "${k}" is not a date.` }; }
-    for (const k of BILL_NUM) { o[k] = num(x[k]); if (o[k] === null) return { error: `Bill ${i + 1}: "${k}" is not a number.` }; }
+    for (const k of BILL_NUM) {
+      o[k] = num(x[k]);
+      if (o[k] === null) return { error: `Bill ${i + 1}: "${k}" is not a number.` };
+      if (!inRange(k, o[k])) { if (lenient) o[k] = ''; else return { error: `Bill ${i + 1}: "${k}" cannot be below zero.` }; }
+    }
     if (x.chargeUnit === 'rate' || x.chargeUnit === 'amount') o.chargeUnit = x.chargeUnit;
     else {
       // Saved before the amounts/per-kWh choice (4 Oct 2026): generation charge per kWh, variable charges in pesos.
@@ -66,4 +91,19 @@ export function parse(text) {
     bills.push(o);
   }
   return { setup, bills };
+}
+
+// "Keep my data on this device" (ticket #43, Fred, 14 Nov 2026). Opt-in. The kept copy is the same text a save file holds,
+// stored in this browser's local storage under STORAGE_KEY, and read back through parse(), so a damaged or edited copy
+// gets the same checks as a hostile file. Never sent anywhere. The made-up examples are never kept.
+export const STORAGE_KEY = 'scnd-data';
+// Text to keep, or null when nothing should be written (an example is on screen).
+export function keptText({ setup, bills, example, savedOn = new Date() }) {
+  return example ? null : serialize(setup, bills, savedOn);
+}
+// { setup, bills } from a kept copy, or null when there is none or it fails the save-file checks.
+export function restoreKept(text) {
+  if (typeof text !== 'string' || !text) return null;
+  const r = parse(text, { lenient: true });
+  return r.error ? null : r;
 }
