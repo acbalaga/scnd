@@ -115,3 +115,13 @@ test('README does not state a test count', () => {
   const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
   assert.doesNotMatch(readme, /\b\d+ tests\b/);
 });
+
+// UI audit, 14 Nov 2026 (docs/ui-audit-2026-11-14.md): the order of the lower page is part of the design.
+test('html: lower page runs bills, add a bill, weather, totals, next steps; footer keeps the feedback caveat under its link', () => {
+  const at = (x) => { const i = html.indexOf(x); assert.ok(i > 0, x); return i; };
+  const order = ['<article class="card">', 'id="bills-end"', 'Was it the weather?', 'class="group-h"', 'Payback so far', 'Year over year', 'class="card next"', 'id="findings"', '<footer class="foot">'].map(at);
+  assert.deepEqual(order, [...order].sort((a, b) => a - b));
+  const foot = html.slice(at('<footer class="foot">'));
+  assert.ok(foot.indexOf('class="foot-note"') < foot.indexOf('class="foot-guides"'), 'caveat sits before the guides');
+  assert.match(foot, /class="foot-data">[^\n]*NASA POWER[^\n]*Weather data by Open-Meteo\.com[^\n]*CC BY 4\.0/, 'a short data credit stays in view');
+});

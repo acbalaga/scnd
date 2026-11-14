@@ -133,7 +133,7 @@ button:active { transform:translateY(2px); box-shadow:none; }
 button:disabled, button[aria-disabled="true"] { opacity:.55; cursor:default; }
 button.primary { background:var(--sun); border-color:var(--btn-edge); color:var(--sun-ink); font-weight:700; box-shadow:0 3px 0 var(--btn-edge); }
 button.primary:active { transform:translateY(3px); box-shadow:none; }
-button.link { display:inline-flex; align-items:center; border:0; padding:0 8px; min-height:44px; color:var(--link); background:none; box-shadow:none; font-size:16px; } button.link:active { transform:none; }
+button.link { display:inline-flex; align-items:center; text-align:left; border:0; padding:0 8px; min-height:44px; color:var(--link); background:none; box-shadow:none; font-size:16px; } button.link:active { transform:none; }
 .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:14px; }
 .err { color:var(--red); font-size:14px; margin:8px 0 0; }
 .flag { background:var(--amber-bg); color:var(--amber); border-radius:12px; padding:10px 12px; margin:10px 0 0; font-size:14px; }
@@ -148,8 +148,8 @@ button.link { display:inline-flex; align-items:center; border:0; padding:0 8px; 
 .optional { margin-top:6px; } .optional summary, details.sec summary, details.inputs summary { list-style:none; cursor:pointer; }
 .optional summary::-webkit-details-marker, details.sec summary::-webkit-details-marker, details.inputs summary::-webkit-details-marker { display:none; }
 .optional summary { color:var(--link); font-weight:600; font-size:15px; padding:12px 0; }
-.optional summary::before, details.sec summary::after { content:"+"; display:inline-block; width:1.2em; font-weight:700; }
-.optional[open] summary::before { content:"\2212"; }
+.optional summary::before, .chart-table summary::before, .tipjar .qr summary::before, details.sec summary::after { content:"+"; display:inline-block; width:1.2em; font-weight:700; }
+.optional[open] summary::before, .chart-table[open] summary::before, .tipjar .qr[open] summary::before { content:"\2212"; }
 .summary-line { display:flex; justify-content:space-between; align-items:center; gap:10px; }
 
 /* bill card */
@@ -223,29 +223,35 @@ ol.steps-list { padding-left:20px; margin:8px 0; } ol.steps-list li { margin-bot
 .chartbox .grid-l { stroke:var(--line); stroke-width:1; } .chartbox .axis-l { stroke:var(--edge); stroke-width:1; }
 .chartbox text { fill:var(--muted); font:12px var(--body); }
 .chartbox text.endlbl { fill:var(--ink); font-weight:700; }
+@media (min-width:560px) { .chartbox text { font-size:8.5px; } }   /* the SVG scales with the card: 12 units drew near 20px here, this keeps labels at about 14px */
 .chartbox .cross { stroke:var(--muted); stroke-width:1; }
 .tip { position:absolute; top:6px; pointer-events:none; white-space:nowrap; background:var(--card); border:1.5px solid var(--edge); border-radius:10px; padding:8px 10px; font-size:13px; box-shadow:3px 3px 0 var(--shadow); min-width:190px; z-index:2; }
 .tip .d { color:var(--muted); font-size:12px; margin-bottom:2px; } .tip .r { display:flex; justify-content:space-between; gap:14px; align-items:center; } .tip .r b { font-family:var(--num); font-variant-numeric:tabular-nums; }
-.chart-table { margin-top:6px; } .chart-table summary { color:var(--link); font-size:15px; font-weight:600; padding:12px 0; cursor:pointer; }
+.chart-table { margin-top:6px; } .chart-table summary { list-style:none; color:var(--link); font-size:15px; font-weight:600; padding:12px 0; cursor:pointer; }
 .chart-table table { width:100%; border-collapse:collapse; font-size:13px; margin-top:6px; } .chart-table td { font-family:var(--num); } .chart-table th, .chart-table td { text-align:right; padding:4px 6px; border-bottom:1px solid var(--line); } .chart-table th:first-child, .chart-table td:first-child { text-align:left; } .chart-table th { color:var(--muted); font-weight:600; }
 
-/* save nudge, footer */
-.nudge-save { display:flex; gap:12px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
-/* Footer: two links, then the folds as ruled rows with the same +/- marker as the result sections, then a sign-off. */
-.foot { display:block; margin-top:32px; color:var(--muted); font-size:14px; } .foot a { color:var(--link); display:inline-block; padding:12px 0; margin:-12px 0; text-decoration-thickness:1px; text-underline-offset:3px; } .foot a:hover { text-decoration-thickness:2px; }
-.foot-links { display:flex; flex-wrap:wrap; align-items:baseline; gap:0 24px; margin:0 0 12px; }
-.foot .foot-share { min-height:44px; padding:0; font-size:15px; font-weight:600; }
-.foot-shared { margin:-6px 0 12px; }
-.foot-guides { display:flex; flex-wrap:wrap; align-items:baseline; gap:0 16px; margin:0 0 16px; }
-.foot-guides b { color:var(--ink); font-weight:600; }
-.foot .foot-guides a { min-height:44px; display:inline-flex; align-items:center; padding:0; margin:0; }
-.foot-note { margin:-6px 0 16px; max-width:62ch; }
-.foot-data { margin:0 0 16px; max-width:62ch; font-size:13px; color:var(--muted); }
-.foot .foot-links a { display:inline-flex; align-items:center; min-height:44px; padding:0; margin:0; font-size:15px; font-weight:600; }
-.foot .foot-links a.foot-main { font-weight:700; font-size:16px; }
-.foot-sign { display:flex; align-items:center; gap:10px; margin:20px 0 0; font-size:14px; } .foot-sign img { display:block; height:22px; width:auto; flex:none; border-radius:4px; }
+/* totals label, next steps, footer */
+/* Group label above the cards that sum over every bill, and the closing "Next steps" card: ruled rows, one job each. */
+.group-h { font-size:20px; margin:28px 0 -2px; }
+.next h3 { margin-bottom:2px; }
+.next-row { padding:14px 0; border-top:1px solid var(--line); } .next-row:first-of-type { border-top:0; padding-top:8px; } .next-row:last-child { padding-bottom:0; }
+.next-row > button, .next-row > .row { margin-top:10px; } .next-row .help { margin-top:2px; }
+/* Footer: a rule, the three actions and their caveat, guides in an even grid, the folds, then credit and sign-off. */
+.foot { display:block; margin-top:36px; padding-top:6px; border-top:1.5px solid var(--edge); color:var(--muted); font-size:14px; }
+.foot a { color:var(--link); text-decoration-thickness:1px; text-underline-offset:3px; } .foot a:hover { text-decoration-thickness:2px; }
+.foot-links { display:flex; flex-wrap:wrap; align-items:center; gap:0 24px; margin:0; }
+.foot .foot-links a, .foot .foot-share { display:inline-flex; align-items:center; min-height:44px; padding:0; margin:0; font-size:15px; font-weight:600; }
+.foot-shared { margin:0 0 8px; }
+.foot-note { margin:0 0 14px; max-width:62ch; font-size:13px; }
+.foot-guides { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:0 16px; margin:0 0 14px; }
+.foot-guides b { grid-column:1 / -1; color:var(--muted); font:600 12px/1.4 var(--body); letter-spacing:.06em; text-transform:uppercase; }
+.foot .foot-guides a, .guide .foot-guides a { min-height:44px; display:inline-flex; align-items:center; padding:0; margin:0; }
+.foot-data { margin:16px 0 0; max-width:62ch; font-size:13px; color:var(--muted); }
+.foot-data a, .foot .fine a { display:inline-block; padding:12px 0; margin:-12px 0; }   /* taller tap area without moving the line */
+.foot-sign { display:flex; align-items:center; gap:10px; margin:14px 0 0; font-size:14px; } .foot-sign img { display:block; height:22px; width:auto; flex:none; border-radius:4px; }
 .tipjar p { margin:0; } .tipjar .tip-links a { display:inline-flex; align-items:center; min-height:44px; color:var(--link); font-weight:600; }
-.tipjar .qr summary { min-height:44px; display:flex; align-items:center; cursor:pointer; color:var(--link); font-weight:600; }
+.chart-table summary::-webkit-details-marker, .tipjar .qr summary::-webkit-details-marker { display:none; }
+.tipjar .qr summary { list-style:none; min-height:44px; display:flex; align-items:center; cursor:pointer; color:var(--link); font-weight:600; }
 .tipjar .qr img { display:block; width:320px; max-width:100%; height:auto; background:#fff; padding:8px; border-radius:8px; border:1.5px solid var(--edge); margin:4px 0 8px; }
 .foot .fine { border-top:1px solid var(--line); } .foot .fine:last-of-type { border-bottom:1px solid var(--line); }
 .foot .fine summary { list-style:none; min-height:48px; display:flex; align-items:center; justify-content:space-between; gap:12px; cursor:pointer; color:var(--ink); font:600 15px/1.25 var(--body); }
@@ -361,4 +367,4 @@ p.err[role=alert] { margin:0 0 12px; } label > .err { margin-top:4px; }
 .guide a.button.primary { background:var(--sun); color:var(--sun-ink); border:1.5px solid var(--btn-edge); box-shadow:0 3px 0 var(--btn-edge); }
 .guide .sources { font-size:14px; color:var(--muted); margin:18px 0; } .guide .sources h2 { font-size:17px; margin:0 0 6px; }
 .guide .sources ul { padding-left:20px; margin:0; } .guide .sources li { margin:6px 0; }
-.guide .foot-guides { font-size:14px; color:var(--muted); }
+.guide .foot-guides { font-size:14px; color:var(--muted); margin-top:22px; padding-top:14px; border-top:1.5px solid var(--edge); }
