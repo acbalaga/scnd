@@ -331,6 +331,8 @@
                 <p class="sub" x-text="answerSub(b)"></p>
                 <!-- PR definition matches the findings sheet (app.js "sources") and docs/SPEC.md F1: energy made over what the rated panels would make in that sun. -->
                 <div class="flag" x-show="result(b).weatherRejected" x-text="'Against this period\'s weather, PR works out at ' + fmt(result(b).prWeather, 2) + ', above what panels can make, so the weather data for these dates looks off. Showing PR against a typical year instead.'"></div>
+                <!-- Ticket #40 (Fred, 14 Nov 2026): a one-source weather index may clear a low month but not make one (calc.judgedPr). -->
+                <div class="flag" x-show="result(b).inferredRejected" x-text="'Against this period\'s weather, PR works out at ' + fmt(result(b).prWeather, 2) + ', which would read lower. That weather figure comes from one source with nothing to cross-check it, so SCND does not mark the month lower on it alone. Showing PR against a typical year instead.'"></div>
                 <p class="help" style="text-align:center"><span x-show="i === firstAnswered">PR compares what your panels made with what panels their size would make in the sun they got, if nothing were lost. Heat, dust, wiring and the inverter always take some, so real systems sit below 1.00. </span>Healthy is 0.75 or more. <span x-text="result(b).basis === 'weather' ? 'Adjusted for the weather in this period.' : 'Against a typical year\'s sun.'"></span><!-- Audit M-4 (Fred, 31 Oct 2026): typical-year sun reads +3.9% vs Global Solar Atlas at Manila, docs/NEXT.md task 1. --></p>
                 <!-- Two low months: a next step, not an alarm. Weather first while unchecked, because a cloudy stretch can clear the flag. -->
                 <div class="raise" x-show="redRaised(b)" role="group" :aria-label="'Two low months in a row, ' + billTitle(b, i)">
@@ -360,7 +362,7 @@
                       <p class="help">The weather index is the sun in this period divided by the sun for the same dates in a typical year (the average of 2020 to 2025). 1.00 is typical. Below 1.00 is cloudier than usual.</p>
                       <dl>
                         <dt>Weather index</dt><dd x-text="fmt(result(b).weather.wi, 2)"></dd>
-                        <dt>PR adjusted for that weather</dt><dd x-text="fmt(result(b).weather.prAdjusted, 2) + (result(b).weatherRejected ? ' (not used)' : '')"></dd>
+                        <dt>PR adjusted for that weather</dt><dd x-text="fmt(result(b).weather.prAdjusted, 2) + (result(b).weatherRejected || result(b).inferredRejected ? ' (not used)' : '')"></dd>
                       </dl>
                       <template x-if="result(b).weather.split.total > 0">
                         <dl>

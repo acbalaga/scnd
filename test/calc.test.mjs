@@ -142,6 +142,26 @@ test('judgedPr edge: no call or an uncertain one stays on the typical year; bad 
   assert.equal(c.judgedPr({ pr: 0.58, expectedKwh: 600, call: { wi: 0.75, uncertain: true } }).basis, 'typical');
   assert.ok(c.isError(c.judgedPr({ pr: NaN, expectedKwh: 600, call: null })));
 });
+// Ticket #40 (Fred, 14 Nov 2026): a one-source (inferred) index may clear a low month but may not make one. Manila had
+// almost no satellite data in 2026, and NASA POWER alone gave indices up to 1.20, which turns a healthy 0.78 into 0.65.
+test('judgedPr edge: an inferred index that would lower the band is not used', () => {
+  const r = c.judgedPr({ pr: 0.78, expectedKwh: 600, month: 8, call: { wi: 1.25, uncertain: false, inferred: true } });
+  assert.equal(r.basis, 'typical'); assert.equal(r.inferredRejected, true); near(r.pr, 0.78); near(r.expectedKwh, 600); near(r.prWeather, 0.78 / 1.25);
+  // amber to red is a lower band too (dry season: amber floor 0.62)
+  const a = c.judgedPr({ pr: 0.66, expectedKwh: 600, month: 1, call: { wi: 1.10, uncertain: false, inferred: true } });
+  assert.equal(a.basis, 'typical'); assert.equal(a.inferredRejected, true);
+});
+test('judgedPr golden: an inferred index may lift a band or keep it, and a cross-checked one may lower it', () => {
+  const up = c.judgedPr({ pr: 0.58, expectedKwh: 600, month: 8, call: { wi: 0.8, uncertain: false, inferred: true } });
+  assert.equal(up.basis, 'weather'); near(up.pr, 0.725); assert.equal(up.inferredRejected, undefined);
+  const same = c.judgedPr({ pr: 0.85, expectedKwh: 600, month: 8, call: { wi: 1.05, uncertain: false, inferred: true } });
+  assert.equal(same.basis, 'weather'); near(same.pr, 0.85 / 1.05);
+  const both = c.judgedPr({ pr: 0.78, expectedKwh: 600, month: 8, call: { wi: 1.25, uncertain: false, inferred: false } });
+  assert.equal(both.basis, 'weather'); near(both.pr, 0.624);
+});
+test('judgedPr edge: an inferred call needs the month to compare bands', () => {
+  assert.ok(c.isError(c.judgedPr({ pr: 0.78, expectedKwh: 600, call: { wi: 1.25, uncertain: false, inferred: true } })));
+});
 test('judgedPr edge: a weather index that lifts a plausible PR above 0.90 is rejected for the typical year', () => {
   // The example's August bill: PR 0.79 against a typical year, NASA-only index 0.657 -> 1.20.
   const r = c.judgedPr({ pr: 0.79, expectedKwh: 556, call: { wi: 0.657, uncertain: false } });

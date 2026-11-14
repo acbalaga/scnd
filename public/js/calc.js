@@ -129,8 +129,10 @@ export function prBand(pr, month) {
 
 // Which PR a bill is judged on (Fred, 30 Sep 2026, docs/NEXT.md task 11). Once the weather check gives a call that
 // is not "uncertain", the bill is judged on weather-adjusted PR, so a cloudy month does not read as a fault. With no
-// call, or an uncertain one, it stays against a typical year. An inferred call (one source) is used: it is labelled.
-// pr and expectedKwh are the typical-year values; call is weatherCall's result or null.
+// call, or an uncertain one, it stays against a typical year. An inferred call (one source) is used only where it does not
+// lower the bill's band (see INFERRED_RULE below).
+// pr and expectedKwh are the typical-year values; call is weatherCall's result or null; month (1 to 12, the bill's
+// midpoint) picks the season's bands and is needed when the call is inferred.
 // Returns { pr, expectedKwh, basis: 'weather' | 'typical' }. Adjusted PR = pr / WI (same as PR on H_POA x WI).
 // A PR above this is more than panels can make in practice (heat, wiring, inverter and soiling losses always apply),
 // so it points at a wrong input: dates, kWh, panel size, or the weather data. Decided by Fred, 1 Oct 2026.
@@ -145,11 +147,21 @@ export const prTooLow = (pr) => Number.isFinite(pr) && pr < PR_PLAUSIBLE_MIN;
 // When the weather adjustment alone lifts PR above PR_PLAUSIBLE_MAX (the typical-year PR is plausible), the weather
 // index is the suspect, not the owner's numbers: judge on the typical year and say why (weatherRejected, prWeather).
 // Seen with real data: Manila, Aug 2026, NASA POWER alone (satellite gap) gave an index of 0.66. Fred, 1 Oct 2026.
-export function judgedPr({ pr, expectedKwh, call }) {
+// INFERRED_RULE (ticket #40, Fred, 14 Nov 2026): an index from one source with no cross-check may clear a low month (a
+// cloudy stretch explains it) but may not make a month read worse than its typical-year band. When it would, the bill
+// stays on the typical year and says why (inferredRejected, prWeather). Manila had almost no satellite data from January
+// to October 2026, and NASA POWER alone gave indices up to 1.20, which turns a healthy 0.78 into 0.65.
+const BAND_RANK = { red: 0, amber: 1, green: 2 };
+const bandRank = (pr, month) => (prTooLow(pr) ? -1 : BAND_RANK[prBand(pr, month)]);
+export function judgedPr({ pr, expectedKwh, call, month }) {
   if (!Number.isFinite(pr) || !Number.isFinite(expectedKwh)) return err('bad_input', 'Need a numeric PR and expected energy.');
   if (!call || call.uncertain || !Number.isFinite(call.wi) || call.wi <= 0) return { pr, expectedKwh, basis: 'typical' };
   const adjusted = pr / call.wi;
   if (prTooHigh(adjusted) && !prTooHigh(pr)) return { pr, expectedKwh, basis: 'typical', weatherRejected: true, prWeather: adjusted };
+  if (call.inferred) {
+    if (!(Number.isInteger(month) && month >= 1 && month <= 12)) return err('bad_input', 'An inferred weather call needs the month 1 to 12.');
+    if (bandRank(adjusted, month) < bandRank(pr, month)) return { pr, expectedKwh, basis: 'typical', inferredRejected: true, prWeather: adjusted };
+  }
   return { pr: adjusted, expectedKwh: expectedKwh * call.wi, basis: 'weather' };
 }
 

@@ -336,6 +336,8 @@ document.addEventListener('alpine:init', () => {
         savedTotal: cum.length ? '₱' + this.fmt(cum[cum.length - 1].saved, 0) : null,
         sources: [...sources, ...f.uncertainty,
           ...rows.filter((x) => x.r.weatherRejected).map(({ b, r }) => `For ${this.fmtRange(b.start, b.end)} the weather-adjusted PR came out at ${this.fmt(r.prWeather, 2)}, above what panels can make, so the weather data for those dates looks off. That period is judged against a typical year.`),
+          // Ticket #40 (Fred, 14 Nov 2026): a one-source index may clear a low month but not make one (calc.judgedPr).
+          ...rows.filter((x) => x.r.inferredRejected).map(({ b, r }) => `For ${this.fmtRange(b.start, b.end)} the weather index came from one source with nothing to cross-check it, and it would have put PR at ${this.fmt(r.prWeather, 2)}, a lower band than against a typical year. A single unchecked source is not used to mark a month lower, so that period is judged against a typical year.`),
           ...rows.filter((x) => x.r.band === 'check' && x.r.checkLow).map(({ b, r }) => `PR for ${this.fmtRange(b.start, b.end)} works out at ${this.fmt(r.pr, 2)}, below the ${calc.PR_PLAUSIBLE_MIN.toFixed(2)} a working system makes, so a figure is likely wrong (reading dates, solar kWh or panel size) or the system was off for part of the period. It is not counted as a low month.`),
           ...rows.filter((x) => x.r.band === 'check' && !x.r.checkLow).map(({ b, r }) => `PR for ${this.fmtRange(b.start, b.end)} works out at ${this.fmt(r.pr, 2)}, above the ${calc.PR_PLAUSIBLE_MAX.toFixed(2)} panels reach in practice, so a figure is likely wrong (reading dates, solar kWh or panel size). Check it before relying on this sheet.`),
           ...(this.gaps.length ? [`Bills are missing for ${this.gaps.map((g) => this.fmtRange(g.from, g.to)).join(', ')}. Two low months either side of a gap are not counted as in a row, and savings to date leave out the missing ${this.gaps.length === 1 ? 'period' : 'periods'}, so the payback pace reads low.`] : [])],
@@ -648,9 +650,9 @@ document.addEventListener('alpine:init', () => {
       out.weather = this.weatherResult(b, out);
       // Judge on weather-adjusted PR once the weather call is trusted (calc.judgedPr). The typical-year values are kept.
       if (out.pr !== null) {
-        const j = calc.judgedPr({ pr: out.pr, expectedKwh: out.expectedKwh, call: out.weather && !out.weather.missing ? out.weather : null });
+        const j = calc.judgedPr({ pr: out.pr, expectedKwh: out.expectedKwh, month: out.midMonth, call: out.weather && !out.weather.missing ? out.weather : null });
         if (!calc.isError(j)) Object.assign(out, { prTypical: out.pr, expectedTypical: out.expectedKwh, pr: j.pr, expectedKwh: j.expectedKwh, basis: j.basis, band: calc.prBand(j.pr, out.midMonth),
-          weatherRejected: !!j.weatherRejected, prWeather: j.prWeather ?? null });
+          weatherRejected: !!j.weatherRejected, inferredRejected: !!j.inferredRejected, prWeather: j.prWeather ?? null });
         // Above what panels can make: a wrong figure, not a healthy month (Fred, 1 Oct 2026).
         if (calc.prTooHigh(out.pr)) out.band = 'check';
         // Below what a working system makes: a typo or a system that was off, not a red month (audit M-8, Fred, 31 Oct 2026).
