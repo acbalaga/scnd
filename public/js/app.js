@@ -116,7 +116,6 @@ document.addEventListener('alpine:init', () => {
     keep: false,
     keepOk: false,
     keepMsg: '',
-    saveNudgeHidden: false,
     feedbackHref: FEEDBACK_URL,
     kofiHref: KOFI_URL,
     qrSrc: QR_PH_SRC,
@@ -547,7 +546,7 @@ document.addEventListener('alpine:init', () => {
       await this.continueSetup();
       if (!this.ready) return;
       this.bills = exampleBills(kind, { climate: this.climate }).map((b) => ({ ...newBill(), ...b, open: false }));
-      this.example = kind; this.savedOnce = false; this.saveNudgeHidden = false;
+      this.example = kind; this.savedOnce = false;
       this.resetWeather();
       this.$nextTick(() => this.focusBill(0, '.bill-title h3'));
     },
@@ -784,13 +783,15 @@ document.addEventListener('alpine:init', () => {
         d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1));
         const day = (d.getTime() - t0) / 86400000;
         if (day > xMax) break;
-        if (day >= xMax * 0.14 && day <= xMax * 0.92) xTicks.push({ day, label: MON[d.getUTCMonth()] });
+        if (day >= xMax * 0.14 && day <= xMax * 0.8) xTicks.push({ day, label: MON[d.getUTCMonth()] });
       }
-      // Always end the axis on the last reading date, and drop a month tick that would crowd it.
+      // At most three month labels between the two end dates, evenly spread (a long history used to keep the last three
+      // months, which ran into each other).
+      const stride = Math.ceil((xTicks.length - 1) / 3);
+      for (let i = xTicks.length - 1; i > 0; i--) if ((i - 1) % stride !== Math.floor((stride - 1) / 2)) xTicks.splice(i, 1);
+      // Always end the axis on the last reading date; month ticks stop at 80% of the span so none crowds it.
       const endMs = t0 + xMax * 86400000, endLabel = this.fmtShort(new Date(endMs).toISOString().slice(0, 10));
-      for (let i = xTicks.length - 1; i > 0; i--) if (xTicks[i].day > xMax * 0.8) xTicks.splice(i, 1);
       xTicks.push({ day: xMax, label: endLabel, end: true });
-      while (xTicks.length > 5) xTicks.splice(1, 1);
       return { W, H, L, R, T, B, pw, ph, xMax, yMax, X, Y, pts, yTicks, xTicks: xTicks.map((k) => ({ ...k, x: X(k.day) })), perDay, baseY: Y(0) };
     },
     monthName: (m) => MON[m - 1],
