@@ -29,6 +29,15 @@ test('headers: every path gets the CSP and the security headers', () => {
   assert.equal(all['x-content-type-options'], 'nosniff');
   assert.match(all['permissions-policy'], /geolocation=\(self\)/);
   assert.match(all['permissions-policy'], /camera=\(\)/);
+  assert.equal(all['x-frame-options'], 'DENY');
+  assert.equal(all['cross-origin-opener-policy'], 'same-origin');
+  assert.match(CSP, /(^|; )upgrade-insecure-requests(;|$)/);
+});
+
+test('headers: fonts are cached for a year as immutable, nothing else is', () => {
+  const rules = parseHeaders(read('public/_headers'));
+  assert.equal(rules['/fonts/*']['cache-control'], 'public, max-age=31536000, immutable');
+  assert.equal(all['cache-control'], undefined);
 });
 
 test('headers: CSP allows only this origin, the two irradiance hosts and Cloudflare analytics for connections', () => {

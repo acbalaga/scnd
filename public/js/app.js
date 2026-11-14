@@ -4,7 +4,7 @@ import * as calc from './calc.js';
 import * as engine from './engine.js';
 import { loadGrid, lookup, isLowDiffuse } from './grid.js';
 import { fetchSatellite, fetchNasa, SOURCE_LABELS } from './weather.js';
-import { serialize, parse, keptText, restoreKept, STORAGE_KEY } from './data.js';
+import { serialize, parse, keptText, restoreKept, STORAGE_KEY, MAX_BYTES } from './data.js';
 import { EXAMPLES, exampleBills } from './examples.js';
 import { findings, MIN_DEGRADATION_PAIRS, PAYBACK_MIN_DAYS } from './findings.js';
 
@@ -260,6 +260,8 @@ document.addEventListener('alpine:init', () => {
       const file = ev.target.files?.[0];
       ev.target.value = '';
       if (!file) return;
+      // Refuse a large file before reading it into memory (a video or a backup picked by mistake), ticket #47.
+      if (file.size > MAX_BYTES) { this.fileMessage = 'That file is too large to be a SCND file.'; return; }
       const r = parse(await file.text());
       if (r.error) { this.fileMessage = r.error; return; }
       await this.applyLoaded(r);

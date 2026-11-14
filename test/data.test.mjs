@@ -70,3 +70,22 @@ test('keep edge: an example is never kept, and a damaged or hostile copy restore
   assert.equal(restoreKept(null), null); assert.equal(restoreKept(''), null); assert.equal(restoreKept('{not json'), null);
   assert.equal(restoreKept(JSON.stringify({ format: 'scnd', version: 1, setup: { kWp: 'DROP TABLE' }, bills: [] })), null);
 });
+
+// Ticket #47: values no real system has are refused in a save file, and blanked in the copy kept on the device.
+test('parse edge: out-of-range setup and bill values are refused with a plain message', () => {
+  const file = (setup = {}, bill = {}) => JSON.stringify({ format: 'scnd', version: 1, setup: { lat: 14.6, lon: 121, kWp: 5, acKw: 5, tilt: 10, azimuth: 0, ...setup }, bills: [{ start: '2026-09-01', end: '2026-10-01', inverterKwh: 500, ...bill }] });
+  assert.equal(parse(file()).error, undefined);
+  assert.match(parse(file({ tilt: 95 })).error, /tilt.*0 to 90/);
+  assert.match(parse(file({ azimuth: 270 })).error, /facing/);
+  assert.match(parse(file({ lat: 40 })).error, /latitude/);
+  assert.match(parse(file({ lon: 100 })).error, /longitude/);
+  assert.match(parse(file({ kWp: 0 })).error, /above zero/);
+  assert.match(parse(file({ cost: -1 })).error, /zero or more/);
+  assert.match(parse(file({}, { exportKwh: -3 })).error, /Bill 1: "exportKwh" cannot be below zero/);
+  assert.equal(parse(file({ cost: '', kWp: '' })).error, undefined);   // blanks are fine
+});
+test('keep edge: an out-of-range value in the kept copy is blanked, the rest is kept', () => {
+  const text = JSON.stringify({ format: 'scnd', version: 1, setup: { lat: 14.6, lon: 121, kWp: 5, acKw: 5, tilt: 95, azimuth: 0 }, bills: [{ start: '2026-09-01', end: '2026-10-01', inverterKwh: 500, exportKwh: -3 }] });
+  const r = restoreKept(text);
+  assert.equal(r.setup.tilt, ''); assert.equal(r.setup.kWp, 5); assert.equal(r.bills[0].exportKwh, ''); assert.equal(r.bills[0].inverterKwh, 500);
+});

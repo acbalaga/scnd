@@ -7,6 +7,8 @@ Writes to public/fonts/ (output is committed; the site never runs this):
   The Latin subsets leave the peso sign out, and the full latin-ext files are 23 to 60 KB each for one glyph.
   app.css points a unicode-range: U+20B1 face at each, so the browser fetches about 1 KB when a page shows a peso.
 All four families are SIL OFL 1.1; licences sit next to the files.
+public/_headers caches /fonts/* for a year as immutable, so a font that changes must be written under a new file name
+(and app.css updated), or browsers keep the old one.
 """
 import io, re, urllib.request
 from pathlib import Path
