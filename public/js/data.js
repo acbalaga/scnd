@@ -7,7 +7,8 @@ export const VERSION = 1;
 export const MAX_BYTES = 1_000_000;   // app.js checks a picked file's size against this before reading it (ticket #47)
 const MAX_BILLS = 60;
 
-const SETUP_NUM = ['lat', 'lon', 'kWp', 'acKw', 'tilt', 'azimuth', 'cost', 'promisedYears', 'warrantyPct', 'batteryCost'];
+// promisedKwhYear: the installer's promised yearly kWh, for the quote check (ticket #49). Older files without it load as blank.
+const SETUP_NUM = ['lat', 'lon', 'kWp', 'acKw', 'tilt', 'azimuth', 'cost', 'promisedYears', 'warrantyPct', 'batteryCost', 'promisedKwhYear'];
 const SETUP_BOOL = ['hybrid', 'netMetering'];
 const BILL_NUM = ['inverterKwh', 'importKwh', 'exportKwh', 'genRate', 'genAmount', 'varRate', 'varCharges', 'total', 'outageHours', 'chargeKwh', 'dischargeKwh', 'homeLoadKwh'];
 const BILL_DATE = ['start', 'end'];

@@ -204,6 +204,29 @@
     <div class="flag" x-show="ready && clipping"><strong>Panels are much bigger than the inverter (DC/AC above 1.3).</strong> On sunny days the inverter caps output, so a lower PR in bright months can be normal.</div>
   </section>
 
+  <!-- Quote check (ticket #49, Fred, 14 Nov 2026): a typical year for this roof, before any bill. Numbers from calc.expectedYear
+       and calc.impliedPr; PR 0.75 is PR_BANDS.green and 0.90 is PR_PLAUSIBLE_MAX. No claim about rates or programs. -->
+  <template x-if="ready && quote">
+    <section class="card" id="quote">
+      <details class="sec" :open="step === 2">
+        <summary>What this system should make in a typical year <span class="teaser" x-text="fmt(quote.totalKwh, 0) + ' kWh'"></span></summary>
+        <div>
+          <p class="help">Expected for each month at a performance ratio (PR) of 0.75, the level SCND calls healthy, in this location's typical-year sun. PR compares what panels make with what they would make if nothing were lost. A kWh is the unit on your bill: it runs a 1,000 W appliance for an hour. The dark tick on each bar is the lowest a month can make and still read "a bit low" rather than low.</p>
+          <div class="chartbox" x-html="quoteChart"></div>
+          <p><b x-text="fmt(quote.totalKwh, 0) + ' kWh a year'"></b>, or <span x-text="fmt(quote.specificYield, 0)"></span> kWh for each kWp of panels.</p>
+          <details class="chart-table"><summary>Show as a table</summary>
+            <table><thead><tr><th>Month</th><th>Healthy (PR 0.75)</th><th>Lowest before "low"</th></tr></thead>
+              <tbody><template x-for="m in quote.months" :key="m.month"><tr><td x-text="monthName(m.month)"></td><td x-text="fmt(m.expectedKwh, 0) + ' kWh'"></td><td x-text="fmt(m.lowKwh, 0) + ' kWh'"></td></tr></template></tbody>
+            </table></details>
+          <label style="margin-top:10px">kWh a year your installer promised (optional)<span class="hint">From the quote or the proposal. SCND shows the PR that promise needs on this roof.</span>
+            <input type="number" min="0" inputmode="decimal" step="any" x-model.number="s.promisedKwhYear" placeholder="e.g. 7000"></label>
+          <p class="help" x-show="quoteText" x-text="quoteText"></p>
+          <p class="help"><a href="/guide/solar-quote-check">How to check a solar quote</a></p>
+        </div>
+      </details>
+    </section>
+  </template>
+
   <!-- 2. One card per bill -->
   <template x-if="ready">
     <section id="bills">
@@ -642,6 +665,7 @@
       <a href="/guide/app-vs-bill">App vs bill</a>
       <a href="/guide/performance-ratio">What PR means</a>
       <a href="/guide/method">How SCND works</a>
+      <a href="/guide/solar-quote-check">Check a solar quote</a>
     </nav>
     <!-- Pre-launch audit M-7 (Fred, 2 Oct 2026): who runs SCND and where a data question goes. Direct address
          contact@alfredbalaga.com added by Fred, 14 Nov 2026 (ticket #47), for issues, feedback and security reports.

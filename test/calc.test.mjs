@@ -382,3 +382,26 @@ test('prTooLow golden (M-8): below 0.30 points at a wrong figure; 0.30 itself an
   assert.equal(c.prTooLow(0.29), true); assert.equal(c.prTooLow(0), true);
   assert.equal(c.prTooLow(0.30), false); assert.equal(c.prTooLow(0.55), false); assert.equal(c.prTooLow(NaN), false);
 });
+
+// ---- Quote check (ticket #49) ----
+test('expectedYear golden: monthly table at PR 0.75 matches poaPeriod for whole calendar months', () => {
+  const ghi = [4.8, 5.4, 6.1, 6.5, 6.0, 5.2, 4.9, 4.8, 4.9, 4.8, 4.6, 4.3], dif = ghi.map((g) => g * 0.42);
+  const y = c.expectedYear({ kWp: 5, tilt: 10, azimuth: 0, lat: 10.3, ghi, dif });
+  assert.equal(y.months.length, 12);
+  const mar = c.poaPeriod({ ghi, dif, tilt: 10, azimuth: 0, lat: 10.3, start: '2026-03-01', end: '2026-04-01' });
+  near(y.months[2].hPoa, mar.hPoa, 1e-9); near(y.months[2].expectedKwh, 5 * mar.hPoa * 0.75, 1e-9);
+  near(y.months[2].lowKwh, 5 * mar.hPoa * c.PR_BANDS.amberDry, 1e-9); near(y.months[6].lowKwh, 5 * y.months[6].hPoa * c.PR_BANDS.amberWet, 1e-9);
+  near(y.totalKwh, y.months.reduce((t, m) => t + m.expectedKwh, 0), 1e-9); near(y.specificYield, y.totalKwh / 5, 1e-9);
+});
+test('expectedYear edge: flat panels get GHI, and bad input is an error', () => {
+  const ghi = Array(12).fill(5), dif = Array(12).fill(2), y = c.expectedYear({ kWp: 1, tilt: 0, azimuth: 0, lat: 14.6, ghi, dif });
+  const days = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  y.months.forEach((m, k) => near(m.hPoa / (5 * days[k]), 1, 0.001));
+  assert.ok(c.isError(c.expectedYear({ kWp: 0, tilt: 10, azimuth: 0, lat: 14.6, ghi, dif })));
+  assert.ok(c.isError(c.expectedYear({ kWp: 5, tilt: 10, azimuth: 0, lat: 14.6, ghi: [1], dif })));
+});
+test('impliedPr golden and edge: promised kWh over the sun the panels get', () => {
+  near(c.impliedPr({ promisedKwhYear: 7500, kWp: 5, hPoaYear: 2000 }), 0.75);
+  assert.ok(c.prTooHigh(c.impliedPr({ promisedKwhYear: 9500, kWp: 5, hPoaYear: 2000 })));
+  assert.ok(c.isError(c.impliedPr({ promisedKwhYear: 0, kWp: 5, hPoaYear: 2000 })));
+});

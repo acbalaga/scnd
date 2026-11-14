@@ -1,6 +1,6 @@
 // Findings sheet (F3): turns the app's own results into questions to ask the installer.
 // Pure: no DOM. Never a verdict, and no installer names anywhere (none are stored).
-import { PR_BANDS } from './calc.js';
+import { PR_BANDS, PR_PLAUSIBLE_MAX, prTooHigh } from './calc.js';
 
 // The degradation question goes on the sheet only from this many same-month pairs (decided by Fred, 29 Sep 2026,
 // docs/NEXT.md task 7). Monthly sun data is noisy (5 to 10%) against a yearly loss under 1%, so one or two pairs would
@@ -29,9 +29,10 @@ const span = (b) => b.period ?? `${b.start} to ${b.end}`;
 // payback: null, or { saved, promised, days } (pesos to date, days since the first reading date)
 // efficiency: null, or { baseline, latest, dropPoints, flagged } from calc.efficiencyDrop (fractions of 1)
 // degradation: null, or { annualLossPct, pairs, exceedsWarranty, warrantyPct } from calc.degradation
+// promise: null, or { kwhYear, impliedPr } (calc.impliedPr): the installer's promised yearly kWh (ticket #49)
 // creditLeftOut: pesos of export credit left out of savings by the variable-charges cap (calc.uncountedCredit), summed
 // Returns { items: [{ id, text }], requests: [text], uncertainty: [text], allClear: boolean, allGreen: boolean }.
-export function findings({ bills, payback, degradation = null, efficiency = null, creditLeftOut = 0 }) {
+export function findings({ bills, payback, degradation = null, efficiency = null, creditLeftOut = 0, promise = null }) {
   const items = [];
   const last = bills[bills.length - 1];
   const raised = [...bills].reverse().find((b) => b.redRaised);
@@ -78,6 +79,11 @@ export function findings({ bills, payback, degradation = null, efficiency = null
   if (paybackRaised) {
     const gap = Math.round(behind * 100);
     items.push({ id: 'payback', text: `Savings so far are ${peso(payback.saved)} against ${peso(payback.promised)} at the promised payback pace (${gap}% behind).${creditNote} How was the promised payback worked out? Was the export credit assumed at the utility's generation charge or at the full retail rate? What rate increases were assumed?` });
+  }
+
+  // Ticket #49 (Fred, 14 Nov 2026): a promise that needs more than panels can make here is a question, never a verdict.
+  if (promise && prTooHigh(promise.impliedPr)) {
+    items.push({ id: 'promise', text: `The promised yield of ${f0(promise.kwhYear)} kWh a year works out at a PR of ${f2(promise.impliedPr)} for this system's size, tilt, facing and location, above the ${f2(PR_PLAUSIBLE_MAX)} panels reach in practice. Which sun data and which losses (heat, dust, wiring, inverter) was the promise based on?` });
   }
 
   const requests = [

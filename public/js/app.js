@@ -105,7 +105,7 @@ document.addEventListener('alpine:init', () => {
     cities: CITIES,
     facings: FACINGS,
     place: '',
-    s: { lat: '', lon: '', kWp: '', acKw: '', tilt: 10, azimuth: 0, commissioned: '', hybrid: false, netMetering: false, cost: '', promisedYears: '', warrantyPct: '', batteryCost: '' },
+    s: { lat: '', lon: '', kWp: '', acKw: '', tilt: 10, azimuth: 0, commissioned: '', hybrid: false, netMetering: false, cost: '', promisedYears: '', warrantyPct: '', batteryCost: '', promisedKwhYear: '' },
     ready: false,
     setupError: '',
     climate: null,
@@ -331,7 +331,7 @@ document.addEventListener('alpine:init', () => {
       const cum = this.cumulative, perDay = this.promisedPerDay;
       const payback = perDay && cum.length ? { saved: cum[cum.length - 1].saved, promised: perDay * cum[cum.length - 1].day, days: cum[cum.length - 1].day } : null;
       const f = findings({
-        payback, creditLeftOut: this.creditLeftOut, degradation: this.degradationResult, efficiency: this.efficiencyTrend,
+        payback, creditLeftOut: this.creditLeftOut, promise: this.quote?.impliedPr != null ? { kwhYear: this.quote.promised, impliedPr: this.quote.impliedPr } : null, degradation: this.degradationResult, efficiency: this.efficiencyTrend,
         bills: rows.map(({ b, r }) => ({
           start: b.start, end: b.end, period: this.fmtRange(b.start, b.end), pr: r.pr, band: r.band, basis: r.basis, redRaised: this.redRaised(b), actualKwh: num(b.inverterKwh),
           expectedKwh: r.expectedKwh, weather: r.weather, flags: r.flags, savings: r.savings, hybridFlags: r.hybrid?.flags ?? [],
@@ -358,6 +358,7 @@ document.addEventListener('alpine:init', () => {
           ['Array capacity', `${s.kWp} kWp`], ['Inverter', `${s.acKw} kW (DC/AC ${this.fmt(num(s.kWp) / num(s.acKw), 2)})`],
           ['Orientation', `${s.tilt}° tilt, facing ${face}`], ['System type', s.hybrid ? 'Hybrid with battery' : 'On-grid'],
           ['Location (rounded)', `${s.lat}, ${s.lon}`], ['Switched on', s.commissioned || 'Not given'],
+          ...(this.quote?.impliedPr != null ? [['Promised yield', `${this.fmt(this.quote.promised, 0)} kWh a year (PR ${this.fmt(this.quote.impliedPr, 2)} for this system and location)`]] : []),
         ],
         rows: rows.slice(-5).map(({ b, r }) => ({
           period: this.fmtRange(b.start, b.end), actual: this.fmt(num(b.inverterKwh), 0), expected: this.fmt(r.expectedKwh, 0),
@@ -527,7 +528,7 @@ document.addEventListener('alpine:init', () => {
       if (kept) { this.example = false; this.applyLoaded(kept, { kept: true }); return; }
       this.example = false; this.ready = false; this.setupOpen = true; this.started = true; this.place = '';
       setTimeout(() => { this.scrollTo('setup'); document.querySelector('[x-ref=fPlace]')?.focus({ preventScroll: true }); }, 50);
-      this.s = { lat: '', lon: '', kWp: '', acKw: '', tilt: 10, azimuth: 0, commissioned: '', hybrid: false, netMetering: false, cost: '', promisedYears: '', warrantyPct: '', batteryCost: '' };
+      this.s = { lat: '', lon: '', kWp: '', acKw: '', tilt: 10, azimuth: 0, commissioned: '', hybrid: false, netMetering: false, cost: '', promisedYears: '', warrantyPct: '', batteryCost: '', promisedKwhYear: '' };
       this.bills = [newBill()]; this.climate = null; this.lowDiffuse = false;
       this.resetWeather();
       this.savedSnap = this.snap();   // a fresh start has nothing to lose
@@ -669,6 +670,43 @@ document.addEventListener('alpine:init', () => {
     },
     fmt: (v, d) => (Number.isFinite(v) ? v.toLocaleString('en-PH', { minimumFractionDigits: d, maximumFractionDigits: d }) : ''),
 
+    // ---- Quote check (ticket #49, Fred, 14 Nov 2026): a typical year for this roof, before any bill ----
+    // Expected kWh per month at PR 0.75 (calc.expectedYear), and the PR an installer's promised yearly kWh implies.
+    get quote() { return this.memo('quote', () => this.computeQuote()); },
+    computeQuote() {
+      if (!this.ready || !this.climate) return null;
+      const s = this.s, kWp = num(s.kWp);
+      const y = calc.expectedYear({ kWp, tilt: num(s.tilt), azimuth: num(s.azimuth), lat: num(s.lat), ghi: this.climate.ghi, dif: this.climate.dif });
+      if (calc.isError(y)) return null;
+      const promised = num(s.promisedKwhYear), pr = promised > 0 ? calc.impliedPr({ promisedKwhYear: promised, kWp, hPoaYear: y.hPoaYear }) : null;
+      return { ...y, promised: promised > 0 ? promised : null, impliedPr: pr !== null && !calc.isError(pr) ? pr : null };
+    },
+    // One plain sentence on the promise. A question for the installer, never a verdict.
+    get quoteText() {
+      const q = this.quote; if (!q || q.impliedPr === null) return '';
+      const pr = this.fmt(q.impliedPr, 2), healthy = calc.PR_BANDS.green.toFixed(2), max = calc.PR_PLAUSIBLE_MAX.toFixed(2);
+      if (calc.prTooHigh(q.impliedPr)) return `${this.fmt(q.promised, 0)} kWh a year works out at a PR of ${pr} for this size, tilt, facing and location. That is more than panels this size can make here (above ${max}). Ask your installer how it was worked out: which sun data, and what losses for heat, dust, wiring and the inverter.`;
+      if (q.impliedPr >= calc.PR_BANDS.green) return `${this.fmt(q.promised, 0)} kWh a year works out at a PR of ${pr} for this size, tilt, facing and location. A healthy system (PR ${healthy} or more) can reach that in a typical year.`;
+      return `${this.fmt(q.promised, 0)} kWh a year works out at a PR of ${pr} for this size, tilt, facing and location, below the ${healthy} SCND calls healthy, so a healthy system should make more than promised in a typical year.`;
+    },
+    // Bar chart: expected kWh per month, with a tick at the season's lower limit. Numbers only go into the SVG.
+    get quoteChart() {
+      const q = this.quote; if (!q) return '';
+      const W = 340, H = 170, L = 40, R = 8, T = 10, B = 24, pw = W - L - R, ph = H - T - B, bw = pw / 12;
+      const top = Math.max(...q.months.map((m) => m.expectedKwh)), raw = top / 4, pow = 10 ** Math.floor(Math.log10(raw)), n = raw / pow;
+      const step = (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * pow, yMax = Math.ceil(top / step) * step, Y = (v) => T + (1 - v / yMax) * ph;
+      const desc = `Expected kWh in a typical year, by month: ${q.months.map((m) => `${MON[m.month - 1]} ${this.fmt(m.expectedKwh, 0)}`).join(', ')}.`;
+      let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${desc}">`;
+      for (let v = 0; v <= yMax + 1e-9; v += step) svg += `<line class="${v === 0 ? 'axis-l' : 'grid-l'}" x1="${L}" x2="${W - R}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}"/><text x="${L - 6}" y="${(Y(v) + 4).toFixed(1)}" text-anchor="end">${this.fmt(v, 0)}</text>`;
+      q.months.forEach((m, k) => {
+        const x = L + k * bw + bw * 0.18, w = bw * 0.64;
+        svg += `<rect x="${x.toFixed(1)}" y="${Y(m.expectedKwh).toFixed(1)}" width="${w.toFixed(1)}" height="${(Y(0) - Y(m.expectedKwh)).toFixed(1)}" rx="2" style="fill:var(--c-save)" opacity=".85"/>`;
+        svg += `<line x1="${(x - 1).toFixed(1)}" x2="${(x + w + 1).toFixed(1)}" y1="${Y(m.lowKwh).toFixed(1)}" y2="${Y(m.lowKwh).toFixed(1)}" style="stroke:var(--ink)" stroke-width="2"/>`;
+        svg += `<text x="${(x + w / 2).toFixed(1)}" y="${H - 8}" text-anchor="middle">${MON[m.month - 1][0]}</text>`;
+      });
+      return svg + '</svg>';
+    },
+
     // ---- Payback (F6) ----
     // Points on the savings curve, oldest bill first. day = days since the first reading date.
     get cumulative() { return this.memo('cumulative', () => this.computeCumulative()); },
@@ -726,6 +764,7 @@ document.addEventListener('alpine:init', () => {
       while (xTicks.length > 5) xTicks.splice(1, 1);
       return { W, H, L, R, T, B, pw, ph, xMax, yMax, X, Y, pts, yTicks, xTicks: xTicks.map((k) => ({ ...k, x: X(k.day) })), perDay, baseY: Y(0) };
     },
+    monthName: (m) => MON[m - 1],
     fmtShort(iso) { const t = Date.parse(iso); return Number.isFinite(t) ? dayMonth(t, false) : ''; },
 
     chartHover: null,

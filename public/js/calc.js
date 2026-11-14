@@ -100,6 +100,33 @@ export function poaPeriod({ ghi, dif, tilt, azimuth, lat, start, end }) {
   return { hPoa, days, midMonth: mid.getUTCMonth() + 1, midYear: mid.getUTCFullYear() };
 }
 
+// ---------- Quote check: a typical year for this roof (ticket #49, Fred, 14 Nov 2026) ----------
+
+// Expected energy in each calendar month of a typical year at PR_BANDS.green, and the lower limit for that season's
+// amber band, from the 12 monthly means. Lets an owner with no bill yet (or a buyer comparing quotes) see what panels
+// this size should make here. Returns { months: [{ month, hPoa, expectedKwh, lowKwh }], hPoaYear, totalKwh, lowKwh,
+// specificYield } with specificYield in kWh per kWp per year. Feb is 28 days, as in poaMonth.
+export function expectedYear({ kWp, tilt, azimuth, lat, ghi, dif }) {
+  if (!Number.isFinite(kWp) || kWp <= 0 || !Array.isArray(ghi) || !Array.isArray(dif) || ghi.length !== 12 || dif.length !== 12) return err('bad_input', 'Need kWp > 0 and 12 monthly ghi and dif values.');
+  const months = [];
+  for (let m = 1; m <= 12; m++) {
+    const h = poaMonth({ ghi: ghi[m - 1], dif: dif[m - 1], tilt, azimuth, lat, month: m });
+    if (isError(h)) return h;
+    const floor = isDrySeason(m) ? PR_BANDS.amberDry : PR_BANDS.amberWet;
+    months.push({ month: m, hPoa: h, expectedKwh: kWp * h * PR_BANDS.green, lowKwh: kWp * h * floor });
+  }
+  const sum = (k) => months.reduce((t, x) => t + x[k], 0);
+  const totalKwh = sum('expectedKwh');
+  return { months, hPoaYear: sum('hPoa'), totalKwh, lowKwh: sum('lowKwh'), specificYield: totalKwh / kWp };
+}
+
+// The PR an installer's promised yearly kWh implies for this roof and location: promised / (kWp x yearly POA sun).
+// Compare with PR_PLAUSIBLE_MAX: above it, the promise is more than panels this size can make here.
+export function impliedPr({ promisedKwhYear, kWp, hPoaYear }) {
+  if (![promisedKwhYear, kWp, hPoaYear].every(Number.isFinite) || promisedKwhYear <= 0 || kWp <= 0 || hPoaYear <= 0) return err('bad_input', 'Need promised kWh, kWp and yearly sun above zero.');
+  return promisedKwhYear / (kWp * hPoaYear);
+}
+
 // ---------- F1: performance ratio and bands ----------
 
 // PR = E_inverter / (kWp x H_POA). Use PV yield, not inverter AC output, for hybrids (F9).
