@@ -1,6 +1,18 @@
-# Headers for static files served without the Worker (run_worker_first excludes them, see wrangler.jsonc).
-# The page itself gets its CSP and the rest from src/worker.js. CSP only matters on documents, so it is not
-# repeated here; the icons are plain SVG with no script.
+# Security headers for every file this site serves, pages included (ticket #37, 14 Nov 2026).
+# SCND is static assets only: no Worker script runs, so these rules are the only place headers are set. Static asset
+# requests are free and unlimited on the Workers Free plan, so a request flood cannot spend a daily quota and take the
+# site down (it could while pages ran a Worker: 100,000 requests a day, then 429 until 08:00 PH).
+#
+# Content-Security-Policy:
+# - script-src: the sha256 is the inline theme script in index.html and the guides (byte-identical). test/headers.test.mjs
+#   fails if they drift apart. 'unsafe-eval' is for Alpine's standard build, which compiles x-data expressions with
+#   new Function (audit M-2, ticket #46). Cloudflare Web Analytics (cookieless page-view counts, turned on in the
+#   Cloudflare dashboard) injects its beacon from static.cloudflareinsights.com and reports to cloudflareinsights.com,
+#   disclosed in "Privacy and limits" (Fred, 2 Oct 2026; audit M-10).
+# - style-src 'unsafe-inline' is for the style="" attributes in index.html.
+# - connect-src: this origin, the two irradiance sources (only on "Check the weather") and the analytics endpoint.
 /*
-  X-Content-Type-Options: nosniff
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-B8U7Anw7zuz9OFoSuoKagKsf+/k9rF62FJxi1G4tCEw=' 'unsafe-eval' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://satellite-api.open-meteo.com https://power.larc.nasa.gov https://cloudflareinsights.com; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
   Referrer-Policy: no-referrer
+  X-Content-Type-Options: nosniff
+  Permissions-Policy: geolocation=(self), camera=(), microphone=(), payment=()

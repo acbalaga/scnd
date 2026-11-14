@@ -66,7 +66,7 @@ test('html: the footer says who runs SCND and where a data question goes', () =>
 });
 
 // Guide pages (Reach batch, 31 Oct 2026): plain HTML for search and sharing. No script beyond the theme line, which
-// must be byte-identical to index.html's so the CSP hash in src/headers.js covers it.
+// must be byte-identical to index.html's so the CSP hash in public/_headers covers it.
 import { readdirSync } from 'node:fs';
 const guideDir = new URL('../public/guide/', import.meta.url);
 const guides = readdirSync(guideDir).filter((f) => f.endsWith('.html'));

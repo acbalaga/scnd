@@ -4,9 +4,9 @@
 
 An owner types their system details and a few numbers from each bill and inverter app. SCND says whether the system is producing what it should, whether a shortfall was the weather or the system, what the export credit is worth, and what to ask the installer. It never gives a verdict, only questions.
 
-Static site served by a Cloudflare Worker. No backend, no accounts, no database, no cookies. Everything the owner types stays in the browser.
+Static site on Cloudflare (Workers static assets, no server code). No backend, no accounts, no database, no cookies. Everything the owner types stays in the browser.
 
-Start here: `CLAUDE.md` (project rules), `docs/SPEC.md` (spec), `docs/NEXT.md` (task queue), `docs/RATE-LIMITING.md`.
+Start here: `CLAUDE.md` (project rules), `docs/SPEC.md` (spec), `docs/NEXT.md` (task queue), `docs/DEPLOY-GATE.md`.
 
 ## What it does
 
@@ -27,15 +27,15 @@ Save and load use a JSON file on the owner's own device. "Try an example" fills 
 - User inputs never leave the browser. The only outbound calls are weather lookups to Open-Meteo and NASA POWER, made when the owner clicks "Check the weather", with the location rounded to 0.1° (about 11 km).
 - The typical-year sun data is a static file (`public/data/ph-grid.json`), so F1 needs no lookup.
 - The only thing stored on your device is your Auto, Light or Dark choice (in the browser's local storage), and only if you pick one. There are no cookies.
-- The Worker rate-limits requests per visitor with a daily-rotating hash of the IP, never the raw IP. It logs and stores nothing.
+- SCND runs no server code. Cloudflare serves the files and sees visitors' IP addresses, like any web host; nothing of SCND's logs or stores them.
 
 ## Layout
 
 - `public/`: `index.html`, `app.css`, `manifest.webmanifest`, `icons/`, `js/` (`calc.js` all the maths, `grid.js`, `weather.js`, `findings.js`, `data.js`, `app.js`), `data/ph-grid.json`, `vendor/alpine.min.js` (Alpine 3.17.4, MIT), `fonts/` (Pixelify Sans, DSEG7 Classic, Chivo and Chivo Mono for the app, Source Serif 4 and Source Sans 3 for the printed report, plus a ₱-only file per family, all SIL Open Font Licence 1.1, licences alongside), `icons/` (logo and app icons). Everything is self-hosted so the page makes no third-party request
-- `src/worker.js`: serves `public/`, rate-limits page requests and sets the security headers (values in `src/headers.js`; static files take theirs from `public/_headers`)
+- `public/_headers`: the security headers, CSP included, for every file (there is no Worker script; `wrangler.jsonc` serves `public/` as static assets)
 - `scripts/`: `build-grid.mjs` (builds the sun grid), `gen-poa-reference.py` (pvlib reference cases), `gen-logo.mjs` and `gen-icons.mjs` (the seven-segment SCND logo and app icons)
 - `test/`: golden-case tests
-- `docs/`: spec, task queue, rate limiting, custom domain guide, feedback form setup
+- `docs/`: spec, task queue, deploy gate, custom domain guide, feedback form setup, audits (`docs/RATE-LIMITING.md` is kept as a record of the retired limiter)
 
 ## Develop
 
@@ -48,7 +48,7 @@ Save and load use a JSON file on the owner's own device. "Try an example" fills 
 
 Cloudflare Workers, Git-connected. Every push to `main` deploys to https://myscnd.app (custom domain, production only, live 2 Oct 2026). Preview URLs and the `scnd.<account>.workers.dev` address are off (`preview_urls` and `workers_dev` are `false` in `wrangler.jsonc`, 2 Oct 2026). Domain notes are in `docs/CUSTOM-DOMAIN.md`.
 
-The Worker runs first on every request (`run_worker_first`) so it can rate-limit: 100 requests per 10 seconds per visitor, failing open if the limiter is unavailable. Every request is therefore a Worker request (Free plan: 100,000 a day). Watch the daily count during beta. Details and the trade-offs are in `docs/RATE-LIMITING.md`.
+Pages and files are static assets: no Worker script runs, so there is no daily request cap to run out of (static asset requests are free and unlimited on the Free plan). The in-code rate limiter was retired on 14 Nov 2026 for this reason (ticket #37); `docs/RATE-LIMITING.md` keeps the record. Tests run on every push (`.github/workflows/test.yml`), and `docs/DEPLOY-GATE.md` has the Cloudflare build command that stops a failing commit from deploying.
 
 ## Feedback
 

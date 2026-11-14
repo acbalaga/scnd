@@ -27,10 +27,9 @@ Add a normal link or button on alfredbalaga.com that goes to https://myscnd.app.
 - https://myscnd.app opens with a padlock, on a phone over mobile data and on a laptop.
 - Enter a sample bill and print the findings sheet.
 - The workers.dev address no longer answers once this deploys (`workers_dev` is false).
-- Run the rate-limit check from `docs/RATE-LIMITING.md` against myscnd.app.
 - Open a version preview URL: it should no longer exist (Preview URLs off, in both `wrangler.jsonc` and the dashboard).
-- In Cloudflare, **Workers & Pages**, **scnd**, **Metrics**: requests are counted. The Worker runs first on every request, so watch the daily count against the Free plan limit of 100,000.
+- In Cloudflare, **Workers & Pages**, **scnd**, **Metrics**: requests are counted. Since 14 Nov 2026 (ticket #37) every request is a static asset request, which is free and has no daily cap.
 
 ## Things that do not change
 
-The rate limiter, the Worker code and the app are the same on any address. Saved files from the app do not depend on the address, so a file saved on workers.dev loads on myscnd.app.
+The app and its headers are the same on any address. Saved files from the app do not depend on the address, so a file saved on workers.dev loads on myscnd.app.

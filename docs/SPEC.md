@@ -105,7 +105,7 @@ The tool is a set of static files with no server of ours, no accounts and no dat
 | Findings sheet (F3) | Print stylesheet + `window.print()` → Save as PDF | No PDF library, works on phones |
 | Charts | Inline SVG, hand-rolled | No dependency, prints cleanly |
 | Analytics | None, or a cookieless page counter | Privacy claim stays literally true |
-| Rate limiting | Worker with Cloudflare's Workers Rate Limiting binding: 100 requests per 10 seconds per visitor, keyed by a daily-rotating hash of the IP, fails open | Bot floods are stopped in our own code (a WAF rule was not available on the plan). Costs a Worker request per page request, see `docs/RATE-LIMITING.md` |
+| Rate limiting | None in our code since 14 Nov 2026 (ticket #37): static assets only, which are free and have no daily cap; Cloudflare's DDoS protection applies | The Worker limiter (29 Sep to 14 Nov 2026) did not block in production, and running it made every page a capped Worker request, see `docs/RATE-LIMITING.md` |
 
 **Spike 2 result (29 Sep 2026), the evidence behind the irradiance rows above.** PVGIS SARAH-3 does not cover the Philippines, so sources were scored against Global Solar Atlas long-term monthly GHI, 2020 to 2023, five cities (Laoag, Manila, Iloilo, Cebu, Davao).
 
@@ -144,7 +144,7 @@ The biggest risk is a false red flag that sends an owner to fight an installer o
 | Bill period vs inverter period misalignment | Negative self-consumption, nonsense savings | Force reading dates; S < 0 blocks the result and explains why |
 | Users treat output as a verdict on their installer | Reputational heat for you | Findings sheet framed as "questions to ask", no installer names stored or shown, disclaimer that it is a screening check, not an inspection |
 | Open-Meteo CORS or terms change | F4 breaks | NASA POWER alone (shown as inferred), then typical-only; non-commercial use only. Himawari has holes in 2026 today, which the fallback already covers |
-| Bot traffic | Free-plan Worker request cap reached, site unavailable | Per-visitor rate limit in the Worker; fails open; watch the daily request count in beta |
+| Bot traffic | Free-plan Worker request cap reached, site unavailable | Removed 14 Nov 2026: no Worker script runs, and static asset requests have no cap (ticket #37) |
 | Employer IP overlap | Ownership dispute | Low: residential net-metering is outside NAC's business. Build on personal hardware and time anyway, and keep it off company devices this time |
 
 **Out of scope:** diagnosing specific faults, string-level data, cell-level or SoC-curve battery analysis (v1 works from monthly charge and discharge totals), anything above 100 kW.
@@ -181,7 +181,7 @@ Built in the order of `docs/NEXT.md`, calc core before any UI, so the numbers ar
 - [x] **Hybrid systems.** In v1 scope as F9
 - [x] **Language.** English UI throughout, including bill-decoder explanations, tooltips and nudges (Taglish dropped 2 Oct 2026); findings sheet is English because it goes to the installer
 - [x] **Obsolescence tracker.** Separate product and brand
-- [x] **Rate limiting.** In code: Worker with the Workers Rate Limiting binding (a WAF rule was not available on Fred's plan). See `docs/RATE-LIMITING.md`
+- [x] **Rate limiting.** Was in code (Worker with the Workers Rate Limiting binding). Retired 14 Nov 2026 with the Worker itself: static assets only (ticket #37). See `docs/RATE-LIMITING.md`
 - [ ] **Beta recruits.** Fred sourcing five owners across three DUs, with at least two hybrids
 
 ## Sources

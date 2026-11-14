@@ -1,4 +1,7 @@
-# Rate limiting
+# Rate limiting (retired 14 Nov 2026)
+
+**Retired (Fred, 14 Nov 2026, ticket #37).** The limiter below ran in a Worker on every page request. On the Free plan that gave the site a daily cap of 100,000 Worker requests, and in production the limiter did not block (see "Observed in production"), so one fast client could spend the day's quota in about 22 minutes and leave the site answering `429` until 08:00 PH. SCND is now static assets only: `wrangler.jsonc` has no `main`, headers come from `public/_headers`, and static asset requests are free and unlimited. Cloudflare's built-in DDoS protection still applies. The Worker code is in git history, last at commit `fb8fc5a`. The rest of this file is the record of what it did.
+
 
 Decided 29 Sep 2026 (Fred): a Cloudflare WAF rate limiting rule was not available on the plan (it showed as an Enterprise add-on), so the limiter is in the Worker, in code.
 
