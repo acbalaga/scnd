@@ -1,0 +1,21 @@
+# Runs the golden-case tests on every push (any branch) and every pull request (ticket #41). No dependencies, no secrets.
+# The deploy itself is gated in Cloudflare (Workers Builds build command), see docs/DEPLOY-GATE.md.
+# Actions are pinned to a major version. To pin by commit SHA, replace each tag with the full SHA of that release.
+name: test
+on:
+  pull_request:
+  push:
+permissions:
+  contents: read
+jobs:
+  node-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - run: node --test
