@@ -11,7 +11,7 @@ const DAYS = [31, 28.25, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 const tiny = (() => {
   const cells = [];
   for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) cells.push(Array.from({ length: 12 }, (_, m) => 10 * i + j + m));
-  return { lat0: 10, lon0: 120, step: 0.5, nLat: 2, nLon: 2, ghi: cells, dif: cells, t2m: cells };
+  return { lat0: 10, lon0: 120, step: 0.5, nLat: 2, nLon: 2, ghi: cells, dif: cells };
 })();
 
 test('interpolate returns the cell value at a grid node', () => {
@@ -24,8 +24,8 @@ test('interpolate returns null outside the grid or on a no-data corner', () => {
   assert.equal(interpolate(tiny, 'ghi', 9, 120.2), null);
   assert.equal(interpolate({ ...tiny, ghi: [null, ...tiny.ghi.slice(1)] }, 'ghi', 10.25, 120.25), null);
 });
-test('lookup returns all three fields', () => {
-  assert.deepEqual(Object.keys(lookup(tiny, 10.2, 120.2)), ['ghi', 'dif', 't2m']);
+test('lookup returns GHI and diffuse', () => {
+  assert.deepEqual(Object.keys(lookup(tiny, 10.2, 120.2)), ['ghi', 'dif']);
 });
 
 // Checks below need the real grid from `node scripts/build-grid.mjs`.

@@ -14,7 +14,10 @@ const OUT = path.join(ROOT, 'public', 'data', 'ph-grid.json');
 const LAT0 = 4.5, LAT1 = 21.0, LON0 = 116.5, LON1 = 127.0, STEP = 0.5;
 const N_LAT = Math.round((LAT1 - LAT0) / STEP) + 1;
 const N_LON = Math.round((LON1 - LON0) / STEP) + 1;
-const PARAMS = { ghi: 'ALLSKY_SFC_SW_DWN', dif: 'ALLSKY_SFC_SW_DIFF', t2m: 'T2M' };
+// Air temperature (T2M) was in the grid until 14 Nov 2026 and never used: annual means across the city points span only
+// about 3 degC (Baguio 23.7 to Davao 26.9), about 1% of PR at typical module temperature coefficients, which is below
+// the noise in the sun data. Dropped to cut the file by a third (Fred, ticket #54). Add `t2m: 'T2M'` back here if needed.
+const PARAMS = { ghi: 'ALLSKY_SFC_SW_DWN', dif: 'ALLSKY_SFC_SW_DIFF' };
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 const DELAY_MS = 2000;
 
@@ -111,7 +114,7 @@ async function main() {
     console.log(`${name}: ${raw[name].length} NASA points`);
   }
 
-  const out = { ghi: [], dif: [], t2m: [] };
+  const out = { ghi: [], dif: [] };
   for (let i = 0; i < N_LAT; i++) {
     for (let j = 0; j < N_LON; j++) {
       const lat = LAT0 + i * STEP, lon = LON0 + j * STEP;
@@ -127,7 +130,7 @@ async function main() {
     meta: {
       source: 'NASA POWER climatology, community RE, regional endpoint, resampled by inverse-distance weighting',
       inlandNodes: 'Sun data at ' + INLAND_NODES.map((n) => `${n.lat}, ${n.lon}`).join(' and ') + ' uses only the NASA inland cells on ' + (INLAND_NODES[0].lon + 0.5) + ' E (Metro Manila, ticket #38)',
-      parameters: { ghi: 'ALLSKY_SFC_SW_DWN kWh/m2/day', dif: 'ALLSKY_SFC_SW_DIFF kWh/m2/day', t2m: 'T2M degC' },
+      parameters: { ghi: 'ALLSKY_SFC_SW_DWN kWh/m2/day', dif: 'ALLSKY_SFC_SW_DIFF kWh/m2/day' },
       // As NASA's response header states it. The 14 Nov 2026 rebuild read 20010101-20251231 while every value matched the
       // 29 Sep 2026 build, which had recorded 20010101-20201231 (noted for Fred in docs/NEXT.md, ticket #38).
       period: period ?? 'unknown (check raw cache header)',
@@ -135,7 +138,7 @@ async function main() {
       step: STEP,
     },
     lat0: LAT0, lon0: LON0, step: STEP, nLat: N_LAT, nLon: N_LON,
-    ghi: out.ghi, dif: out.dif, t2m: out.t2m,
+    ghi: out.ghi, dif: out.dif,
   };
   const text = JSON.stringify(grid);
   await mkdir(path.dirname(OUT), { recursive: true });

@@ -21,4 +21,4 @@ Today "Check the weather" makes the visitor's browser call Open-Meteo (satellite
 
 **Do not build it now.** The rule as written does not allow it, the Open-Meteo terms are unread, and the gain (IP addresses kept from two public science services that already get only a rounded point) is smaller than the new failure point and the shared rate limit. Revisit if either source starts blocking browser calls (the case rule 2 already covers) or if Open-Meteo asks for server-side use.
 
-**Fred, to decide:** whether to read Open-Meteo's terms yourself (or let a session reach `open-meteo.com`), and whether to add attribution lines for both sources (finding 8).
+**Decided (Fred, 14 Nov 2026):** not built. Attribution added (finding 8): footer, findings sheet and method guide. Still open: read Open-Meteo's terms and licence wording yourself, since this sandbox cannot reach `open-meteo.com`.

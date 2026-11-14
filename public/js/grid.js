@@ -1,6 +1,6 @@
 // Typical-year irradiance grid lookup. Pure apart from the one static JSON load.
 // Grid layout: cell (i, j) is at lat0 + i*step, lon0 + j*step; index = i*nLon + j.
-// Values are monthly means, Jan to Dec. GHI and diffuse in kWh/m2/day, T2M in degC.
+// Values are monthly means, Jan to Dec. GHI and diffuse in kWh/m2/day. (Air temperature was dropped 14 Nov 2026, ticket #54.)
 
 let cached = null;
 
@@ -27,12 +27,11 @@ export function interpolate(grid, field, lat, lon) {
   return c[0].map((_, m) => c.reduce((s, cv, k) => s + w[k] * cv[m], 0));
 }
 
-// { ghi, dif, t2m } monthly arrays for a point, or null outside coverage.
+// { ghi, dif } monthly arrays for a point, or null outside coverage.
 export function lookup(grid, lat, lon) {
   const ghi = interpolate(grid, 'ghi', lat, lon);
   const dif = interpolate(grid, 'dif', lat, lon);
-  const t2m = interpolate(grid, 't2m', lat, lon);
-  return ghi && dif && t2m ? { ghi, dif, t2m } : null;
+  return ghi && dif ? { ghi, dif } : null;
 }
 
 // Diffuse fraction below this in any month marks a very clear dry-season location.
