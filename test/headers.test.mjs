@@ -43,7 +43,8 @@ test('headers: fonts are cached for a year as immutable, nothing else is', () =>
 test('headers: CSP allows only this origin, the two irradiance hosts and Cloudflare analytics for connections', () => {
   assert.match(CSP, /(^|; )default-src 'self'(;|$)/);
   assert.match(CSP, /connect-src 'self' https:\/\/satellite-api\.open-meteo\.com https:\/\/power\.larc\.nasa\.gov https:\/\/cloudflareinsights\.com(;|$)/);
-  assert.match(CSP, /script-src 'self' 'sha256-[^']+' 'unsafe-eval' https:\/\/static\.cloudflareinsights\.com(;|$)/);
+  assert.match(CSP, /script-src 'self' 'sha256-[^']+' https:\/\/static\.cloudflareinsights\.com(;|$)/);
+  assert.doesNotMatch(CSP, /unsafe-eval/);   // ticket #46: Alpine's CSP build needs no eval
   for (const d of ["frame-ancestors 'none'", "object-src 'none'", "base-uri 'none'", "form-action 'none'"]) assert.ok(CSP.includes(d), d);
 });
 

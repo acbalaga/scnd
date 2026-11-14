@@ -5,8 +5,8 @@
 #
 # Content-Security-Policy:
 # - script-src: the sha256 is the inline theme script in index.html and the guides (byte-identical). test/headers.test.mjs
-#   fails if they drift apart. 'unsafe-eval' is for Alpine's standard build, which compiles x-data expressions with
-#   new Function (audit M-2, ticket #46). Cloudflare Web Analytics (cookieless page-view counts, turned on in the
+#   fails if they drift apart. No 'unsafe-eval': the app runs Alpine's CSP build, which parses template expressions
+#   without eval (ticket #46, 14 Nov 2026). Cloudflare Web Analytics (cookieless page-view counts, turned on in the
 #   Cloudflare dashboard) injects its beacon from static.cloudflareinsights.com and reports to cloudflareinsights.com,
 #   disclosed in "Privacy and limits" (Fred, 2 Oct 2026; audit M-10).
 # - style-src 'unsafe-inline' is for the style="" attributes in index.html.
@@ -15,7 +15,7 @@
 # - upgrade-insecure-requests: any http:// reference is fetched over https (ticket #47).
 # X-Frame-Options repeats frame-ancestors 'none' for older browsers; COOP keeps other sites' windows out of this one.
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-B8U7Anw7zuz9OFoSuoKagKsf+/k9rF62FJxi1G4tCEw=' 'unsafe-eval' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://satellite-api.open-meteo.com https://power.larc.nasa.gov https://cloudflareinsights.com; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; worker-src 'self'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-B8U7Anw7zuz9OFoSuoKagKsf+/k9rF62FJxi1G4tCEw=' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://satellite-api.open-meteo.com https://power.larc.nasa.gov https://cloudflareinsights.com; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; worker-src 'self'; upgrade-insecure-requests
   Referrer-Policy: no-referrer
   X-Content-Type-Options: nosniff
   Permissions-Policy: geolocation=(self), camera=(), microphone=(), payment=()

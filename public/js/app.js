@@ -372,6 +372,23 @@ document.addEventListener('alpine:init', () => {
       };
     },
 
+    // ---- Alpine CSP build helpers (ticket #46) ----
+    // The CSP build parses template expressions without eval, so it has no arrow functions, `delete`, `if` statements,
+    // optional chaining or DOM property writes in markup, and no globals. These methods stand in for what the templates
+    // used to say inline.
+    abs: Math.abs, min: Math.min, max: Math.max, round: Math.round,
+    clearErr(name) { delete this.fieldErr[name]; },
+    choosePlace() { this.pickPlace(); this.clearErr('place'); },
+    startSetup() { this.started = true; this.$nextTick(() => { this.scrollTo('setup'); this.$refs.fPlace?.focus({ preventScroll: true }); }); },
+    openSheet() { this.showSheet = true; this.probeQr(); this.$nextTick(() => this.scrollTo('findings')); },
+    toggleSheet() { if (this.showSheet) this.showSheet = false; else this.openSheet(); },
+    openIfOutage(el, b) { el.open = num(b.outageHours) > 0; },
+    decodeTeaser(b) { return this.decode(b)?.flags?.includes('total_below_charges') ? 'Check the total' : 'Why it is not zero'; },
+    // Stands in for x-html, which the CSP build refuses. The markup is only ever the SVG built by dialSvg, chart and
+    // quoteChart from numbers, fixed labels and dates that data.js has checked against YYYY-MM-DD; no text the owner
+    // types reaches it (the place name is shown with x-text only). Rewrites only when the markup changes.
+    paintSvg(el, markup) { if (el._svg !== markup) { el.innerHTML = markup; el._svg = markup; } },
+
     // ---- Presentation helpers (no maths here) ----
     get step() {
       if (!this.ready) return 1;

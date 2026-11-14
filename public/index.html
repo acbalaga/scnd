@@ -66,7 +66,7 @@
     <p x-show="!ready">Check your rooftop system against your own bill. Free, and your bills and kWh stay in this browser.</p>
     <p class="need" x-show="!ready"><b>You need:</b> your latest electric bill, and the solar kWh for the same dates from your inverter app.</p>
     <div class="row" style="margin-top:12px" x-show="!ready">
-      <button type="button" class="primary" @click="started = true; $nextTick(() => { scrollTo('setup'); $refs.fPlace?.focus({ preventScroll: true }); })">Check my system</button>
+      <button type="button" class="primary" @click="startSetup()">Check my system</button>
       <button type="button" @click="loadExample()">Try an example</button>
     </div>
     <div x-show="!ready"><button type="button" class="link" style="padding-left:0" @click="loadExample('hybrid')">Or try a hybrid example: battery, 14 months of bills</button></div>
@@ -110,7 +110,7 @@
       <!-- Sample answer: made-up numbers, drawn by the same dial code as a real bill (app.js sampleDial). Landing only. -->
       <figure class="sample" x-show="landing">
         <figcaption>What an answer looks like <span>(made-up numbers)</span></figcaption>
-        <div class="dial" x-html="sampleDial"></div>
+        <div class="dial" x-effect="paintSvg($el, sampleDial)"></div>
         <p class="headline">Looks healthy.</p>
         <p class="sub">600 kWh made, against about 570 kWh for a healthy system in that sun (5% over).</p>
         <button type="button" class="link" @click="loadExample()">See a full example</button>
@@ -137,7 +137,7 @@
       <p class="err" role="alert" x-show="setupError" x-text="setupError"></p>
       <div class="grid">
         <label class="wide">Where is it?
-          <select x-model="place" @change="pickPlace(); delete fieldErr.place" x-ref="fPlace" :aria-invalid="!!fieldErr.place" aria-describedby="e_place" :class="{ empty: !place }">
+          <select x-model="place" @change="choosePlace()" x-ref="fPlace" :aria-invalid="!!fieldErr.place" aria-describedby="e_place" :class="{ empty: !place }">
             <option value="">Pick the nearest city</option>
             <template x-for="c in cities" :key="c.name"><option :value="c.name" x-text="c.name"></option></template>
           </select>
@@ -156,17 +156,17 @@
         </div>
         <label>Panel size (kWp)
           <span class="hint">On your quotation. Not sure? Panel watts times panel count: six 550 W panels is 3.3 kWp.</span>
-          <input type="number" inputmode="decimal" min="0" step="0.01" x-model.number="s.kWp" x-ref="fKwp" :aria-invalid="!!fieldErr.kWp" aria-describedby="e_kWp" @input="delete fieldErr.kWp" placeholder="e.g. 5.5">
+          <input type="number" inputmode="decimal" min="0" step="0.01" x-model.number="s.kWp" x-ref="fKwp" :aria-invalid="!!fieldErr.kWp" aria-describedby="e_kWp" @input="clearErr('kWp')" placeholder="e.g. 5.5">
         <span class="err" id="e_kWp" x-show="fieldErr.kWp" x-text="fieldErr.kWp"></span>
         </label>
         <label>Inverter size (kW)
           <span class="hint">On the inverter label.</span>
-          <input type="number" inputmode="decimal" min="0" step="0.1" x-model.number="s.acKw" x-ref="fAc" :aria-invalid="!!fieldErr.acKw" aria-describedby="e_acKw" @input="delete fieldErr.acKw" placeholder="e.g. 5">
+          <input type="number" inputmode="decimal" min="0" step="0.1" x-model.number="s.acKw" x-ref="fAc" :aria-invalid="!!fieldErr.acKw" aria-describedby="e_acKw" @input="clearErr('acKw')" placeholder="e.g. 5">
         <span class="err" id="e_acKw" x-show="fieldErr.acKw" x-text="fieldErr.acKw"></span>
         </label>
         <label>Roof tilt (degrees)
           <span class="hint">Most PH roofs are 10 to 15°. Not sure? Leave it at 10.</span>
-          <input type="number" inputmode="decimal" min="0" max="90" step="1" x-model.number="s.tilt" x-ref="fTilt" :aria-invalid="!!fieldErr.tilt" aria-describedby="e_tilt" @input="delete fieldErr.tilt">
+          <input type="number" inputmode="decimal" min="0" max="90" step="1" x-model.number="s.tilt" x-ref="fTilt" :aria-invalid="!!fieldErr.tilt" aria-describedby="e_tilt" @input="clearErr('tilt')">
         <span class="err" id="e_tilt" x-show="fieldErr.tilt" x-text="fieldErr.tilt"></span>
         </label>
         <label>Panels face
@@ -212,7 +212,7 @@
         <summary>What this system should make in a typical year <span class="teaser" x-text="fmt(quote.totalKwh, 0) + ' kWh'"></span></summary>
         <div>
           <p class="help">Expected for each month at a performance ratio (PR) of 0.75, the level SCND calls healthy, in this location's typical-year sun. PR compares what panels make with what they would make if nothing were lost. A kWh is the unit on your bill: it runs a 1,000 W appliance for an hour. The dark tick on each bar is the lowest a month can make and still read "a bit low" rather than low.</p>
-          <div class="chartbox" x-html="quoteChart"></div>
+          <div class="chartbox" x-effect="paintSvg($el, quoteChart)"></div>
           <p><b x-text="fmt(quote.totalKwh, 0) + ' kWh a year'"></b>, or <span x-text="fmt(quote.specificYield, 0)"></span> kWh for each kWp of panels.</p>
           <details class="chart-table"><summary>Show as a table</summary>
             <table><thead><tr><th>Month</th><th>Healthy (PR 0.75)</th><th>Lowest before "low"</th></tr></thead>
@@ -262,7 +262,7 @@
                 <div class="wide help-row"><details class="optional"><summary>? What is this? Reading dates</summary>
                   <p class="help">Your bill shows a "Previous reading date" and a "Present reading date". A billing period rarely matches a calendar month, so SCND uses these two dates.</p></details></div>
                 <!-- Optional, so it stays folded and out of the path to the answer (dates, then solar kWh). Opens when it holds a value. -->
-                <div class="wide help-row"><details class="optional" x-init="$el.open = num(b.outageHours) > 0"><summary>Had brownouts? Add outage hours</summary>
+                <div class="wide help-row"><details class="optional" x-init="openIfOutage($el, b)"><summary>Had brownouts? Add outage hours</summary>
                   <label style="margin-top:4px">Outage hours in this period (optional)
                     <span class="hint">On-grid inverters stop during brownouts by design, so those hours are not a fault.</span>
                     <input type="number" min="0" step="any" inputmode="decimal" x-model.number="b.outageHours"></label></details></div>
@@ -349,7 +349,7 @@
           <template x-if="result(b) && result(b).pr !== null">
             <div>
               <div class="answer">
-                <div class="dial" x-html="dial(b)"></div>
+                <div class="dial" x-effect="paintSvg($el, dial(b))"></div>
                 <p class="headline" x-text="headline(b)"></p>
                 <p class="sub" x-text="answerSub(b)"></p>
                 <!-- PR definition matches the findings sheet (app.js "sources") and docs/SPEC.md F1: energy made over what the rated panels would make in that sun. -->
@@ -365,7 +365,7 @@
                   <p class="help" role="status" x-show="!result(b).weather" x-text="weatherStatusLine"></p>
                   <div class="row">
                     <button type="button" x-show="!result(b).weather" @click="checkWeather()" :aria-disabled="weather.status === 'loading'" x-text="weather.status === 'loading' ? 'Checking...' : (weather.status === 'failed' ? 'Try the weather again' : 'Check the weather first')"></button>
-                    <button type="button" :class="result(b).weather ? '' : 'link'" @click="showSheet = true; probeQr(); $nextTick(() => scrollTo('findings'))">Open findings sheet</button>
+                    <button type="button" :class="result(b).weather ? '' : 'link'" @click="openSheet()">Open findings sheet</button>
                   </div>
                 </div>
                 <p class="help" x-show="result(b).band === 'red' && !redRaised(b)" style="text-align:center">We wait for a second low month before raising a flag, because satellite sun data can be off by 5 to 10% for a single month.</p>
@@ -390,7 +390,7 @@
                       <template x-if="result(b).weather.split.total > 0">
                         <dl>
                           <dt>Below a typical period by</dt><dd x-text="fmt(result(b).weather.split.total, 0) + ' kWh'"></dd>
-                          <dt x-text="result(b).weather.split.weather >= 0 ? 'Explained by weather' : 'Extra the sunny weather should have given'"></dt><dd x-text="fmt(Math.abs(result(b).weather.split.weather), 0) + ' kWh'"></dd>
+                          <dt x-text="result(b).weather.split.weather >= 0 ? 'Explained by weather' : 'Extra the sunny weather should have given'"></dt><dd x-text="fmt(abs(result(b).weather.split.weather), 0) + ' kWh'"></dd>
                           <dt>Left for the system to explain</dt><dd x-text="fmt(result(b).weather.split.system, 0) + ' kWh'"></dd>
                         </dl>
                       </template>
@@ -447,7 +447,7 @@
                    metering" and SolarPro Install "reading the net-metered Meralco bill". No rates are hard-coded:
                    every peso figure below is read from the user's own bill. -->
               <details class="sec" x-show="decode(b) && !decode(b).error">
-                <summary>Decode this bill <span class="teaser" x-text="decode(b)?.flags?.includes('total_below_charges') ? 'Check the total' : 'Why it is not zero'"></span></summary>
+                <summary>Decode this bill <span class="teaser" x-text="decodeTeaser(b)"></span></summary>
                 <div><template x-if="decode(b) && !decode(b).error"><div>
                   <ol class="steps-list">
                     <li><strong>Bought from the grid.</strong> You bought <b x-text="fmt(num(b.importKwh), 0) + ' kWh'"></b>. The charges that rise with kWh came to <b x-text="'₱' + fmt(charges(b).varCharges, 2)"></b>, an average of <b x-text="'₱' + fmt(decode(b).rImport, 2) + ' per kWh'"></b>.</li>
@@ -455,7 +455,7 @@
                       <span x-show="decode(b).exportGap > 0"> Solar you use at home saves more (<b x-text="'₱' + fmt(decode(b).rImport, 2)"></b> per kWh) than solar you export (<b x-text="'₱' + fmt(charges(b).genRate, 2)"></b> per kWh).</span></li>
                     <!-- Steps 3 and 4 say what these numbers show: credit above the charges, a total below them, or nothing left for fixed charges. -->
                     <li x-show="!decode(b).excess"><strong>After the credit.</strong> <span x-text="'₱' + fmt(charges(b).varCharges, 2) + ' minus ₱' + fmt(decode(b).exportCredit, 2) + ' is ₱' + fmt(decode(b).afterCredit, 2) + '.'"></span>
-                      <span x-show="decode(b).coverage !== null"> The credit covers <b x-text="fmt(Math.min(decode(b).coverage, 1) * 100, 0) + '%'"></b> of the variable charges.</span></li>
+                      <span x-show="decode(b).coverage !== null"> The credit covers <b x-text="fmt(min(decode(b).coverage, 1) * 100, 0) + '%'"></b> of the variable charges.</span></li>
                     <li x-show="decode(b).excess > 0"><strong>After the credit.</strong> The credit (<b x-text="'₱' + fmt(decode(b).exportCredit, 2)"></b>) is larger than the variable charges (<b x-text="'₱' + fmt(charges(b).varCharges, 2)"></b>), so nothing is left here: <b>₱0.00</b>. SCND does not model the extra <b x-text="'₱' + fmt(decode(b).excess, 2)"></b>. See the note below.</li>
                     <li x-show="!decode(b).flags.includes('total_below_charges') && !decode(b).noFixed"><strong>Why the bill is not zero.</strong> The remaining <b x-text="'₱' + fmt(decode(b).other, 2)"></b> is fixed charges (such as metering and supply) and other charges outside the variable charges. Exporting more does not lower them. The credit only offsets variable charges, so the bill never reaches zero.</li>
                     <li x-show="decode(b).flags.includes('total_below_charges')"><strong>The total does not match.</strong> Your total is <b x-text="'₱' + fmt(-decode(b).other, 2)"></b> below the <b x-text="'₱' + fmt(decode(b).afterCredit, 2)"></b> left after the credit. Fixed charges cannot explain that, so recheck the numbers. See the note below.</li>
@@ -501,7 +501,7 @@
 
       <div id="bills-end" class="row">
         <button type="button" @click="addBill()">Add another bill</button>
-        <button type="button" :class="{ primary: weather.status === 'done' }" @click="showSheet = !showSheet; if (showSheet) { probeQr(); $nextTick(() => scrollTo('findings')); }" x-text="showSheet ? 'Hide findings sheet' : 'Findings sheet for my installer'"></button>
+        <button type="button" :class="{ primary: weather.status === 'done' }" @click="toggleSheet()" x-text="showSheet ? 'Hide findings sheet' : 'Findings sheet for my installer'"></button>
       </div>
 
       <!-- Save nudge: after the first answer, before they leave -->
@@ -530,7 +530,7 @@
           </div>
           <div class="stats" x-show="paybackStats">
             <div class="stat"><small>Saved so far</small><b x-text="'₱' + fmt(paybackStats.saved, 0)"></b><em x-text="'over ' + fmt(paybackStats.days, 0) + ' days'"></em></div>
-            <div class="stat" x-show="paybackStats.promised !== null"><small>Promised pace</small><span class="early-tag" x-show="earlyTag" x-text="earlyTag"></span><b x-text="'₱' + fmt(paybackStats.promised, 0)"></b><em x-text="fmt(Math.abs(paybackStats.gapPct), 0) + '% ' + (paybackStats.gapPct >= 0 ? 'ahead' : 'behind')"></em></div>
+            <div class="stat" x-show="paybackStats.promised !== null"><small>Promised pace</small><span class="early-tag" x-show="earlyTag" x-text="earlyTag"></span><b x-text="'₱' + fmt(paybackStats.promised, 0)"></b><em x-text="fmt(abs(paybackStats.gapPct), 0) + '% ' + (paybackStats.gapPct >= 0 ? 'ahead' : 'behind')"></em></div>
             <div class="stat" x-show="paybackStats.years !== null"><small>Payback at your pace</small><span class="early-tag" x-show="earlyTag" x-text="earlyTag"></span><b x-text="fmt(paybackStats.years, 1) + ' yr'"></b><em x-text="paybackStats.promisedYears ? 'promised ' + fmt(paybackStats.promisedYears, 1) + ' yr' : 'rough guide'"></em></div>
           </div>
           <div class="legend" x-show="promisedPerDay">
@@ -538,7 +538,7 @@
             <span><i class="key" style="border-color:var(--c-promise)"></i>Promised pace</span>
           </div>
           <div class="chartbox" tabindex="0" role="group" aria-label="Savings over time. Use the left and right arrow keys to read each bill." @pointermove="chartMove($event)" @pointerdown="chartMove($event)" @pointerleave="chartHover = null" @focus="chartKey(0)" @blur="chartHover = null" @keydown.left.prevent="chartKey(-1)" @keydown.right.prevent="chartKey(1)">
-            <div x-html="chart"></div>
+            <div x-effect="paintSvg($el, chart)"></div>
             <div class="tip" x-show="tip" :style="tip ? tip.style : {}">
               <div class="d" x-text="tip ? tip.date : ''"></div>
               <div class="r"><span><i class="key" style="border-color:var(--c-save)"></i>Your savings</span><b x-text="tip ? tip.saved : ''"></b></div>
@@ -575,7 +575,7 @@
       <template x-if="degradationResult">
         <section class="card">
           <h3>Year over year</h3>
-          <p x-text="'Comparing the same months a year apart, weather-adjusted PR changed by about ' + fmt(Math.abs(degradationResult.annualLossPct), 1) + '% a year (' + (degradationResult.annualLossPct >= 0 ? 'down' : 'up') + '), across ' + degradationResult.pairs + ' pair' + (degradationResult.pairs === 1 ? '' : 's') + '.' + (degradationResult.exceedsWarranty === null ? '' : (degradationResult.exceedsWarranty ? ' That is more than the ' + fmt(degradationResult.warrantyPct, 2) + '% a year in your module warranty.' : ' That is within the ' + fmt(degradationResult.warrantyPct, 2) + '% a year in your module warranty.'))"></p>
+          <p x-text="'Comparing the same months a year apart, weather-adjusted PR changed by about ' + fmt(abs(degradationResult.annualLossPct), 1) + '% a year (' + (degradationResult.annualLossPct >= 0 ? 'down' : 'up') + '), across ' + degradationResult.pairs + ' pair' + (degradationResult.pairs === 1 ? '' : 's') + '.' + (degradationResult.exceedsWarranty === null ? '' : (degradationResult.exceedsWarranty ? ' That is more than the ' + fmt(degradationResult.warrantyPct, 2) + '% a year in your module warranty.' : ' That is within the ' + fmt(degradationResult.warrantyPct, 2) + '% a year in your module warranty.'))"></p>
           <!-- Ticket #45 (14 Nov 2026): spread of the same-month pairs, from calc.degradation. -->
           <p class="help" x-show="degradationSpread" x-text="degradationSpread"></p>
           <p class="help">One year of degradation is small next to month-to-month noise in the sun data, so one or two pairs mean little. It becomes more useful as the pairs build up over two or more years.</p>

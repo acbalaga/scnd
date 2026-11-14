@@ -92,3 +92,20 @@ test('guides: sitemap and footer links point at files we ship', () => {
   for (const p of [...locs.filter((x) => x !== '/'), ...linked]) assert.ok(existsSync(new URL('../public' + p + '.html', import.meta.url)), p);
   assert.equal(locs.length, guides.length + 1);
 });
+
+// Ticket #46: Alpine's CSP build parses template expressions without eval and refuses x-html, arrow functions, `delete`,
+// `if` statements, optional chaining, several statements in one handler, writes to DOM properties and globals such as
+// Math. Put that logic in a component method instead. A test here is cheaper than finding it in the browser console.
+test('templates use only expressions the Alpine CSP build can run', () => {
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
+  assert.doesNotMatch(html, /\sx-html=/, 'x-html: use paintSvg($el, markup) via x-effect');
+  const exprs = [...html.matchAll(/\s((?:x-[\w:.-]+|@[\w.:-]+|:[\w.-]+))="([^"]*)"/g)].map((m) => [m[1], m[2]]);
+  const quoted = /'(?:[^'\\]|\\.)*'/g;   // ignore what sits inside string literals
+  for (const [name, expr] of exprs) {
+    const code = expr.replace(quoted, "''");
+    for (const [bad, why] of [[/=>/, 'arrow function'], [/\bdelete\b/, 'delete'], [/\bif\s*\(/, 'if statement'], [/\?\./, 'optional chaining'],
+      [/;/, 'more than one statement'], [/\bMath\./, 'global Math'], [/\$el\.[\w]+\s*=(?!=)/, 'write to a DOM property'], [/`/, 'template literal']]) {
+      assert.doesNotMatch(code, bad, `${name}="${expr.slice(0, 80)}": ${why}`);
+    }
+  }
+});
