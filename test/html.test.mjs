@@ -109,3 +109,9 @@ test('templates use only expressions the Alpine CSP build can run', () => {
     }
   }
 });
+
+// Ticket #55: the README said "94 tests" long after the count moved on. A count goes stale with every ticket, so it is not stated.
+test('README does not state a test count', () => {
+  const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+  assert.doesNotMatch(readme, /\b\d+ tests\b/);
+});

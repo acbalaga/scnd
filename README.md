@@ -4,7 +4,7 @@
 
 An owner types their system details and a few numbers from each bill and inverter app. SCND says whether the system is producing what it should, whether a shortfall was the weather or the system, what the export credit is worth, and what to ask the installer. It never gives a verdict, only questions.
 
-Static site on Cloudflare (Workers static assets, no server code). No backend, no accounts, no database, no cookies. Everything the owner types stays in the browser.
+Static site on Cloudflare (Workers static assets, no server code). No backend, no accounts, no database, no cookies. The owner's bills and kWh stay in the browser; the one exception is the weather check, which sends the location rounded to 0.1° and a date range.
 
 Start here: `CLAUDE.md` (project rules), `docs/SPEC.md` (spec), `docs/NEXT.md` (task queue), `docs/DEPLOY-GATE.md`.
 
@@ -19,8 +19,9 @@ Start here: `CLAUDE.md` (project rules), `docs/SPEC.md` (spec), `docs/NEXT.md` (
 | F5 to F7 | Energy split, savings against the promised payback (chart with hover, table view and payback time at your own pace), load-shift value |
 | F8 | Year-over-year degradation against the module warranty, after 13 months of bills |
 | F9 | Hybrid systems: battery round-trip efficiency, implied house load, battery value, grid-charging flag |
+| Quote check | Before any bill: expected kWh per month for the roof in a typical year, and the PR an installer's promised yearly kWh needs |
 
-Save and load use a JSON file on the owner's own device. "Try an example" fills a made-up system and two bills so a first-time owner sees a full result in one tap.
+Save and load use a JSON file on the owner's own device, or the owner can tick "Keep my data on this device". "Remind me next month" downloads a calendar file. "Try an example" fills a made-up system and bills so a first-time owner sees a full result in one tap. The installed app opens offline (service worker).
 
 ## Privacy
 
@@ -31,17 +32,19 @@ Save and load use a JSON file on the owner's own device. "Try an example" fills 
 
 ## Layout
 
-- `public/`: `index.html`, `app.css`, `manifest.webmanifest`, `icons/`, `js/` (`calc.js` all the maths, `grid.js`, `weather.js`, `findings.js`, `data.js`, `app.js`), `data/ph-grid.json`, `vendor/alpine.min.js` (Alpine 3.17.4 CSP build, MIT; no eval, so the CSP has no `'unsafe-eval'`), `fonts/` (Pixelify Sans, DSEG7 Classic, Chivo and Chivo Mono for the app, Source Serif 4 and Source Sans 3 for the printed report, plus a ₱-only file per family, all SIL Open Font Licence 1.1, licences alongside), `icons/` (logo and app icons). Everything is self-hosted so the page makes no third-party request
+- `public/`: `index.html`, `404.html`, `guide/` (five plain-HTML guides), `app.css`, `manifest.webmanifest`, `sitemap.xml`, `sw.js` (offline copy, see `docs/SERVICE-WORKER.md`), `.well-known/security.txt`, `js/` (`calc.js` the formulas, `engine.js` per-bill results and cross-bill summaries, `findings.js` the sheet's questions, `data.js` save, load and the kept copy, `grid.js`, `weather.js`, `sources.js` weather-source status, `reminder.js` calendar file, `examples.js`, `cities.js`, and `app.js` the Alpine component, presentation only), `data/ph-grid.json` (typical-year sun), `data/source-status.json` (monthly weather-source check), `vendor/alpine.min.js` (Alpine 3.17.4 CSP build, MIT; no eval, so the CSP has no `'unsafe-eval'`), `fonts/` (Pixelify Sans, DSEG7 Classic, Chivo and Chivo Mono for the app, Source Serif 4 and Source Sans 3 for the printed report, plus a ₱-only file per family, all SIL Open Font Licence 1.1, licences alongside), `icons/` (logo and app icons). Everything is self-hosted so the page makes no third-party request
 - `public/_headers`: the security headers, CSP included, for every file (there is no Worker script; `wrangler.jsonc` serves `public/` as static assets)
-- `scripts/`: `build-grid.mjs` (builds the sun grid), `gen-poa-reference.py` (pvlib reference cases), `gen-logo.mjs` and `gen-icons.mjs` (the seven-segment SCND logo and app icons)
+- `scripts/`: `build-grid.mjs` (builds the sun grid), `source-health.mjs` (monthly weather-source check, run by `.github/workflows/source-health.yml`), `sw-version.mjs` (service-worker version), `gen-poa-reference.py` (pvlib reference cases), `gen-logo.mjs`, `gen-icons.mjs` and `gen-og.mjs` (logo, app icons, share image), `fetch-fonts.py` (Chivo files and the ₱-only cuts)
 - `test/`: golden-case tests
 - `docs/`: spec, task queue, deploy gate, custom domain guide, feedback form setup, audits (`docs/RATE-LIMITING.md` is kept as a record of the retired limiter)
 
 ## Develop
 
-- Tests: `node --test` (94 tests, no dependencies)
+- Tests: `node --test` (no dependencies). They also run on every push (`.github/workflows/test.yml`).
 - Run locally: `npx wrangler dev`
 - Rebuild the sun grid: `NODE_USE_ENV_PROXY=1 node scripts/build-grid.mjs` (the env var is only needed behind an HTTP proxy)
+- After changing a file the service worker lists: `node scripts/sw-version.mjs` (a test fails until you do)
+- Weather-source check by hand: `NODE_USE_ENV_PROXY=1 node scripts/source-health.mjs`
 - Regenerate the pvlib reference cases: `python3 scripts/gen-poa-reference.py` (needs `pip install pvlib`)
 
 ## Deploy
@@ -52,11 +55,11 @@ Pages and files are static assets: no Worker script runs, so there is no daily r
 
 ## Feedback
 
-Set `FEEDBACK_URL` in `public/js/app.js` to a Google Form link to show a "Give feedback" link in the footer. See `docs/FEEDBACK-FORM.md`. The link is a plain link the visitor chooses to click, and it passes none of their numbers to the form.
+`FEEDBACK_URL` in `public/js/app.js` is the Google Form behind the footer's "Give feedback" link (see `docs/FEEDBACK-FORM.md`); it is a plain link and passes none of the visitor's numbers. Direct contact for issues, feedback and security reports: contact@alfredbalaga.com (also in `/.well-known/security.txt`).
 
 ## Status
 
-Pre-beta. Tasks 1 to 9 in `docs/NEXT.md` are built and tested. Open: the 5-minute first-time-owner check on a phone, printing the findings sheet on Safari mobile, the private beta (five owners across three DUs, at least two hybrids), and the deploy.
+Live at https://myscnd.app since 2 Oct 2026. The work queue and what is open are in `docs/NEXT.md` (latest: section 22, the 13 Nov 2026 audit tickets). Never checked on a real device: the 5-minute first-time-owner check and printing the findings sheet from Safari on an iPhone (owner checklist, issue #52).
 
 ## Sources decision (29 Sep 2026)
 

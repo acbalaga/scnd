@@ -161,7 +161,7 @@ Built in the order of `docs/NEXT.md`, calc core before any UI, so the numbers ar
 6. **F4 weather check.** Done (task 5).
 7. **F3 findings sheet and save/load JSON.** Done (task 6).
 8. **F8 degradation and F9 hybrid.** Done (task 7).
-9. **Clean-up and rate limiting.** Done (tasks 8 and 9). Spike pages and proxy routes removed; per-visitor limiter in the Worker.
+9. **Clean-up and rate limiting.** Done (tasks 8 and 9). Spike pages and proxy routes removed; per-visitor limiter in the Worker (retired 14 Nov 2026 with the Worker itself, ticket #37).
 10. **Private beta** with 5 owners across Luzon, Visayas and Mindanao DUs; compare the tool's PR against each owner's installer claims. Open.
 11. **Deploy** to the subdomain; doorway page on alfredbalaga.com. Open.
 

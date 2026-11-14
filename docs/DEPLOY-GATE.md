@@ -30,4 +30,6 @@ GitHub > `acbalaga/scnd` > Settings > Branches (or Rules) > add a rule for `main
 ## What the tests also guard
 
 - `test/vendor.test.mjs`: the vendored Alpine file is byte-identical to the npm release named in its header. Changing it is a dependency change (ask Fred).
-- `test/worker.test.mjs`: the CSP hash still matches the inline theme script, and no shipped file runs the Worker by mistake.
+- `test/headers.test.mjs`: every header and the CSP (no `'unsafe-eval'`), the theme-script hash on every page, and that no Worker script comes back.
+- `test/sw.test.mjs`: the offline service worker's version matches its files.
+- `test/html.test.mjs`: template expressions stay within what Alpine's CSP build can run.

@@ -315,7 +315,7 @@ document.addEventListener('alpine:init', () => {
       return r;
     },
 
-    // Findings sheet (F3): the latest 6 bills as a table, plus questions built from the results.
+    // Findings sheet (F3): the latest 5 bills as a table (what fits one printed page), plus questions built from all bills.
     get sheet() { return this.memo('sheet', () => this.computeSheet()); },
     computeSheet() {
       if (!this.ready) return null;
