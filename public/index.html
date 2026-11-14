@@ -485,6 +485,8 @@
         <details class="optional"><summary>What is sent?</summary>
           <p class="help">Sun data comes from a satellite (Himawari, through Open-Meteo) and NASA POWER. Only your location, rounded to 0.1° (about 11 km), and a date range go to those two services, and only when you tap the button.</p>
         </details>
+        <!-- Ticket #48: from public/data/source-status.json (monthly check of both sources at the public city points). -->
+        <p class="help" x-show="weather.status === 'idle' && satGapText" x-text="satGapText"></p>
         <div class="row" style="margin-top:10px">
           <button type="button" :class="{ primary: weather.status !== 'done' }" @click="checkWeather()" :disabled="!canCheckWeather" :aria-disabled="weather.status === 'loading'" x-text="weather.status === 'loading' ? 'Checking...' : (weather.status === 'done' ? 'Check again' : (weather.status === 'failed' ? 'Try again' : 'Check the weather'))"></button>
         </div>

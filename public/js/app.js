@@ -7,6 +7,8 @@ import { fetchSatellite, fetchNasa, SOURCE_LABELS } from './weather.js';
 import { serialize, parse, keptText, restoreKept, STORAGE_KEY, MAX_BYTES } from './data.js';
 import { EXAMPLES, exampleBills } from './examples.js';
 import { reminderIcs, nextReminderDate } from './reminder.js';
+import { CITIES } from './cities.js';
+import { satelliteGaps } from './sources.js';
 import { findings, MIN_DEGRADATION_PAIRS, PAYBACK_MIN_DAYS } from './findings.js';
 
 const { num, NUM_FIELDS } = engine;
@@ -25,15 +27,6 @@ document.addEventListener('paste', (e) => {
 const round1 = (v) => Math.round(v * 10) / 10;
 // Today on the owner's own clock, as YYYY-MM-DD. toISOString() is UTC, which is yesterday in PH before 8 am.
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
-
-// Nearest-city shortcuts, coordinates rounded to 0.1 degree.
-const CITIES = [
-  ['Laoag', 18.2, 120.6], ['Tuguegarao', 17.6, 121.7], ['Baguio', 16.4, 120.6], ['Angeles', 15.1, 120.6],
-  ['Quezon City', 14.7, 121.0], ['Manila', 14.6, 121.0], ['Batangas', 13.8, 121.1], ['Legazpi', 13.1, 123.7],
-  ['Puerto Princesa', 9.7, 118.7], ['Iloilo', 10.7, 122.6], ['Bacolod', 10.7, 123.0], ['Cebu', 10.3, 123.9],
-  ['Tacloban', 11.2, 125.0], ['Cagayan de Oro', 8.5, 124.6], ['Davao', 7.1, 125.6], ['General Santos', 6.1, 125.2],
-  ['Zamboanga', 6.9, 122.1],
-].map(([name, lat, lon]) => ({ name, lat, lon }));
 
 // azimuth: 0 = south, 90 = west, -90 = east (same as calc.js).
 const FACINGS = [
@@ -503,6 +496,22 @@ document.addEventListener('alpine:init', () => {
       if (w.status !== 'failed') return '';
       const unreachable = w.errors.length && w.noAnswer;
       return `The weather check did not get through: ${unreachable ? 'neither weather service could be reached. Check your connection and try again' : 'the weather services gave no usable data for these dates. Try again later'}, or go ahead with the findings sheet, which shows PR against a typical year's sun.`;
+    },
+    // Ticket #48: where the monthly source check found the satellite short at the nearest city, say before the click that
+    // those months will rest on NASA POWER alone. The status file is a static file from this site, loaded once on need.
+    sourceStatus: null,
+    sourceStatusAsked: false,
+    get satGapText() {
+      if (!this.canCheckWeather) return '';
+      if (!this.sourceStatusAsked) {
+        this.sourceStatusAsked = true;
+        fetch('/data/source-status.json').then((r) => (r.ok ? r.json() : null)).then((j) => { this.sourceStatus = j; }).catch(() => {});
+      }
+      const months = this.bills.map((b) => this.result(b)).filter((r) => r?.pr != null).map((r) => `${r.midYear}-${String(r.midMonth).padStart(2, '0')}`);
+      const g = satelliteGaps(this.sourceStatus, num(this.s.lat), num(this.s.lon), months);
+      if (!g.months.length) return '';
+      const names = g.months.map((ym) => `${MON[Number(ym.slice(5)) - 1]} ${ym.slice(0, 4)}`);
+      return `At ${g.city}, the satellite has too few days of data for ${this.listAnd(names)}, so for bills in ${g.months.length === 1 ? 'that month' : 'those months'} the check will use NASA POWER alone.`;
     },
     get canCheckWeather() { return this.bills.some((b) => this.result(b)?.pr != null); },
 
