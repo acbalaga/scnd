@@ -142,16 +142,6 @@ export const prTooHigh = (pr) => Number.isFinite(pr) && pr > PR_PLAUSIBLE_MAX;
 export const PR_PLAUSIBLE_MIN = 0.30;
 export const prTooLow = (pr) => Number.isFinite(pr) && pr < PR_PLAUSIBLE_MIN;
 
-// Typical-year sun reads +3.9% high around Manila against Global Solar Atlas (docs/NEXT.md task 1 check), so PR
-// reads about 4% low there. Only Manila was checked against GSA, so the note covers the 0.5 degree grid cells around
-// it. Disclosed, not corrected: Fred, 31 Oct 2026 (pre-launch audit M-4). Bands and sun data are unchanged.
-export const MANILA_BIAS = { lat: 14.6, lon: 121.0, radiusDeg: 0.5, pct: 3.9 };
-export function nearManila(lat, lon) {
-  const y = Number(lat), x = Number(lon);
-  if (lat === '' || lon === '' || !Number.isFinite(y) || !Number.isFinite(x)) return false;
-  return Math.abs(y - MANILA_BIAS.lat) <= MANILA_BIAS.radiusDeg && Math.abs(x - MANILA_BIAS.lon) <= MANILA_BIAS.radiusDeg;
-}
-
 // When the weather adjustment alone lifts PR above PR_PLAUSIBLE_MAX (the typical-year PR is plausible), the weather
 // index is the suspect, not the owner's numbers: judge on the typical year and say why (weatherRejected, prWeather).
 // Seen with real data: Manila, Aug 2026, NASA POWER alone (satellite gap) gave an index of 0.66. Fred, 1 Oct 2026.

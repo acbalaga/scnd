@@ -313,7 +313,7 @@ document.addEventListener('alpine:init', () => {
       const adjusted = rows.some((x) => x.r.basis === 'weather');
       const sources = [
         `PR is the electricity produced divided by what the panels are rated to produce in the sun received. Within the usual range is ${calc.PR_BANDS.green} or more, with a lower limit of ${calc.PR_BANDS.amberWet} (June to October) or ${calc.PR_BANDS.amberDry} (November to May). Expected output assumes a PR of ${calc.PR_BANDS.green}.`,
-        `Sun data: NASA POWER typical-year climatology (2001 to 2020), transposed to the panel tilt and facing.${this.manilaBias ? ` Around Metro Manila this data reads about ${calc.MANILA_BIAS.pct}% sunnier than Global Solar Atlas, so PR here may read about 4% low.` : ''}${weatherUsed ? ' Weather index compares each period with a 2020 to 2025 baseline from satellite data (Himawari, through Open-Meteo) and NASA POWER, where 1.00 is a typical year.' : ''}`,
+        `Sun data: NASA POWER typical-year climatology (2001 to 2020), transposed to the panel tilt and facing.${weatherUsed ? ' Weather index compares each period with a 2020 to 2025 baseline from satellite data (Himawari, through Open-Meteo) and NASA POWER, where 1.00 is a typical year.' : ''}`,
         ...(adjusted ? ['Where the weather check gave a result and its sources agreed within 5 points, PR and expected output are adjusted for that period\'s weather. Otherwise they are against a typical year (marked "not used" in the weather column).'] : []),
       ];
       return {
@@ -740,8 +740,6 @@ document.addEventListener('alpine:init', () => {
     computeCreditLeftOut() {
       return this.bills.reduce((t, b) => { const r = this.result(b); return t + (r && r.savings !== null && r.uncounted > 0 ? r.uncounted : 0); }, 0);
     },
-    // Typical-year sun reads high around Manila (calc.MANILA_BIAS, audit M-4): a note on the dial and the sheet.
-    get manilaBias() { return this.ready && calc.nearManila(this.s.lat, this.s.lon); },
     get startDate() { return this.memo('startDate', () => this.computeStartDate()); },
     computeStartDate() { const b = this.bills.filter((x) => x.start).sort((a, c) => (a.start < c.start ? -1 : 1))[0]; return b ? b.start : ''; },
 

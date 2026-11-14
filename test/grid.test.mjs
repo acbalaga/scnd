@@ -36,6 +36,15 @@ const opts = { skip: hasGrid ? false : 'public/data/ph-grid.json not built yet' 
 test('grid file is under 250 KB', opts, () => {
   assert.ok(statSync(GRID_PATH).size < 250 * 1024);
 });
+// Ticket #38 (Fred, 14 Nov 2026): Metro Manila nodes take NASA's inland cell (scripts/build-grid.mjs INLAND_NODES).
+// Blended with the Manila Bay cell, 8 of 12 months were more than 5% sunnier than GSA (up to +10% in January).
+test('Manila GHI within 5% of Global Solar Atlas in every month', opts, () => {
+  const g = lookup(real, 14.6, 121.0).ghi;
+  g.forEach((v, m) => {
+    const r = (v * DAYS[m]) / GSA_MANILA_GHI_KWH_M2_MONTH[m];
+    assert.ok(Math.abs(r - 1) <= 0.05, `month ${m + 1}: ${((r - 1) * 100).toFixed(1)}%`);
+  });
+});
 test('Manila annual GHI within 5% of Global Solar Atlas', opts, () => {
   const g = lookup(real, 14.6, 121.0).ghi;
   const nasa = g.reduce((s, v, m) => s + v * DAYS[m], 0);

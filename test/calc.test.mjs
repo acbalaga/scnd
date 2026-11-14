@@ -345,8 +345,3 @@ test('prTooLow golden (M-8): below 0.30 points at a wrong figure; 0.30 itself an
   assert.equal(c.prTooLow(0.29), true); assert.equal(c.prTooLow(0), true);
   assert.equal(c.prTooLow(0.30), false); assert.equal(c.prTooLow(0.55), false); assert.equal(c.prTooLow(NaN), false);
 });
-test('nearManila golden (M-4): Manila and Quezon City are inside the checked area; Cebu and Baguio are not', () => {
-  assert.equal(c.nearManila(14.6, 121.0), true); assert.equal(c.nearManila(14.7, 121.0), true);
-  assert.equal(c.nearManila(10.3, 123.9), false); assert.equal(c.nearManila(16.4, 120.6), false);
-  assert.equal(c.nearManila('', ''), false);
-});
