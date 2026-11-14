@@ -333,7 +333,7 @@ document.addEventListener('alpine:init', () => {
       const adjusted = rows.some((x) => x.r.basis === 'weather');
       const sources = [
         `PR is the electricity produced divided by what the panels are rated to produce in the sun received. Within the usual range is ${calc.PR_BANDS.green} or more, with a lower limit of ${calc.PR_BANDS.amberWet} (June to October) or ${calc.PR_BANDS.amberDry} (November to May). Expected output assumes a PR of ${calc.PR_BANDS.green}.`,
-        `Sun data: NASA POWER typical-year climatology (2001 to 2020), transposed to the panel tilt and facing.${weatherUsed ? ' Weather index compares each period with a 2020 to 2025 baseline from satellite data (Himawari, through Open-Meteo) and NASA POWER, where 1.00 is a typical year.' : ''}`,
+        `Sun data: NASA POWER typical-year climatology (2001 to 2025, as NASA labels it), transposed to the panel tilt and facing.${weatherUsed ? ' Weather index compares each period with a 2020 to 2025 baseline from satellite data (Himawari, through Open-Meteo) and NASA POWER, where 1.00 is a typical year.' : ''}`,
         ...(adjusted ? ['Where the weather check gave a result and its sources agreed within 5 points, PR and expected output are adjusted for that period\'s weather. Otherwise they are against a typical year (marked "not used" in the weather column).'] : []),
       ];
       return {
