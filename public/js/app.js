@@ -832,6 +832,11 @@ document.addEventListener('alpine:init', () => {
     openIntro() { this.introOpen = true; this.$nextTick(() => this.scrollTo('about')); },
     closeIntro() { this.introOpen = false; },
     init() {
+      // Offline copy of the app's own files (public/sw.js, ticket #51). Not on localhost unless ?sw is in the address, so
+      // local development is not served from a stale copy.
+      if ('serviceWorker' in navigator && (location.hostname !== 'localhost' || new URLSearchParams(location.search).has('sw'))) {
+        window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+      }
       // Rebuild the bill results once per change to any input (ticket #39, see the note above `let model`).
       Alpine.effect(() => { this.inputKey(); this.refreshModel(); });
       this.savedSnap = this.snap();

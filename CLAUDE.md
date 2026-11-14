@@ -27,6 +27,7 @@ Owner: Fred (Alfred Balaga), renewable energy O&M practitioner. Personal project
 - Inline SVG charts, hand-rolled. Print stylesheet + `window.print()` for the findings sheet.
 - Cloudflare Workers (static assets only, no Worker script). `wrangler.jsonc`, deploys on push to `main` via Git integration. Preview URLs and the workers.dev address are off (2 Oct 2026). The deploy gate is in `docs/DEPLOY-GATE.md`.
 - Local dev: `npx wrangler dev`.
+- Offline service worker (`public/sw.js`, ticket #51): after changing any file it lists, run `node scripts/sw-version.mjs` (a test fails until you do). Kill switch in `docs/SERVICE-WORKER.md`.
 - Build scripts (e.g. grid generation) live in `scripts/`, run locally with Node or Python, and commit their output. They are never run by the deployed site.
 
 ## Product decisions
