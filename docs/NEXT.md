@@ -311,7 +311,7 @@ Work them in the order the report suggests. One ticket per commit, tick the box 
   - `/.well-known/security.txt` added with contact@alfredbalaga.com (Fred, 14 Nov 2026), expires 14 Nov 2027; the same address is now in "Privacy and limits" as a direct contact for issues and feedback. **Fred:** renew the Expires line before 14 Nov 2027.
 - [ ] **P2-12 (#48)** Monthly source-health check. Decision needed.
 - [ ] **P2-13 (#49)** Quote check: expected yield from setup alone. Decision needed.
-- [ ] **P2-14 (#50)** Calendar reminder file.
+- [x] **P2-14 (#50)** "Remind me next month" (14 Nov 2026). `public/js/reminder.js` (pure) writes an RFC 5545 calendar file: one all-day event a month after the latest bill's end date, repeating monthly, with a 9 am alarm and a stable UID so a second download updates the same event. Days 29 to 31 become the 28th, because a monthly repeat on those days skips short months; old bills roll forward to the next date still to come. The file holds the reminder text and a date only: no bill figures, location or system details. CRLF, 75-octet folding and escaping tested (4 tests). The button sits with "Keep my data on this device" once a bill has an answer. Checked in Chromium: downloads `scnd-reminder.ics` starting a month after the bill, no network request. `node --test`: 177 pass. **Fred:** import one on your iPhone (Apple Calendar) to confirm; I could not test a real calendar app here.
 - [ ] **P2-15 (#51)** Service worker for offline use. Decision needed.
 - [ ] **P2-16 (#52)** Owner checklist: dashboard, DNS, real-device checks. Fred.
 - [ ] **P3-17 (#53)** Investigate a cached weather proxy on the Worker. Decision needed.

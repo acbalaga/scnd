@@ -6,6 +6,7 @@ import { loadGrid, lookup, isLowDiffuse } from './grid.js';
 import { fetchSatellite, fetchNasa, SOURCE_LABELS } from './weather.js';
 import { serialize, parse, keptText, restoreKept, STORAGE_KEY, MAX_BYTES } from './data.js';
 import { EXAMPLES, exampleBills } from './examples.js';
+import { reminderIcs, nextReminderDate } from './reminder.js';
 import { findings, MIN_DEGRADATION_PAIRS, PAYBACK_MIN_DAYS } from './findings.js';
 
 const { num, NUM_FIELDS } = engine;
@@ -280,6 +281,19 @@ document.addEventListener('alpine:init', () => {
       if (kept && !done) { this.started = true; this.setupOpen = true; }
       else await this.continueSetup();
       this.savedSnap = this.snap();
+    },
+    // "Remind me next month" (ticket #50): a calendar file made here, a month after the latest bill. Nothing is sent.
+    remindMsg: '',
+    remindMe() {
+      const end = this.bills.map((b) => b.end).filter(Boolean).sort().at(-1);
+      const next = end ? nextReminderDate(end, today()) : null, text = next ? reminderIcs({ nextDate: next }) : null;
+      if (!text) { this.remindMsg = 'Add a bill with its reading dates first.'; return; }
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([text], { type: 'text/calendar' }));
+      a.download = 'scnd-reminder.ics';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      this.remindMsg = `Calendar file saved. Open it to add a monthly reminder, starting ${this.fmtDate(next)}.`;
     },
     // Tick: keep a copy now (the effect in init() keeps it up to date). Untick: delete the kept copy. The theme stays.
     setKeep(on) {
