@@ -87,11 +87,22 @@ const NUM_FIELDS = [['inverterKwh', 'solar produced'], ['chargeKwh', 'battery ch
   ['total', 'total amount due'], ['outageHours', 'outage hours']];
 const BILL_FIELDS = ['start', 'end', ...NUM_FIELDS.map(([k]) => k)];
 let nextId = 1;
+// Every bill's result, worked out once per change to the inputs (ticket #39). Templates call result(b) about 100 times
+// per bill and several getters scan all bills, so recomputing on each call took about 17 s per keystroke at 56 bills on
+// a slow phone. An effect in init() reads every input and rebuilds the model. It then bumps `ver[id]` only for the bills
+// whose result changed, `ver.fold` when the first or last answered bill moved, and `ver.all` on every change, so a
+// keystroke re-renders only the bills it affects plus the summaries. Getters that summarise all bills are memoized on
+// the model (memo()), so the many bindings that read them share one computation. The model is kept
+// outside Alpine's reactive state on purpose, so filling it never triggers a re-render. It is built from `raw`, the
+// plain object Alpine wraps (see Alpine.data below): Alpine.raw() cannot reach it, because methods run with `this` set to
+// a merged scope proxy rather than the reactive object.
 const newBill = () => ({ id: nextId++, start: '', end: '', inverterKwh: '', importKwh: '', exportKwh: '', chargeUnit: 'amount', genRate: '', genAmount: '', varRate: '', varCharges: '', total: '', outageHours: '', chargeKwh: '', dischargeKwh: '', homeLoadKwh: '', open: true });
 
 document.addEventListener('alpine:init', () => {
   document.getElementById('boot')?.remove();   // the "Loading" fallback in index.html (audit M-11); only a failed start leaves it showing
-  Alpine.data('scnd', () => ({
+  let model = null, built = null;
+  const memos = new Map();
+  Alpine.data('scnd', () => { const raw = {
     minPairs: MIN_DEGRADATION_PAIRS,
     cities: CITIES,
     facings: FACINGS,
@@ -119,6 +130,7 @@ document.addEventListener('alpine:init', () => {
     showSheet: false,
     weather: { status: 'idle', sat: null, nasa: null, satBase: null, nasaBase: null, errors: [] },
     weatherAt: null,
+    ver: { all: 0, fold: 0 },   // per-bill result versions, bumped by the effect in init() (see the note above `let model`)
     resetWeather() { this.weather = { status: 'idle', sat: null, nasa: null, satBase: null, nasaBase: null, errors: [] }; this.weatherAt = null; },
 
     // Called when the findings sheet opens. A missing file never fires onload, so the QR entry stays hidden.
@@ -268,7 +280,8 @@ document.addEventListener('alpine:init', () => {
     },
 
     // Findings sheet (F3): the latest 6 bills as a table, plus questions built from the results.
-    get sheet() {
+    get sheet() { return this.memo('sheet', () => this.computeSheet()); },
+    computeSheet() {
       if (!this.ready) return null;
       const rows = this.bills.filter((b) => b.start && b.end).sort((a, c) => (a.start < c.start ? -1 : 1))
         .map((b) => ({ b, r: this.result(b) })).filter((x) => x.r && x.r.pr !== null);
@@ -349,7 +362,7 @@ document.addEventListener('alpine:init', () => {
       return '';
     },
     // Earlier bills that already have an answer fold to one line once a newer bill has one too (long scroll on phones).
-    foldable(i) { return i < this.bills.reduce((n, b, k) => (this.result(b)?.pr != null ? k : n), -1); },
+    foldable(i) { this.ver.fold; return i < (model ??= raw.buildModel()).lastAnswered; },
     folded(b, i) { return this.foldable(i) && !b.expanded && this.removing !== b.id; },
     // Placeholders only (never a value): last month's numbers as a reference while typing. Nothing is saved from them.
     prevHint(i, key) { const v = i > 0 ? num(this.bills[i - 1]?.[key]) : NaN; return Number.isFinite(v) ? `last bill: ${this.fmt(v, 0)}` : ''; },
@@ -507,10 +520,70 @@ document.addEventListener('alpine:init', () => {
       this.$nextTick(() => this.focusBill(Math.min(k, this.bills.length - 1), '.bill-title h3'));
     },
     // Index of the first bill with an answer: the PR definition is shown there only, not under every dial.
-    get firstAnswered() { return this.bills.findIndex((b) => this.result(b)?.pr != null); },
+    get firstAnswered() { this.ver.fold; return (model ??= raw.buildModel()).firstAnswered; },
 
-    // One result object per bill. Only fields the bill has enough data for are filled.
+    // Everything the bill results feed into, read once so the effect in init() depends on all of it and nothing else.
+    inputKey() {
+      const w = this.weather;
+      return [this.ready, this.climate, w.status, w.sat, w.nasa, w.satBase, w.nasaBase,
+        ...Object.keys(this.s).map((k) => this.s[k]),
+        ...this.bills.flatMap((b) => [b.id, b.chargeUnit, ...BILL_FIELDS.map((k) => b[k])])];
+    },
+    // All bill results plus what is derived across bills. Built from `raw`, so it adds no reactive dependencies.
+    // Called by refreshModel, and once on first use if a template asks before init() has run. Returns { results, red, firstAnswered, lastAnswered, keys }.
+    buildModel() {
+      const results = new Map();
+      for (const b of raw.bills) results.set(b.id, raw.computeResult(b));
+      const band = (b) => results.get(b.id)?.band ?? null;
+      // Two consecutive red bills, oldest to newest (same order and rule as before: a skipped month breaks the run).
+      const ordered = raw.bills.filter((x) => x.start).sort((a, c) => (a.start < c.start ? -1 : 1));
+      const red = new Set();
+      for (let k = 1; k < ordered.length; k++) {
+        if (calc.isConsecutive(ordered[k - 1], ordered[k]) && calc.redFlag([band(ordered[k - 1]), band(ordered[k])])) red.add(ordered[k].id);
+      }
+      const answered = raw.bills.map((b) => results.get(b.id)?.pr != null);
+      // What each bill shows, as text: a bill is re-rendered only when this changes.
+      const keys = new Map(raw.bills.map((b) => [b.id, JSON.stringify([results.get(b.id), red.has(b.id)])]));
+      return { results, red, firstAnswered: answered.indexOf(true), lastAnswered: answered.lastIndexOf(true), keys };
+    },
+    // Rebuild the model and bump the versions of what changed. Readers re-run on the writes (made through the reactive
+    // proxy); the old versions are read from `raw` so this effect does not depend on its own writes.
+    // The writes wait for a microtask: Alpine runs each queued job once per flush and drops a re-trigger of a job that has
+    // already run in it, so a binding that read the old model earlier in this flush would otherwise keep showing it.
+    // The new model goes live in the same microtask, so every binding in one flush sees the same model: a child of an x-if
+    // could otherwise read the new model while its parent still shows for the old one.
+    refreshModel() {
+      const old = built ?? model, m = raw.buildModel();
+      built = m;
+      const bumped = [...m.keys].filter(([id, key]) => old?.keys.get(id) !== key).map(([id]) => id);
+      const fold = !old || old.firstAnswered !== m.firstAnswered || old.lastAnswered !== m.lastAnswered;
+      queueMicrotask(() => {
+        model = m;
+        for (const id of bumped) this.ver[id] = (raw.ver[id] ?? 0) + 1;
+        if (fold) this.ver.fold = raw.ver.fold + 1;
+        this.ver.all = raw.ver.all + 1;
+      });
+    },
+    // The model, built on first use if a template asks before init() has run. Readers depend on ver.all, which moves on
+    // every input change, so anything memoized on the model is recomputed exactly once per change.
+    get model() { this.ver.all; return model ??= raw.buildModel(); },
+    memo(name, fn) {
+      const m = this.model, c = memos.get(name);
+      if (c && c.m === m) return c.v;
+      const v = fn();
+      memos.set(name, { m, v });
+      return v;
+    },
+    // One result object per bill (null until setup is done and the bill has dates). Shared between callers: read only.
+    // Depends only on this bill's version, so a change to one bill does not re-render the others.
     result(b) {
+      this.ver[b.id];
+      const r = (model ??= raw.buildModel()).results.get(b.id);
+      // A bill added since the last refresh: work it out directly once; the refresh puts it in the model.
+      return r !== undefined ? r : raw.computeResult(Alpine.raw(b));
+    },
+    // Only fields the bill has enough data for are filled.
+    computeResult(b) {
       if (!this.ready || !this.climate) return null;
       const s = this.s, errors = [], out = { errors, flags: [], pr: null, split: null, savings: null };
       if (!b.start || !b.end) return null;
@@ -585,7 +658,8 @@ document.addEventListener('alpine:init', () => {
 
     // F8: same-month weather-adjusted PR, one year apart. Bills are paired by the month and year of their midpoint.
     // Hidden (null) until the bills span 13 months and have a weather check.
-    get degradationResult() {
+    get degradationResult() { return this.memo('degradationResult', () => this.computeDegradationResult()); },
+    computeDegradationResult() {
       if (!this.ready) return null;
       const records = [];
       for (const b of this.bills) {
@@ -598,7 +672,8 @@ document.addEventListener('alpine:init', () => {
     },
 
     // F9: sustained drop in round-trip efficiency against the owner's own first bills. null until 5 bills have one.
-    get efficiencyTrend() {
+    get efficiencyTrend() { return this.memo('efficiencyTrend', () => this.computeEfficiencyTrend()); },
+    computeEfficiencyTrend() {
       if (!this.s.hybrid) return null;
       const ordered = this.bills.filter((b) => b.start).sort((a, c) => (a.start < c.start ? -1 : 1));
       const r = calc.efficiencyDrop(ordered.map((b) => this.result(b)?.hybrid?.roundTripEfficiency ?? null));
@@ -606,7 +681,8 @@ document.addEventListener('alpine:init', () => {
     },
 
     // F9: what the battery has earned over the bills entered, against its cost if given.
-    get batteryTotal() {
+    get batteryTotal() { return this.memo('batteryTotal', () => this.computeBatteryTotal()); },
+    computeBatteryTotal() {
       if (!this.s.hybrid) return null;
       const vals = this.bills.map((b) => this.result(b)?.hybrid?.value).filter(Number.isFinite);
       if (!vals.length) return null;
@@ -615,16 +691,12 @@ document.addEventListener('alpine:init', () => {
     },
 
     // A missing month before this bill (calc.billGaps): shown on the later bill and on the sheet.
-    get gaps() { return calc.billGaps(this.bills); },
+    get gaps() { return this.memo('gaps', () => this.computeGaps()); },
+    computeGaps() { return calc.billGaps(this.bills); },
     gapBefore(b) { return this.gaps.find((g) => g.to === b.start) ?? null; },
 
-    // Two consecutive red bills, oldest to newest, ending at this bill.
-    redRaised(b) {
-      const ordered = this.bills.filter((x) => x.start).sort((a, c) => (a.start < c.start ? -1 : 1));
-      const k = ordered.findIndex((x) => x.id === b.id);
-      if (k < 1 || !calc.isConsecutive(ordered[k - 1], ordered[k])) return false;   // a skipped month breaks the run
-      return calc.redFlag(ordered.slice(0, k + 1).map((x) => this.result(x)?.band ?? null));
-    },
+    // Two consecutive red bills, oldest to newest, ending at this bill (worked out in buildModel).
+    redRaised(b) { this.ver[b.id]; return (model ??= raw.buildModel()).red.has(b.id); },
 
     num,
     listAnd: (xs) => (xs.length < 2 ? xs.join('') : xs.slice(0, -1).join(', ') + ' and ' + xs[xs.length - 1]),
@@ -645,7 +717,8 @@ document.addEventListener('alpine:init', () => {
 
     // ---- Payback (F6) ----
     // Points on the savings curve, oldest bill first. day = days since the first reading date.
-    get cumulative() {
+    get cumulative() { return this.memo('cumulative', () => this.computeCumulative()); },
+    computeCumulative() {
       const rows = this.bills.filter((b) => b.start).sort((a, c) => (a.start < c.start ? -1 : 1))
         .map((b) => ({ b, r: this.result(b) })).filter((x) => x.r && x.r.savings !== null);
       if (!rows.length) return [];
@@ -654,12 +727,14 @@ document.addEventListener('alpine:init', () => {
       return rows.map(({ b, r }) => { sum += r.savings; return { day: (Date.parse(b.end) - t0) / 86400000, saved: sum, date: b.end }; });
     },
     // Export credit left out of savings by the variable-charges cap, summed over bills with savings (audit M-3).
-    get creditLeftOut() {
+    get creditLeftOut() { return this.memo('creditLeftOut', () => this.computeCreditLeftOut()); },
+    computeCreditLeftOut() {
       return this.bills.reduce((t, b) => { const r = this.result(b); return t + (r && r.savings !== null && r.uncounted > 0 ? r.uncounted : 0); }, 0);
     },
     // Typical-year sun reads high around Manila (calc.MANILA_BIAS, audit M-4): a note on the dial and the sheet.
     get manilaBias() { return this.ready && calc.nearManila(this.s.lat, this.s.lon); },
-    get startDate() { const b = this.bills.filter((x) => x.start).sort((a, c) => (a.start < c.start ? -1 : 1))[0]; return b ? b.start : ''; },
+    get startDate() { return this.memo('startDate', () => this.computeStartDate()); },
+    computeStartDate() { const b = this.bills.filter((x) => x.start).sort((a, c) => (a.start < c.start ? -1 : 1))[0]; return b ? b.start : ''; },
 
     // Promised line: cost spread evenly over the promised years, from the first reading date.
     get promisedPerDay() {
@@ -667,7 +742,8 @@ document.addEventListener('alpine:init', () => {
       return cost > 0 && yrs > 0 ? cost / (yrs * 365.25) : null;
     },
 
-    get paybackStats() {
+    get paybackStats() { return this.memo('paybackStats', () => this.computePaybackStats()); },
+    computePaybackStats() {
       const c = this.cumulative; if (!c.length) return null;
       const last = c[c.length - 1], cost = num(this.s.cost), yrs = num(this.s.promisedYears);
       const okNum = (v) => (calc.isError(v) ? null : v);
@@ -696,7 +772,8 @@ document.addEventListener('alpine:init', () => {
     },
 
     // Chart model: pixel positions in a 340 x 200 box, clean axis ticks, one point per bill.
-    get chartModel() {
+    get chartModel() { return this.memo('chartModel', () => this.computeChartModel()); },
+    computeChartModel() {
       const c = this.cumulative; if (!c.length) return null;
       const W = 340, H = 200, L = 48, R = 16, T = 14, B = 30, pw = W - L - R, ph = H - T - B;
       const perDay = this.promisedPerDay, xMax = Math.max(c[c.length - 1].day, 30);
@@ -777,6 +854,8 @@ document.addEventListener('alpine:init', () => {
     openIntro() { this.introOpen = true; this.$nextTick(() => this.scrollTo('about')); },
     closeIntro() { this.introOpen = false; },
     init() {
+      // Rebuild the bill results once per change to any input (ticket #39, see the note above `let model`).
+      Alpine.effect(() => { this.inputKey(); this.refreshModel(); });
       this.savedSnap = this.snap();
       window.addEventListener('beforeunload', (e) => { if (this.unsaved) { e.preventDefault(); e.returnValue = ''; } });
       try { const t = localStorage.getItem('scnd-theme'); if (t === 'light' || t === 'dark') this.theme = t; } catch { /* storage blocked: stay on auto */ }
@@ -796,5 +875,5 @@ document.addEventListener('alpine:init', () => {
         m.setAttribute('content', this.theme === 'auto' ? colours[wants] : colours[this.theme]);
       });
     },
-  }));
+  }; return raw; });
 });
