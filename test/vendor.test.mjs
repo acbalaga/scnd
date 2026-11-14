@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 
 // sha256 of alpinejs@3.17.4 dist/cdn.min.js from npm, checked against the vendored file in the pre-launch audit (2 Oct 2026).
-const ALPINE_VERSION = '3.17.4-ci-check';
+const ALPINE_VERSION = '3.17.4';
 const ALPINE_SHA256 = '232519394c6c8fdba6f362b1d9da16106db513cdbf899011f00daab4051df31c';
 
 test('vendored Alpine is the npm release, plus a one-line header naming its version', () => {
