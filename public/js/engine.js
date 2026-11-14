@@ -174,9 +174,12 @@ export function paybackStats({ setup, cumulative, bills, resultOf, minDays }) {
 export function degradationFor({ setup, bills, resultOf }) {
   const records = [];
   for (const b of bills) {
-    const r = resultOf(b), pr = r?.weather?.prAdjusted;
-    // A rejected weather index or an implausible PR would put a wrong figure into the year-over-year pairs.
-    if (r && Number.isFinite(pr) && pr > 0 && !r.weatherRejected && !calc.prTooHigh(pr) && !calc.prTooLow(pr)) records.push({ year: r.midYear, month: r.midMonth, pr });
+    const r = resultOf(b), w = r?.weather, pr = w?.prAdjusted;
+    // A rejected weather index or an implausible PR would put a wrong figure into the year-over-year pairs. Months where
+    // the two sources disagreed by more than 5 points are left out too, as the PR verdict leaves them out (ticket #45).
+    if (r && Number.isFinite(pr) && pr > 0 && !w.uncertain && !r.weatherRejected && !calc.prTooHigh(pr) && !calc.prTooLow(pr)) {
+      records.push({ year: r.midYear, month: r.midMonth, pr, days: w.days, source: w.source });
+    }
   }
   const warrantyPct = num(setup.warrantyPct), d = calc.degradation(records, warrantyPct);
   return d && !calc.isError(d) ? { ...d, warrantyPct } : null;

@@ -375,20 +375,37 @@ export function loadShiftValue({ rImport, rExport }) {
 
 // ---------- F8: degradation ----------
 
-// records: [{ year, month, pr }] where pr is weather-normalised (computed on actual-month POA).
+// records: [{ year, month, pr, days?, source? }] where pr is weather-normalised (computed on actual-month POA).
 // Averages the year-over-year loss for each calendar month that has a twin 12 months earlier.
 // Returns null until the records span 13 months. warrantyPctPerYear is optional.
+// Ticket #45 (Fred, 14 Nov 2026):
+//  - Records in the same month (28-day cycles, a short bill after a meter change) are averaged, weighted by days, instead
+//    of the later one silently replacing the earlier.
+//  - A pair counts only when both months came from the same weather source ('both' = cross-checked, or one source
+//    alone), so a switch between sources is not read as degradation. A month that mixes sources pairs with nothing.
+//    Records without a source pair freely.
+//  - minLossPct and maxLossPct give the spread of the pair losses: one month's sun data carries 5 to 10% noise.
 export function degradation(records, warrantyPctPerYear) {
   if (!Array.isArray(records) || records.some((r) => !Number.isFinite(r.pr) || r.pr <= 0)) return err('bad_input', 'Need records with pr > 0.');
   const idx = (r) => r.year * 12 + (r.month - 1);
-  const byIdx = new Map(records.map((r) => [idx(r), r.pr]));
+  const byIdx = new Map();
+  for (const r of records) {
+    const w = Number.isFinite(r.days) && r.days > 0 ? r.days : 1, k = idx(r), m = byIdx.get(k);
+    if (!m) byIdx.set(k, { sum: r.pr * w, w, source: r.source });
+    else { m.sum += r.pr * w; m.w += w; if (m.source !== r.source) m.source = 'mixed'; }
+  }
   const keys = [...byIdx.keys()];
   if (keys.length === 0 || Math.max(...keys) - Math.min(...keys) < 12) return null;
   const losses = [];
-  for (const [k, pr] of byIdx) if (byIdx.has(k - 12)) losses.push((1 - pr / byIdx.get(k - 12)) * 100);
+  for (const [k, m] of byIdx) {
+    const prev = byIdx.get(k - 12);
+    if (!prev || m.source === 'mixed' || prev.source !== m.source) continue;
+    losses.push((1 - m.sum / m.w / (prev.sum / prev.w)) * 100);
+  }
   if (losses.length === 0) return null;
   const annualLossPct = losses.reduce((s, v) => s + v, 0) / losses.length;
-  return { annualLossPct, pairs: losses.length, exceedsWarranty: Number.isFinite(warrantyPctPerYear) ? annualLossPct > warrantyPctPerYear : null };
+  return { annualLossPct, pairs: losses.length, minLossPct: Math.min(...losses), maxLossPct: Math.max(...losses),
+    exceedsWarranty: Number.isFinite(warrantyPctPerYear) ? annualLossPct > warrantyPctPerYear : null };
 }
 
 // ---------- F9: hybrid balance ----------

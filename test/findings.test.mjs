@@ -100,3 +100,8 @@ test('findings edge (M-3): before a year, the credit caveat joins the awareness 
   const none = findings({ bills: [bill()], payback: { saved: 8000, promised: 10000, days: PAYBACK_MIN_DAYS }, creditLeftOut: 0 });
   assert.ok(!/carries over/.test(none.items.find((i) => i.id === 'payback').text));
 });
+
+test('findings golden: the degradation question gives the spread of the pairs (ticket #45)', () => {
+  const r = findings({ bills: [bill()], payback: null, degradation: { annualLossPct: 2.3, pairs: MIN_DEGRADATION_PAIRS, minLossPct: -0.5, maxLossPct: 4.1, exceedsWarranty: true, warrantyPct: 0.5 } });
+  assert.match(r.items.find((i) => i.id === 'degradation').text, /pairs range from up 0\.5% to down 4\.1%/);
+});

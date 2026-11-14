@@ -570,6 +570,13 @@ document.addEventListener('alpine:init', () => {
     get degradationResult() { return this.memo('degradationResult', () => this.computeDegradationResult()); },
     computeDegradationResult() { return this.ready ? engine.degradationFor({ setup: this.s, bills: this.bills, resultOf: (b) => this.result(b) }) : null; },
 
+    // Spread of the year-over-year pairs, as change in PR (ticket #45). Empty with one pair.
+    get degradationSpread() {
+      const d = this.degradationResult; if (!d || d.pairs < 2) return '';
+      const ch = (loss) => `${loss >= 0 ? 'down' : 'up'} ${this.fmt(Math.abs(loss), 1)}%`;
+      return `Single pairs range from ${ch(d.minLossPct)} to ${ch(d.maxLossPct)}. One month's sun data can be off by 5 to 10%, so the range stays wide until many months are paired.`;
+    },
+
     // F9: sustained drop in round-trip efficiency against the owner's own first bills. null until 5 bills have one.
     get efficiencyTrend() { return this.memo('efficiencyTrend', () => this.computeEfficiencyTrend()); },
     computeEfficiencyTrend() { return engine.efficiencyFor({ setup: this.s, bills: this.bills, resultOf: (b) => this.result(b) }); },

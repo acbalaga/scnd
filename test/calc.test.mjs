@@ -274,6 +274,23 @@ test('degradation edge: null under 13 months, error on bad pr', () => {
   assert.equal(c.degradation(months(2025, 0.8)), null);
   assert.ok(c.isError(c.degradation([{ year: 2025, month: 1, pr: 0 }])));
 });
+// Ticket #45 (Fred, 14 Nov 2026). Two bills whose midpoints fall in the same month used to overwrite each other.
+test('degradation edge: bills in the same month are averaged by days, not dropped', () => {
+  const r = c.degradation([{ year: 2025, month: 3, pr: 0.80 }, { year: 2026, month: 3, pr: 0.60, days: 10 }, { year: 2026, month: 3, pr: 0.80, days: 30 }, { year: 2026, month: 4, pr: 0.8 }]);
+  // March 2026 = (0.60 x 10 + 0.80 x 30) / 40 = 0.75, against 0.80 a year earlier: 6.25% down.
+  assert.equal(r.pairs, 1); assert.ok(Math.abs(r.annualLossPct - 6.25) < 1e-9);
+});
+test('degradation edge: a pair needs both months from the same weather source', () => {
+  const recs = [{ year: 2025, month: 1, pr: 0.80, source: 'both' }, { year: 2025, month: 2, pr: 0.80, source: 'nasa' }, { year: 2025, month: 3, pr: 0.80, source: 'nasa' },
+    { year: 2026, month: 1, pr: 0.79, source: 'both' }, { year: 2026, month: 2, pr: 0.70, source: 'both' }, { year: 2026, month: 3, pr: 0.79, source: 'nasa' }];
+  const r = c.degradation(recs);
+  assert.equal(r.pairs, 2);   // January (both, both) and March (nasa, nasa); February mixes sources and is skipped
+  assert.ok(Math.abs(r.annualLossPct - 1.25) < 1e-9);
+});
+test('degradation golden: the spread of the pair losses is returned', () => {
+  const r = c.degradation([...months(2025, 0.8), { year: 2026, month: 1, pr: 0.78 }, { year: 2026, month: 2, pr: 0.80 }, { year: 2026, month: 3, pr: 0.784 }]);
+  assert.equal(r.pairs, 3); assert.ok(Math.abs(r.minLossPct - 0) < 1e-9); assert.ok(Math.abs(r.maxLossPct - 2.5) < 1e-9);
+});
 test('degradation edge: loss above warranty is flagged', () => {
   const r = c.degradation([...months(2025, 0.8), { year: 2026, month: 1, pr: 0.78 }], 1.0);
   near(r.annualLossPct, 2.5); assert.equal(r.exceedsWarranty, true);

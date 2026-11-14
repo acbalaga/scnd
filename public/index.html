@@ -542,6 +542,8 @@
         <section class="card">
           <h3>Year over year</h3>
           <p x-text="'Comparing the same months a year apart, weather-adjusted PR changed by about ' + fmt(Math.abs(degradationResult.annualLossPct), 1) + '% a year (' + (degradationResult.annualLossPct >= 0 ? 'down' : 'up') + '), across ' + degradationResult.pairs + ' pair' + (degradationResult.pairs === 1 ? '' : 's') + '.' + (degradationResult.exceedsWarranty === null ? '' : (degradationResult.exceedsWarranty ? ' That is more than the ' + fmt(degradationResult.warrantyPct, 2) + '% a year in your module warranty.' : ' That is within the ' + fmt(degradationResult.warrantyPct, 2) + '% a year in your module warranty.'))"></p>
+          <!-- Ticket #45 (14 Nov 2026): spread of the same-month pairs, from calc.degradation. -->
+          <p class="help" x-show="degradationSpread" x-text="degradationSpread"></p>
           <p class="help">One year of degradation is small next to month-to-month noise in the sun data, so one or two pairs mean little. It becomes more useful as the pairs build up over two or more years.</p>
           <div class="flag" x-show="degradationResult.pairs < minPairs"><strong>Early reading.</strong> <span x-text="'Fewer than ' + minPairs + ' pairs, so this is too few months to act on. It is shown so you know it is being tracked. Keep adding bills.'"></span></div>
         </section>

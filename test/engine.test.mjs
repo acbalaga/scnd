@@ -125,3 +125,11 @@ test('engine golden: the weather check adjusts PR; a degradation record skips a 
   near(r.weather.wi, 0.9, 1e-9); assert.equal(r.basis, 'weather'); near(r.pr, r.prTypical / 0.9, 1e-9); assert.equal(r.band, 'green');
   assert.equal(e.degradationFor({ setup, bills: [b], resultOf: () => ({ ...r, weatherRejected: true }) }), null);
 });
+
+test('engine edge: year-over-year leaves out months where the weather sources disagreed (ticket #45)', () => {
+  const rec = (year, month, pr, extra = {}) => ({ midYear: year, midMonth: month, weather: { prAdjusted: pr, uncertain: false, source: 'both', days: 30, ...extra } });
+  const rows = [rec(2025, 1, 0.8), rec(2025, 2, 0.8), ...Array.from({ length: 10 }, (_, k) => rec(2025, k + 3, 0.8)), rec(2026, 1, 0.79), rec(2026, 2, 0.6, { uncertain: true })];
+  const bills = rows.map((_, k) => ({ id: k })), resultOf = (b) => rows[b.id];
+  const d = e.degradationFor({ setup: { warrantyPct: 0.5 }, bills, resultOf });
+  assert.equal(d.pairs, 1); assert.ok(Math.abs(d.annualLossPct - 1.25) < 1e-9); assert.equal(d.warrantyPct, 0.5);
+});
