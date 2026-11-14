@@ -67,3 +67,18 @@ export function parse(text) {
   }
   return { setup, bills };
 }
+
+// "Keep my data on this device" (ticket #43, Fred, 14 Nov 2026). Opt-in. The kept copy is the same text a save file holds,
+// stored in this browser's local storage under STORAGE_KEY, and read back through parse(), so a damaged or edited copy
+// gets the same checks as a hostile file. Never sent anywhere. The made-up examples are never kept.
+export const STORAGE_KEY = 'scnd-data';
+// Text to keep, or null when nothing should be written (an example is on screen).
+export function keptText({ setup, bills, example, savedOn = new Date() }) {
+  return example ? null : serialize(setup, bills, savedOn);
+}
+// { setup, bills } from a kept copy, or null when there is none or it fails the save-file checks.
+export function restoreKept(text) {
+  if (typeof text !== 'string' || !text) return null;
+  const r = parse(text);
+  return r.error ? null : r;
+}

@@ -26,7 +26,7 @@ Save and load use a JSON file on the owner's own device. "Try an example" fills 
 
 - User inputs never leave the browser. The only outbound calls are weather lookups to Open-Meteo and NASA POWER, made when the owner clicks "Check the weather", with the location rounded to 0.1° (about 11 km).
 - The typical-year sun data is a static file (`public/data/ph-grid.json`), so F1 needs no lookup.
-- The only thing stored on your device is your Auto, Light or Dark choice (in the browser's local storage), and only if you pick one. There are no cookies.
+- The browser's local storage holds your Auto, Light or Dark choice if you pick one, and your setup and bills only if you tick "Keep my data on this device" (untick to delete them). Nothing in it is sent anywhere. There are no cookies.
 - SCND runs no server code. Cloudflare serves the files and sees visitors' IP addresses, like any web host; nothing of SCND's logs or stores them.
 
 ## Layout

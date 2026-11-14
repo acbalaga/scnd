@@ -4,7 +4,7 @@ import * as calc from './calc.js';
 import * as engine from './engine.js';
 import { loadGrid, lookup, isLowDiffuse } from './grid.js';
 import { fetchSatellite, fetchNasa, SOURCE_LABELS } from './weather.js';
-import { serialize, parse } from './data.js';
+import { serialize, parse, keptText, restoreKept, STORAGE_KEY } from './data.js';
 import { EXAMPLES, exampleBills } from './examples.js';
 import { findings, MIN_DEGRADATION_PAIRS, PAYBACK_MIN_DAYS } from './findings.js';
 
@@ -117,6 +117,11 @@ document.addEventListener('alpine:init', () => {
     started: false,   // landing shows the hero first; the setup form opens on "Check my system"
     example: false,
     savedOnce: false,
+    // "Keep my data on this device" (ticket #43): opt-in, local storage in this browser only. keepOk is false after a
+    // failed write (private window, storage full or blocked), so the leave-page prompt comes back.
+    keep: false,
+    keepOk: false,
+    keepMsg: '',
     saveNudgeHidden: false,
     feedbackHref: FEEDBACK_URL,
     kofiHref: KOFI_URL,
@@ -257,15 +262,48 @@ document.addEventListener('alpine:init', () => {
       if (!file) return;
       const r = parse(await file.text());
       if (r.error) { this.fileMessage = r.error; return; }
+      await this.applyLoaded(r);
+      this.fileMessage = this.ready ? `Loaded ${this.bills.length} bill${this.bills.length === 1 ? '' : 's'}.` : '';
+    },
+    // Puts a parsed save file (or the kept copy) on screen, then runs setup on it. A kept copy can hold a setup the owner
+    // had not finished: then the form opens with what they typed, without error messages.
+    async applyLoaded(r, { kept = false } = {}) {
       this.place = r.setup.place;
       this.s = { ...this.s, ...r.setup };
       this.bills = r.bills.length ? r.bills.map((b, k, all) => ({ ...b, id: nextId++, open: k === all.length - 1 })) : [newBill()];
       this.example = false; this.savedOnce = true;
       this.resetWeather();
       this.ready = false; this.showSheet = false;
-      await this.continueSetup();
+      const s = this.s, done = Number.isFinite(num(s.lat)) && Number.isFinite(num(s.lon)) && num(s.kWp) > 0 && num(s.acKw) > 0;
+      if (kept && !done) { this.started = true; this.setupOpen = true; }
+      else await this.continueSetup();
       this.savedSnap = this.snap();
-      this.fileMessage = this.ready ? `Loaded ${this.bills.length} bill${this.bills.length === 1 ? '' : 's'}.` : '';
+    },
+    // Tick: keep a copy now (the effect in init() keeps it up to date). Untick: delete the kept copy. The theme stays.
+    setKeep(on) {
+      this.keep = on;
+      if (!on) {
+        try { localStorage.removeItem(STORAGE_KEY); } catch { /* nothing kept */ }
+        // Nothing holds the data now, so leaving the page asks first again (unless it was just saved to a file).
+        this.keepOk = false; this.savedSnap = ''; this.keepMsg = 'Deleted from this device. Use "Save" to keep a file instead.';
+        return;
+      }
+      this.writeKept();
+      if (this.keepOk) this.keepMsg = 'Kept on this device. Your setup and bills open again next time you visit SCND in this browser.';
+    },
+    writeKept() {
+      const text = keptText({ setup: { ...this.s, place: this.place }, bills: this.bills, example: this.example });
+      if (text === null) return;
+      try { localStorage.setItem(STORAGE_KEY, text); this.keepOk = true; }
+      catch { this.keepOk = false; this.keepMsg = 'This browser would not keep the data (a private window, or storage is full or blocked). Use "Save" to keep a file instead.'; }
+    },
+    // The kept copy, if there is one and it passes the save-file checks. A copy that fails them is deleted.
+    readKept() {
+      let text = null;
+      try { text = localStorage.getItem(STORAGE_KEY); } catch { return null; }
+      const r = restoreKept(text);
+      if (text !== null && !r) { try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ } }
+      return r;
     },
 
     // Findings sheet (F3): the latest 6 bills as a table, plus questions built from the results.
@@ -456,6 +494,8 @@ document.addEventListener('alpine:init', () => {
     // Made-up systems from examples.js: 'ongrid' (two bills, quick look) or 'hybrid' (14 months, battery, payback).
     async loadExample(kind = 'ongrid') {
       const ex = EXAMPLES[kind];
+      // Flag the example before its setup lands, so the kept copy (ticket #43) is never written with example data.
+      this.example = kind;
       this.place = ex.place;
       this.s = { ...this.s, ...ex.setup };
       await this.continueSetup();
@@ -466,6 +506,9 @@ document.addEventListener('alpine:init', () => {
       this.$nextTick(() => this.focusBill(0, '.bill-title h3'));
     },
     clearExample() {
+      // With "Keep my data" on, "Start with mine" brings back the owner's own kept setup and bills.
+      const kept = this.keep ? this.readKept() : null;
+      if (kept) { this.example = false; this.applyLoaded(kept, { kept: true }); return; }
       this.example = false; this.ready = false; this.setupOpen = true; this.started = true; this.place = '';
       setTimeout(() => { this.scrollTo('setup'); document.querySelector('[x-ref=fPlace]')?.focus({ preventScroll: true }); }, 50);
       this.s = { lat: '', lon: '', kWp: '', acKw: '', tilt: 10, azimuth: 0, commissioned: '', hybrid: false, netMetering: false, cost: '', promisedYears: '', warrantyPct: '', batteryCost: '' };
@@ -706,7 +749,7 @@ document.addEventListener('alpine:init', () => {
     // Unsaved-changes prompt: compares what a save would write with what was last saved or loaded. Nothing is stored.
     savedSnap: '',
     snap() { return serialize({ ...this.s, place: this.place }, this.bills, new Date(0)); },
-    get unsaved() { return !this.example && this.snap() !== this.savedSnap; },
+    get unsaved() { return !this.example && !(this.keep && this.keepOk) && this.snap() !== this.savedSnap; },
     // Explainer: hidden until asked for. Nothing is stored.
     // Share the site address only: the OS share sheet where the browser has one, else copy to the clipboard.
     shareMsg: '',
@@ -728,6 +771,10 @@ document.addEventListener('alpine:init', () => {
       // Rebuild the bill results once per change to any input (ticket #39, see the note above `let model`).
       Alpine.effect(() => { this.inputKey(); this.refreshModel(); });
       this.savedSnap = this.snap();
+      // Kept copy (ticket #43): open it, then keep it current on every change while the box is ticked.
+      const kept = this.readKept();
+      if (kept) { this.keep = true; this.keepOk = true; this.started = true; this.applyLoaded(kept, { kept: true }); }
+      Alpine.effect(() => { this.snap(); if (this.keep && !this.example) this.writeKept(); });
       window.addEventListener('beforeunload', (e) => { if (this.unsaved) { e.preventDefault(); e.returnValue = ''; } });
       try { const t = localStorage.getItem('scnd-theme'); if (t === 'light' || t === 'dark') this.theme = t; } catch { /* storage blocked: stay on auto */ }
       this.applyTheme();
