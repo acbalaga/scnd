@@ -9,7 +9,7 @@
 // BUILD is a hash of the files in SHELL: test/sw.test.mjs fails when a listed file changes and BUILD does not, and
 // `node scripts/sw-version.mjs` updates it. A new BUILD installs a fresh copy and deletes the old one.
 // Kill switch: docs/SERVICE-WORKER.md has a sw.js that removes itself and its cache from every visitor.
-const BUILD = 'f37d26f7ca26';
+const BUILD = '7ade0a659791';
 const CACHE = `scnd-${BUILD}`;
 // SHELL-START
 const SHELL = [

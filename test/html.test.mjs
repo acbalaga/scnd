@@ -65,6 +65,12 @@ test('html: the footer says who runs SCND and where a data question goes', () =>
   assert.match(foot, /<p class="foot-note" x-show="feedbackHref">Please leave bill and account numbers out of feedback\.<\/p>/);
 });
 
+test('html: the footer links to the source code and names its licence (AGPL-3.0 section 13)', () => {
+  const foot = html.slice(html.indexOf('<footer class="foot">'));
+  assert.match(foot, /<a href="https:\/\/github\.com\/acbalaga\/scnd" target="_blank" rel="noopener noreferrer">Source code<\/a> \(AGPL-3\.0\)\./);
+  assert.match(readFileSync(new URL('../LICENSE', import.meta.url), 'utf8'), /GNU AFFERO GENERAL PUBLIC LICENSE\s+Version 3/);
+});
+
 // Guide pages (Reach batch, 31 Oct 2026): plain HTML for search and sharing. No script beyond the theme line, which
 // must be byte-identical to index.html's so the CSP hash in public/_headers covers it.
 import { readdirSync } from 'node:fs';
