@@ -328,7 +328,7 @@ Pre-flip check of the repo before switching `acbalaga/scnd` from private to publ
 - [x] Cloudflare account subdomain (`scnd.<account>.workers.dev`) masked in `docs/pre-launch-audit.md`. workers.dev is off anyway.
 - [x] Workflows are safe on a public repo: `test.yml` runs on `pull_request` (not `pull_request_target`) with a read-only token and `persist-credentials: false`; `source-health.yml` runs on schedule and manual dispatch only, so a fork cannot trigger its write token.
 - [x] Tests: 195 pass.
-- [ ] **Fred: history.** Older commits still show the employer names (from the first commit to 2ba2e96) and the personal Gmail in 6 commit author fields (audit L-6). Either accept that, or rewrite history before the flip (force-push to `main`, all clones go stale).
-- [ ] **Fred: licence.** No `LICENSE` file, so public code is "all rights reserved" by default: people can read it but not reuse it.
+- [x] **History: left as is** (Fred, 27 Nov 2026). Older commits still show the employer names (from the first commit to 2ba2e96) and the personal Gmail in 6 commit author fields (audit L-6). Either accept that, or rewrite history before the flip (force-push to `main`, all clones go stale). No employer data is in them, only the names.
+- [x] **Licence:** AGPL-3.0 (Fred asked for the best fit, 27 Nov 2026). `LICENSE` is the official text; README lists the third-party licences (Alpine MIT, fonts OFL 1.1, Open-Meteo CC BY 4.0).
 - [ ] **Fred: after the flip.** Settings > Code security: turn on secret scanning and push protection (free on public repos). Settings > Actions > General: keep "Require approval for first-time contributors". Add a branch rule on `main` (P2-16).
 - Left as is, already public on the live site: the name Alfred Balaga, contact@alfredbalaga.com, the Ko-fi link and the GCash QR (masked payee).

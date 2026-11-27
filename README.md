@@ -72,3 +72,13 @@ Against Global Solar Atlas long-term monthly GHI, 2020 to 2023:
 | Open-Meteo archive (reanalysis) | +11.8% (FAIL, Manila) | 0.81 to 0.89 |
 
 Decision: NASA POWER climatology for the typical year (F1). Himawari as a ratio to its own 2020 to 2025 baseline for the weather index (F4), cross-checked against NASA. Reanalysis dropped. The spike pages and the `/api/pvgis` and `/api/gsa` proxy routes are in git history (last at commit `fba1128`).
+
+## Licence
+
+SCND's code is © 2026 Alfred Balaga, licensed under the GNU Affero General Public License v3.0 (`LICENSE`). You may read, change and reuse it. If you run a modified copy as a website, you must offer its source to the people who use it, so a copy cannot quietly drop the privacy promise.
+
+Third-party parts keep their own licences:
+
+- `public/vendor/alpine.min.js`: Alpine.js CSP build, MIT.
+- `public/fonts/`: Pixelify Sans, DSEG7 Classic, Chivo, Chivo Mono, Source Serif 4 and Source Sans 3, SIL Open Font Licence 1.1 (licence files alongside).
+- Weather data: NASA POWER (NASA Langley Research Center, free to use) and Open-Meteo (CC BY 4.0), credited in the app.
