@@ -145,7 +145,7 @@ The biggest risk is a false red flag that sends an owner to fight an installer o
 | Users treat output as a verdict on their installer | Reputational heat for you | Findings sheet framed as "questions to ask", no installer names stored or shown, disclaimer that it is a screening check, not an inspection |
 | Open-Meteo CORS or terms change | F4 breaks | NASA POWER alone (shown as inferred), then typical-only; non-commercial use only. Himawari has holes in 2026 today, which the fallback already covers |
 | Bot traffic | Free-plan Worker request cap reached, site unavailable | Removed 14 Nov 2026: no Worker script runs, and static asset requests have no cap (ticket #37) |
-| Employer IP overlap | Ownership dispute | Low: residential net-metering is outside NAC's business. Build on personal hardware and time anyway, and keep it off company devices this time |
+| Employer IP overlap | Ownership dispute | Low: residential net-metering is outside the employer's business. Built on personal hardware and time, off company devices |
 
 **Out of scope:** diagnosing specific faults, string-level data, cell-level or SoC-curve battery analysis (v1 works from monthly charge and discharge totals), anything above 100 kW.
 
